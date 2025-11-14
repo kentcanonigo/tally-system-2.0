@@ -1,0 +1,241 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi } from '../services/api';
+import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
+
+function TallySessionDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [session, setSession] = useState<TallySession | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [plant, setPlant] = useState<Plant | null>(null);
+  const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
+  const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
+  const [formData, setFormData] = useState({
+    weight_classification_id: 0,
+    required_bags: 0,
+    allocated_bags: 0,
+  });
+
+  useEffect(() => {
+    if (id) {
+      fetchData();
+    }
+  }, [id]);
+
+  const fetchData = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const sessionRes = await tallySessionsApi.getById(Number(id));
+      const sessionData = sessionRes.data;
+      setSession(sessionData);
+
+      const [customerRes, plantRes, allocationsRes, wcRes] = await Promise.all([
+        customersApi.getById(sessionData.customer_id),
+        plantsApi.getById(sessionData.plant_id),
+        allocationDetailsApi.getBySession(Number(id)),
+        weightClassificationsApi.getByPlant(sessionData.plant_id),
+      ]);
+
+      setCustomer(customerRes.data);
+      setPlant(plantRes.data);
+      setAllocations(allocationsRes.data);
+      setWeightClassifications(wcRes.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      alert('Error fetching session details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingAllocation(null);
+    setFormData({
+      weight_classification_id: weightClassifications[0]?.id || 0,
+      required_bags: 0,
+      allocated_bags: 0,
+    });
+    setShowModal(true);
+  };
+
+  const handleEdit = (allocation: AllocationDetails) => {
+    setEditingAllocation(allocation);
+    setFormData({
+      weight_classification_id: allocation.weight_classification_id,
+      required_bags: allocation.required_bags,
+      allocated_bags: allocation.allocated_bags,
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      if (editingAllocation) {
+        await allocationDetailsApi.update(editingAllocation.id, formData);
+      } else {
+        await allocationDetailsApi.create(Number(id), formData);
+      }
+      setShowModal(false);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error saving allocation:', error);
+      alert(error.response?.data?.detail || 'Error saving allocation');
+    }
+  };
+
+  const handleDelete = async (allocationId: number) => {
+    if (!confirm('Are you sure you want to delete this allocation?')) return;
+    try {
+      await allocationDetailsApi.delete(allocationId);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting allocation:', error);
+      alert('Error deleting allocation');
+    }
+  };
+
+  const getWeightClassificationName = (wcId: number) => {
+    return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!session) {
+    return <div>Session not found</div>;
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <button className="btn btn-secondary" onClick={() => navigate('/tally-sessions')} style={{ marginBottom: '20px' }}>
+          ← Back to Sessions
+        </button>
+        <h1>Tally Session #{session.id}</h1>
+        <p>
+          Customer: {customer?.name} | Plant: {plant?.name} | Date: {new Date(session.date).toLocaleDateString()}
+        </p>
+        <p>
+          Status: <span className={`status-badge status-${session.status}`}>{session.status}</span>
+        </p>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <button className="btn btn-primary" onClick={handleCreate}>
+          Add Allocation
+        </button>
+      </div>
+
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Weight Classification</th>
+              <th>Required Bags</th>
+              <th>Allocated Bags</th>
+              <th>Difference</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allocations.map((allocation) => {
+              const difference = allocation.allocated_bags - allocation.required_bags;
+              return (
+                <tr key={allocation.id}>
+                  <td>{allocation.id}</td>
+                  <td>{getWeightClassificationName(allocation.weight_classification_id)}</td>
+                  <td>{allocation.required_bags}</td>
+                  <td>{allocation.allocated_bags}</td>
+                  <td style={{ color: difference >= 0 ? '#27ae60' : '#e74c3c' }}>
+                    {difference >= 0 ? '+' : ''}{difference.toFixed(2)}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleEdit(allocation)}
+                      style={{ marginRight: '10px' }}
+                    >
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(allocation.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="modal" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingAllocation ? 'Edit Allocation' : 'Add Allocation'}</h2>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Weight Classification</label>
+                <select
+                  value={formData.weight_classification_id}
+                  onChange={(e) =>
+                    setFormData({ ...formData, weight_classification_id: Number(e.target.value) })
+                  }
+                  required
+                >
+                  <option value="">Select classification</option>
+                  {weightClassifications.map((wc) => (
+                    <option key={wc.id} value={wc.id}>
+                      {wc.classification} ({wc.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Required Bags</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.required_bags}
+                  onChange={(e) => setFormData({ ...formData, required_bags: parseFloat(e.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Allocated Bags</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.allocated_bags}
+                  onChange={(e) => setFormData({ ...formData, allocated_bags: parseFloat(e.target.value) })}
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {editingAllocation ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default TallySessionDetail;
+
