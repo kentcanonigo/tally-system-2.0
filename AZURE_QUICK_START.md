@@ -32,11 +32,17 @@ Quick guide to get your Tally System running on Azure free tier.
 
 **Get Connection String:**
 - Go to database → Connection strings
-- Copy ADO.NET connection string
-- Format for SQLAlchemy:
+- Copy "ADO.NET (SQL authentication)" connection string
+- It looks like: `Server=tcp:SERVER.database.windows.net,1433;Initial Catalog=tally-system-db;User ID=tallyadmin;Password={your_password};...`
+- Convert to SQLAlchemy format:
   ```
   mssql+pyodbc://tallyadmin:PASSWORD@SERVER.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
   ```
+- **Quick tip**: Extract from ADO.NET:
+  - `Server=tcp:...` → Server name (remove `tcp:` and `,1433`)
+  - `Initial Catalog=...` → Database name
+  - `User ID=...` → Username
+  - `Password=...` → Password (replace `{your_password}`)
 
 ### 3. Configure Database Firewall (1 min)
 

@@ -66,21 +66,46 @@ This guide will help you deploy the Tally System to Azure using free tier servic
 
 1. Go to your SQL database in Azure Portal
 2. Click "Connection strings" in left menu
-3. Copy the "ADO.NET" connection string
-4. Format it for SQLAlchemy (replace placeholders):
+3. Copy the "ADO.NET (SQL authentication)" connection string
+4. It will look like this:
    ```
-   mssql+pyodbc://tallyadmin:YOUR_PASSWORD@tally-system-sql-XXXX.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+   Server=tcp:tally-system-sql.database.windows.net,1433;Initial Catalog=tally-system-db;Persist Security Info=False;User ID=tallyadmin;Password={your_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+   ```
+
+5. Convert it to SQLAlchemy format:
+   
+   **From ADO.NET format:**
+   ```
+   Server=tcp:SERVER_NAME.database.windows.net,1433;Initial Catalog=DATABASE_NAME;User ID=USERNAME;Password=PASSWORD;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
    ```
    
-   **Important**: Replace:
-   - `YOUR_PASSWORD` with your actual database password
-   - `tally-system-sql-XXXX` with your actual server name
-   - `tally-system-db` with your database name
+   **To SQLAlchemy format:**
+   ```
+   mssql+pyodbc://USERNAME:PASSWORD@SERVER_NAME.database.windows.net:1433/DATABASE_NAME?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+   ```
    
-   **Example**:
-   ```
-   mssql+pyodbc://tallyadmin:MySecurePass123!@tally-system-sql-abc123.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
-   ```
+   **Example conversion:**
+   - ADO.NET: `Server=tcp:tally-system-sql.database.windows.net,1433;Initial Catalog=tally-system-db;User ID=tallyadmin;Password=MyPass123!;...`
+   - SQLAlchemy: `mssql+pyodbc://tallyadmin:MyPass123!@tally-system-sql.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30`
+   
+   **Quick conversion steps:**
+   1. Extract values from ADO.NET string:
+      - `Server=tcp:...` → Server name (remove `tcp:` and `,1433`)
+      - `Initial Catalog=...` → Database name
+      - `User ID=...` → Username
+      - `Password=...` → Password (replace `{your_password}` with actual password)
+   2. Format as: `mssql+pyodbc://USERNAME:PASSWORD@SERVER:1433/DATABASE?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30`
+   
+   **Note**: If your password contains special characters, URL encode them:
+   - `@` → `%40`
+   - `#` → `%23`
+   - `$` → `%24`
+   - `%` → `%25`
+   - `&` → `%26`
+   - `+` → `%2B`
+   - `=` → `%3D`
+   
+   **Or use the helper script**: Run `python backend/convert_connection_string.py` to automatically convert your ADO.NET string.
 
 ## Step 6: Deploy Backend (Azure App Service)
 

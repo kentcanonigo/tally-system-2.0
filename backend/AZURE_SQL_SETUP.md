@@ -2,11 +2,35 @@
 
 ## Connection String Format
 
-For Azure SQL Database, use this format:
+Azure Portal provides ADO.NET connection strings. Convert them to SQLAlchemy format:
 
+### ADO.NET Format (from Azure Portal):
 ```
-mssql+pyodbc://USERNAME:PASSWORD@SERVER.database.windows.net:1433/DATABASE_NAME?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+Server=tcp:tally-system-sql.database.windows.net,1433;Initial Catalog=tally-system-db;Persist Security Info=False;User ID=tallyadmin;Password={your_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 ```
+
+### SQLAlchemy Format (for Python):
+```
+mssql+pyodbc://tallyadmin:PASSWORD@tally-system-sql.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+```
+
+### Conversion Guide:
+
+1. **Extract from ADO.NET:**
+   - `Server=tcp:...` → Remove `tcp:` and `,1433` → `SERVER.database.windows.net`
+   - `Initial Catalog=...` → Database name
+   - `User ID=...` → Username
+   - `Password=...` → Password (replace `{your_password}`)
+
+2. **Format as SQLAlchemy:**
+   ```
+   mssql+pyodbc://USERNAME:PASSWORD@SERVER:1433/DATABASE?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+   ```
+
+3. **Use helper script:**
+   ```bash
+   python backend/convert_connection_string.py
+   ```
 
 ## Important Parameters
 
