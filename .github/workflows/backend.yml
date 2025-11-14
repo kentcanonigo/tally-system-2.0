@@ -40,12 +40,18 @@ jobs:
         docker build -t tally-backend:latest .
       continue-on-error: true  # Continue even if Docker build fails (Azure will build it)
     
+    - name: Azure Login
+      if: github.ref == 'refs/heads/main'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      continue-on-error: false
+
     - name: Deploy to Azure App Service
       if: github.ref == 'refs/heads/main'
       uses: azure/webapps-deploy@v2
       with:
         app-name: 'tally-system-backend'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ./backend
         startup-command: 'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000'
 

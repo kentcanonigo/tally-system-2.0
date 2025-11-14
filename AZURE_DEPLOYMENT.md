@@ -153,24 +153,51 @@ The backend needs `pyodbc` and ODBC Driver for SQL Server. These are already inc
 
 **Option A: Using GitHub Actions (Recommended)**
 
-1. Push your code to GitHub (if not already):
+1. **Set up Azure Service Principal** (for GitHub Actions authentication):
+   
+   **Option 1: Using Azure CLI** (Recommended):
+   ```bash
+   # Install Azure CLI if not already installed
+   # Login to Azure
+   az login
+   
+   # Create service principal (replace with your subscription ID and resource group)
+   az ad sp create-for-rbac --name "tally-system-github-actions" \
+     --role contributor \
+     --scopes /subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/tally-system-rg \
+     --sdk-auth
+   ```
+   
+   Copy the JSON output and add it as a GitHub secret:
+   - Go to your GitHub repository
+   - Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `AZURE_CREDENTIALS`
+   - Value: Paste the entire JSON output from the command above
+   
+   **Option 2: Using Azure Portal**:
+   - Go to Azure Portal → Subscriptions → Your subscription → Access control (IAM)
+   - Add role assignment → Contributor → Select your GitHub account
+   - Or create a service principal in Azure Active Directory
+
+2. Push your code to GitHub (if not already):
    ```bash
    git add .
    git commit -m "Ready for Azure deployment"
    git push origin main
    ```
 
-2. In Azure Portal, go to your App Service
-3. Click "Deployment Center" in left menu
-4. Choose:
+3. In Azure Portal, go to your App Service
+4. Click "Deployment Center" in left menu
+5. Choose:
    - **Source**: GitHub
    - **Organization**: Your GitHub username
    - **Repository**: tally-system-2.0
    - **Branch**: main
    - **Build provider**: GitHub Actions
-5. Click "Save"
-6. Azure will create a GitHub Actions workflow
-7. Go to GitHub → Actions tab to see deployment progress
+6. Click "Save"
+7. Azure will create a GitHub Actions workflow (or use the existing one)
+8. Go to GitHub → Actions tab to see deployment progress
 
 **Option B: Using Azure CLI**
 
