@@ -12,8 +12,17 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install PostgreSQL driver
-RUN pip install --no-cache-dir psycopg2-binary
+# Install SQL Server driver
+RUN pip install --no-cache-dir pyodbc
+
+# Install ODBC Driver for SQL Server (if not pre-installed)
+RUN apt-get update && apt-get install -y \
+    curl apt-transport-https gnupg \
+    && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 COPY . .

@@ -19,20 +19,24 @@ Quick guide to get your Tally System running on Azure free tier.
 
 ### 2. Create Database (5 min)
 
-1. Search "Azure Database for PostgreSQL" → Create
-2. Choose "Flexible server"
-3. Fill in:
-   - Server name: `tally-system-db-XXXX` (add random numbers for uniqueness)
-   - Region: Same as resource group
-   - Compute: B1ms (free tier)
-   - Admin: `tallyadmin`
-   - Password: **Save this password!**
-4. Create → Wait 5 minutes
+1. Search "SQL databases" → Create
+2. Fill in:
+   - Database name: `tally-system-db`
+   - Server: Create new
+     - Server name: `tally-system-sql-XXXX` (add random numbers for uniqueness)
+     - Location: Same as resource group
+     - Admin: `tallyadmin`
+     - Password: **Save this password!**
+   - Compute: Basic tier (free tier)
+3. Create → Wait 2-3 minutes
 
 **Get Connection String:**
 - Go to database → Connection strings
-- Copy PostgreSQL connection string
-- Format: `postgresql://tallyadmin:PASSWORD@SERVER.postgres.database.azure.com:5432/postgres`
+- Copy ADO.NET connection string
+- Format for SQLAlchemy:
+  ```
+  mssql+pyodbc://tallyadmin:PASSWORD@SERVER.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+  ```
 
 ### 3. Configure Database Firewall (1 min)
 
@@ -55,10 +59,11 @@ Quick guide to get your Tally System running on Azure free tier.
 1. App Service → Configuration → Application settings
 2. Add:
    ```
-   DATABASE_URL = postgresql://tallyadmin:PASSWORD@SERVER.postgres.database.azure.com:5432/postgres
+   DATABASE_URL = mssql+pyodbc://tallyadmin:PASSWORD@SERVER.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
    API_V1_PREFIX = /api/v1
    DEBUG = False
    ```
+   (Replace PASSWORD and SERVER with your actual values)
 3. Save
 
 **Deploy Code:**
@@ -131,7 +136,7 @@ After backend deploys:
 - **Backend API**: `https://tally-system-api-XXXX.azurewebsites.net`
 - **API Docs**: `https://tally-system-api-XXXX.azurewebsites.net/docs`
 - **Web Dashboard**: `https://tally-system-web.azurestaticapps.net`
-- **Database**: `tally-system-db-XXXX.postgres.database.azure.com`
+- **Database**: `tally-system-sql-XXXX.database.windows.net`
 
 ## Common Issues
 
@@ -147,8 +152,10 @@ After backend deploys:
 
 **Database connection fails:**
 - Check firewall rules
-- Verify connection string
+- Verify connection string format (must start with `mssql+pyodbc://`)
 - Ensure "Allow Azure services" is enabled
+- Verify server name and database name are correct
+- Check that ODBC Driver 17 is available (pre-installed on Azure App Service Linux)
 
 ## Next Steps
 

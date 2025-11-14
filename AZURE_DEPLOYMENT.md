@@ -12,7 +12,7 @@ This guide will help you deploy the Tally System to Azure using free tier servic
 
 1. **Azure App Service (Free Tier)** - Backend API
 2. **Azure Static Web Apps (Free Tier)** - Web Dashboard
-3. **Azure Database for PostgreSQL (Free Tier)** - Database (or Azure SQL Database)
+3. **Azure SQL Database (Free Tier)** - Database
 
 ## Step 1: Azure Account Setup
 
@@ -29,44 +29,29 @@ This guide will help you deploy the Tally System to Azure using free tier servic
 4. Region: Choose closest to you (e.g., `East US`, `West Europe`)
 5. Click "Review + create" then "Create"
 
-## Step 3: Create Database (PostgreSQL)
+## Step 3: Create Database (Azure SQL Database)
 
-### Option A: Azure Database for PostgreSQL (Free Tier)
-
-1. In Azure Portal, search for "Azure Database for PostgreSQL"
-2. Click "Create"
-3. Choose "Flexible server" (free tier available)
-4. Fill in:
-   - **Server name**: `tally-system-db` (must be unique globally)
-   - **Region**: Same as resource group
-   - **PostgreSQL version**: 15
-   - **Compute + storage**: Click "Configure server"
-     - **Compute tier**: Burstable
-     - **Compute size**: B1ms (1 vCore, 2GB RAM) - Free eligible
-     - **Storage**: 32 GB (minimum)
-   - **Admin username**: `tallyadmin` (remember this!)
-   - **Password**: Create a strong password (save it!)
-5. Click "Review + create" then "Create"
-6. Wait for deployment (5-10 minutes)
-
-### Option B: Azure SQL Database (Free Tier Alternative)
-
-If PostgreSQL free tier isn't available in your region:
-
-1. Search for "SQL databases"
+1. In Azure Portal, search for "SQL databases"
 2. Click "Create"
 3. Fill in:
    - **Database name**: `tally-system-db`
-   - **Server**: Create new
-     - **Server name**: `tally-system-sql` (unique globally)
+   - **Subscription**: Your subscription
+   - **Resource group**: `tally-system-rg` (created in Step 2)
+   - **Server**: Click "Create new"
+     - **Server name**: `tally-system-sql-XXXX` (must be unique globally, add random numbers)
      - **Location**: Same as resource group
-     - **Authentication method**: SQL authentication
-     - **Admin username**: `tallyadmin`
-     - **Password**: Strong password
-   - **Compute + storage**: Basic tier (free eligible)
+     - **Authentication method**: Use SQL authentication
+     - **Server admin login**: `tallyadmin` (remember this!)
+     - **Password**: Create a strong password (save it!)
+     - **Confirm password**: Re-enter password
+     - Click "OK"
+   - **Want to use SQL elastic pool?**: No
+   - **Compute + storage**: Click "Configure database"
+     - **Service tier**: Basic (free tier eligible)
+     - **Compute size**: Basic (5 DTU)
+     - Click "Apply"
 4. Click "Review + create" then "Create"
-
-**Note**: If using SQL Database, you'll need to update the backend to use `pyodbc` instead of `psycopg2`.
+5. Wait for deployment (2-3 minutes)
 
 ## Step 4: Configure Database Firewall
 
@@ -79,24 +64,22 @@ If PostgreSQL free tier isn't available in your region:
 
 ## Step 5: Get Database Connection String
 
-### For PostgreSQL:
-
-1. Go to your PostgreSQL server
-2. Click "Connection strings" in left menu
-3. Copy the "psycopg2" connection string
-4. It will look like:
-   ```
-   postgresql://tallyadmin:YOUR_PASSWORD@tally-system-db.postgres.database.azure.com:5432/postgres
-   ```
-
-### For SQL Database:
-
-1. Go to your SQL database
+1. Go to your SQL database in Azure Portal
 2. Click "Connection strings" in left menu
 3. Copy the "ADO.NET" connection string
-4. Format it for SQLAlchemy:
+4. Format it for SQLAlchemy (replace placeholders):
    ```
-   mssql+pyodbc://tallyadmin:YOUR_PASSWORD@tally-system-sql.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server
+   mssql+pyodbc://tallyadmin:YOUR_PASSWORD@tally-system-sql-XXXX.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
+   ```
+   
+   **Important**: Replace:
+   - `YOUR_PASSWORD` with your actual database password
+   - `tally-system-sql-XXXX` with your actual server name
+   - `tally-system-db` with your database name
+   
+   **Example**:
+   ```
+   mssql+pyodbc://tallyadmin:MySecurePass123!@tally-system-sql-abc123.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
    ```
 
 ## Step 6: Deploy Backend (Azure App Service)
@@ -125,26 +108,21 @@ If PostgreSQL free tier isn't available in your region:
 4. Add these settings:
 
    ```
-   DATABASE_URL = postgresql://tallyadmin:PASSWORD@tally-system-db.postgres.database.azure.com:5432/postgres
+   DATABASE_URL = mssql+pyodbc://tallyadmin:PASSWORD@tally-system-sql-XXXX.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
    API_V1_PREFIX = /api/v1
    DEBUG = False
    ```
 
-   (Replace PASSWORD with your actual database password)
+   (Replace PASSWORD with your actual database password and tally-system-sql-XXXX with your server name)
 
 5. Click "Save"
 6. Click "Continue" when prompted
 
-### 6.3 Enable PostgreSQL Driver
+### 6.3 Install SQL Server Driver
 
-1. In App Service, go to "SSH" in left menu
-2. Click "Go" to open SSH terminal
-3. Run:
-   ```bash
-   pip install psycopg2-binary
-   ```
+The backend needs `pyodbc` and ODBC Driver for SQL Server. These are already included in the updated requirements.txt.
 
-   Or add it to requirements.txt before deploying.
+**Note**: Azure App Service Linux comes with ODBC Driver 17 for SQL Server pre-installed, so you don't need to install it separately.
 
 ### 6.4 Deploy Backend Code
 
@@ -300,8 +278,10 @@ app.add_middleware(
 
 **Database connection errors:**
 - Check firewall rules allow Azure services
-- Verify connection string is correct
+- Verify connection string format (must use `mssql+pyodbc://` prefix)
+- Ensure ODBC Driver 17 is available (pre-installed on Azure App Service Linux)
 - Check App Service logs: App Service → Log stream
+- Verify server name and database name are correct
 
 **Migration errors:**
 - SSH into App Service
@@ -348,10 +328,11 @@ app.add_middleware(
   - 100 GB bandwidth/month
   - Unlimited sites
 
-- **PostgreSQL Free Tier**:
-  - 32 GB storage
-  - 750 hours/month
-  - Basic performance tier
+- **Azure SQL Database Free Tier**:
+  - Basic tier (5 DTU)
+  - 2 GB storage
+  - Free for 12 months (then pay-as-you-go)
+  - Note: Free tier may have limited availability in some regions
 
 ## Next Steps
 

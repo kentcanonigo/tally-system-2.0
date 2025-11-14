@@ -7,7 +7,6 @@ pydantic-settings>=2.3.0
 python-dotenv==1.0.0
 requests==2.31.0
 
-# PostgreSQL support (optional - only needed for production)
-# Uncomment if using PostgreSQL:
-# psycopg2-binary==2.9.9
+# Azure SQL Database support (required for production)
+pyodbc>=5.0.0
 
