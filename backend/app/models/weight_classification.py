@@ -9,10 +9,10 @@ class WeightClassification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False, index=True)
-    classification = Column(String, nullable=False)
+    classification = Column(String(255), nullable=False)
     min_weight = Column(Float, nullable=False)
     max_weight = Column(Float, nullable=False)
-    category = Column(String, nullable=False)  # e.g., "Dressed", "Byproduct", "Uncategorized"
+    category = Column(String(100), nullable=False)  # e.g., "Dressed", "Byproduct", "Uncategorized"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

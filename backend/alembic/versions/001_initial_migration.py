@@ -16,11 +16,30 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Drop tables if they exist (for clean migration after partial failure)
+    # This is safe for initial migration - check if tables exist first
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    # Drop tables in reverse dependency order if they exist
+    if 'allocation_details' in existing_tables:
+        op.drop_table('allocation_details')
+    if 'tally_sessions' in existing_tables:
+        op.drop_table('tally_sessions')
+    if 'weight_classifications' in existing_tables:
+        op.drop_table('weight_classifications')
+    if 'plants' in existing_tables:
+        op.drop_table('plants')
+    if 'customers' in existing_tables:
+        op.drop_table('customers')
+    
     # Create customers table
     op.create_table(
         'customers',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
+        sa.Column('name', sa.String(255), nullable=False),
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.PrimaryKeyConstraint('id')
@@ -32,7 +51,7 @@ def upgrade() -> None:
     op.create_table(
         'plants',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
+        sa.Column('name', sa.String(255), nullable=False),
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.PrimaryKeyConstraint('id')
@@ -45,10 +64,10 @@ def upgrade() -> None:
         'weight_classifications',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('plant_id', sa.Integer(), nullable=False),
-        sa.Column('classification', sa.String(), nullable=False),
+        sa.Column('classification', sa.String(255), nullable=False),
         sa.Column('min_weight', sa.Float(), nullable=False),
         sa.Column('max_weight', sa.Float(), nullable=False),
-        sa.Column('category', sa.String(), nullable=False),
+        sa.Column('category', sa.String(100), nullable=False),
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.ForeignKeyConstraint(['plant_id'], ['plants.id'], ),
@@ -65,7 +84,7 @@ def upgrade() -> None:
         sa.Column('customer_id', sa.Integer(), nullable=False),
         sa.Column('plant_id', sa.Integer(), nullable=False),
         sa.Column('date', sa.Date(), nullable=False),
-        sa.Column('status', sa.String(), nullable=False),
+        sa.Column('status', sa.String(50), nullable=False),
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=True),
         sa.ForeignKeyConstraint(['customer_id'], ['customers.id'], ),
