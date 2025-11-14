@@ -53,7 +53,7 @@ jobs:
       if: github.ref == 'refs/heads/main'
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'tally-system-backend'
+        app-name: 'tally-system-api'
         package: ./backend
         startup-command: 'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000'
 
