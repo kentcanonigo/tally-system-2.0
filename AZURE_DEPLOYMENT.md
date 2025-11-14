@@ -229,10 +229,21 @@ After deployment, run migrations:
    alembic upgrade head
    ```
 
-Or add to startup command in App Service → Configuration → General settings:
-```
-alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+**Important**: Azure App Service needs to install dependencies first. Configure the startup command:
+
+1. Go to App Service → **Configuration** → **General settings**
+2. Set **Startup Command** to:
+   ```
+   alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+3. Ensure **SCM_DO_BUILD_DURING_DEPLOYMENT** is enabled (should be automatic)
+4. Click **Save**
+5. **Restart** the app service
+
+**Note**: If you get "alembic: Permission denied" or "command not found", Azure hasn't installed dependencies yet. Make sure:
+- `requirements.txt` is in the root of your deployment (`/home/site/wwwroot/requirements.txt`)
+- Azure detects it as a Python app (should auto-detect)
+- Check **Deployment Center** → **Logs** to see if build succeeded
 
 ## Step 7: Deploy Web Dashboard (Azure Static Web Apps)
 
