@@ -15,11 +15,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install SQL Server driver
 RUN pip install --no-cache-dir pyodbc
 
-# Install ODBC Driver for SQL Server (if not pre-installed)
+# Install ODBC Driver for SQL Server using modern method (apt-key is deprecated)
+# Note: Azure App Service Linux has ODBC Driver 17 pre-installed, but we install it here for Docker builds
 RUN apt-get update && apt-get install -y \
-    curl apt-transport-https gnupg \
-    && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-    && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    curl apt-transport-https gnupg lsb-release \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/$(lsb_release -rs | cut -d. -f1)/prod $(lsb_release -cs) main" > /etc/apt/sources.list.d/mssql-release.list \
+    && chmod 644 /etc/apt/keyrings/microsoft.gpg \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
     && rm -rf /var/lib/apt/lists/*
