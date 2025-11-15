@@ -11,12 +11,12 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Get allowed origins from settings (can be configured via CORS_ORIGINS env var)
+# Defaults to "*" (allow all) if not set
+cors_origins = settings.get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://happy-rock-0067eee00.3.azurestaticapps.net",  # Your Static Web App URL
-        "http://localhost:3000",  # For local development
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
