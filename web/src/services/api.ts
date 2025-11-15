@@ -7,7 +7,9 @@ import type {
   AllocationDetails,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// Vite replaces import.meta.env.VITE_API_URL at build time
+// If not set, fallback to localhost for local development
+const API_BASE_URL = (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim()) || 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

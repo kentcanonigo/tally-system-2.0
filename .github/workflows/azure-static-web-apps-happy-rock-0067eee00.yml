@@ -31,7 +31,21 @@ jobs:
         run: npm ci
       - name: Build
         working-directory: ./web
-        run: npm run build
+        run: |
+          echo "Building with VITE_API_URL..."
+          if [ -z "$VITE_API_URL" ]; then
+            echo "ERROR: VITE_API_URL environment variable is not set!"
+            exit 1
+          else
+            echo "VITE_API_URL is set (first 20 chars: ${VITE_API_URL:0:20}...)"
+          fi
+          npm run build
+          echo "Checking built files for API URL..."
+          if grep -r "localhost:8000" dist/ 2>/dev/null; then
+            echo "WARNING: Found localhost:8000 in built files - VITE_API_URL may not have been replaced"
+          else
+            echo "SUCCESS: No localhost:8000 found in built files"
+          fi
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: Build And Deploy
