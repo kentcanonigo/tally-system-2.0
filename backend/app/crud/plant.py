@@ -17,7 +17,8 @@ def get_plant(db: Session, plant_id: int) -> Optional[Plant]:
 
 
 def get_plants(db: Session, skip: int = 0, limit: int = 100) -> List[Plant]:
-    return db.query(Plant).offset(skip).limit(limit).all()
+    # SQL Server requires ORDER BY when using OFFSET/LIMIT
+    return db.query(Plant).order_by(Plant.id).offset(skip).limit(limit).all()
 
 
 def update_plant(db: Session, plant_id: int, plant_update: PlantUpdate) -> Optional[Plant]:

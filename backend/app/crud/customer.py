@@ -17,7 +17,8 @@ def get_customer(db: Session, customer_id: int) -> Optional[Customer]:
 
 
 def get_customers(db: Session, skip: int = 0, limit: int = 100) -> List[Customer]:
-    return db.query(Customer).offset(skip).limit(limit).all()
+    # SQL Server requires ORDER BY when using OFFSET/LIMIT
+    return db.query(Customer).order_by(Customer.id).offset(skip).limit(limit).all()
 
 
 def update_customer(db: Session, customer_id: int, customer_update: CustomerUpdate) -> Optional[Customer]:

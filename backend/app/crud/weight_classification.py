@@ -17,9 +17,10 @@ def get_weight_classification(db: Session, wc_id: int) -> Optional[WeightClassif
 
 
 def get_weight_classifications_by_plant(db: Session, plant_id: int, skip: int = 0, limit: int = 100) -> List[WeightClassification]:
+    # SQL Server requires ORDER BY when using OFFSET/LIMIT
     return db.query(WeightClassification).filter(
         WeightClassification.plant_id == plant_id
-    ).offset(skip).limit(limit).all()
+    ).order_by(WeightClassification.id).offset(skip).limit(limit).all()
 
 
 def update_weight_classification(db: Session, wc_id: int, wc_update: WeightClassificationUpdate) -> Optional[WeightClassification]:
