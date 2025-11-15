@@ -13,5 +13,11 @@ export default defineConfig({
       },
     },
   },
+  publicDir: 'public',
+  build: {
+    outDir: 'dist',
+    // Copy staticwebapp.config.json to dist
+    copyPublicDir: true,
+  },
 })
 
