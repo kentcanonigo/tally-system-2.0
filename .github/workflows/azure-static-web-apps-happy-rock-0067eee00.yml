@@ -48,8 +48,14 @@ jobs:
               exit 1
             fi
           fi
+          # Create .env.production file for Vite to pick up
+          echo "Creating .env.production file..."
+          echo "VITE_API_URL=$VITE_API_URL" > .env.production
+          echo "Contents of .env.production (first 50 chars):"
+          head -c 50 .env.production
+          echo ""
           echo "Running build command..."
-          VITE_API_URL="$VITE_API_URL" npm run build
+          npm run build
           echo "Checking built files for API URL..."
           echo "Searching for localhost:8000..."
           if grep -r "localhost:8000" dist/ 2>/dev/null | head -3; then
