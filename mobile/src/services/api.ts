@@ -8,7 +8,7 @@ import type {
   AllocationDetails,
 } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1'; // Change this to your backend URL
+const API_BASE_URL = 'https://tally-system-api-awdvavfdgtexhyhu.southeastasia-01.azurewebsites.net/api/v1'; // Change this to your backend URL
 
 const api = axios.create({
   baseURL: API_BASE_URL,
