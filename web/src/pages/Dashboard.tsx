@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
-import type { Customer, Plant, TallySession } from '../types';
 
 function Dashboard() {
   const [stats, setStats] = useState({
