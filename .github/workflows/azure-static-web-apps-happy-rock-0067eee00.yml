@@ -35,14 +35,33 @@ jobs:
           echo "Building with VITE_API_URL..."
           if [ -z "$VITE_API_URL" ]; then
             echo "ERROR: VITE_API_URL environment variable is not set!"
+            echo "Please check GitHub Secrets → VITE_API_URL"
             exit 1
           else
-            echo "VITE_API_URL is set (first 20 chars: ${VITE_API_URL:0:20}...)"
+            echo "VITE_API_URL is set"
+            echo "First 40 chars: ${VITE_API_URL:0:40}..."
+            echo "Length: ${#VITE_API_URL}"
+            # Verify it's a valid URL format
+            if [[ ! "$VITE_API_URL" =~ ^https?:// ]]; then
+              echo "ERROR: VITE_API_URL doesn't start with http:// or https://"
+              echo "Current value starts with: ${VITE_API_URL:0:10}"
+              exit 1
+            fi
           fi
-          npm run build
+          echo "Running build command..."
+          VITE_API_URL="$VITE_API_URL" npm run build
           echo "Checking built files for API URL..."
-          if grep -r "localhost:8000" dist/ 2>/dev/null; then
-            echo "WARNING: Found localhost:8000 in built files - VITE_API_URL may not have been replaced"
+          echo "Searching for localhost:8000..."
+          if grep -r "localhost:8000" dist/ 2>/dev/null | head -3; then
+            echo "WARNING: Found localhost:8000 in built files"
+            echo "This means VITE_API_URL was not replaced during build"
+            echo "Checking what API URL is actually in the file..."
+            grep -o "http[s]*://[^\"']*" dist/assets/*.js | head -5 || echo "No URLs found"
+            echo ""
+            echo "TROUBLESHOOTING:"
+            echo "1. Verify VITE_API_URL secret value is correct"
+            echo "2. Check that it starts with https://"
+            echo "3. Ensure no extra spaces or newlines"
           else
             echo "SUCCESS: No localhost:8000 found in built files"
           fi
