@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert 
 import { useNavigation } from '@react-navigation/native';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import type { Customer, Plant } from '../types';
+import { useResponsive } from '../utils/responsive';
 
 function CreateTallySessionScreen() {
   const navigation = useNavigation();
+  const responsive = useResponsive();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,24 +73,77 @@ function CreateTallySessionScreen() {
     );
   }
 
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+    },
+    contentContainer: {
+      ...styles.scrollContent,
+      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    form: {
+      ...styles.form,
+      padding: responsive.padding.large,
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    formGroup: {
+      ...styles.formGroup,
+      marginBottom: responsive.spacing.lg,
+    },
+    label: {
+      ...styles.label,
+      fontSize: responsive.fontSize.medium,
+      marginBottom: responsive.spacing.md,
+    },
+    input: {
+      ...styles.input,
+      padding: responsive.padding.medium,
+      fontSize: responsive.fontSize.medium,
+    },
+    pickerContainer: {
+      ...styles.pickerContainer,
+      maxHeight: responsive.isTablet ? 200 : 150,
+    },
+    pickerOption: {
+      ...styles.pickerOption,
+      padding: responsive.padding.medium,
+    },
+    pickerOptionText: {
+      ...styles.pickerOptionText,
+      fontSize: responsive.fontSize.medium,
+    },
+    submitButton: {
+      ...styles.submitButton,
+      padding: responsive.padding.medium,
+      marginTop: responsive.spacing.lg,
+      maxWidth: responsive.isTablet ? 400 : undefined,
+      alignSelf: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    submitButtonText: {
+      ...styles.submitButtonText,
+      fontSize: responsive.fontSize.medium,
+    },
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Customer</Text>
-          <View style={styles.pickerContainer}>
+    <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
+      <View style={dynamicStyles.form}>
+        <View style={dynamicStyles.formGroup}>
+          <Text style={dynamicStyles.label}>Customer</Text>
+          <View style={dynamicStyles.pickerContainer}>
             {customers.map((customer) => (
               <TouchableOpacity
                 key={customer.id}
                 style={[
-                  styles.pickerOption,
+                  dynamicStyles.pickerOption,
                   formData.customer_id === customer.id && styles.pickerOptionSelected,
                 ]}
                 onPress={() => setFormData({ ...formData, customer_id: customer.id })}
               >
                 <Text
                   style={[
-                    styles.pickerOptionText,
+                    dynamicStyles.pickerOptionText,
                     formData.customer_id === customer.id && styles.pickerOptionTextSelected,
                   ]}
                 >
@@ -99,21 +154,21 @@ function CreateTallySessionScreen() {
           </View>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Plant</Text>
-          <View style={styles.pickerContainer}>
+        <View style={dynamicStyles.formGroup}>
+          <Text style={dynamicStyles.label}>Plant</Text>
+          <View style={dynamicStyles.pickerContainer}>
             {plants.map((plant) => (
               <TouchableOpacity
                 key={plant.id}
                 style={[
-                  styles.pickerOption,
+                  dynamicStyles.pickerOption,
                   formData.plant_id === plant.id && styles.pickerOptionSelected,
                 ]}
                 onPress={() => setFormData({ ...formData, plant_id: plant.id })}
               >
                 <Text
                   style={[
-                    styles.pickerOptionText,
+                    dynamicStyles.pickerOptionText,
                     formData.plant_id === plant.id && styles.pickerOptionTextSelected,
                   ]}
                 >
@@ -124,10 +179,10 @@ function CreateTallySessionScreen() {
           </View>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Date</Text>
+        <View style={dynamicStyles.formGroup}>
+          <Text style={dynamicStyles.label}>Date</Text>
           <TextInput
-            style={styles.input}
+            style={dynamicStyles.input}
             value={formData.date}
             onChangeText={(text) => setFormData({ ...formData, date: text })}
             placeholder="YYYY-MM-DD"
@@ -135,11 +190,11 @@ function CreateTallySessionScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+          style={[dynamicStyles.submitButton, submitting && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={submitting}
         >
-          <Text style={styles.submitButtonText}>
+          <Text style={dynamicStyles.submitButtonText}>
             {submitting ? 'Creating...' : 'Create Session'}
           </Text>
         </TouchableOpacity>
@@ -153,23 +208,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   form: {
-    padding: 20,
+    flexGrow: 1,
   },
   formGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 16,
     fontWeight: '500',
     color: '#2c3e50',
-    marginBottom: 10,
   },
   input: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
   },
@@ -180,7 +234,6 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   pickerOption: {
-    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -188,7 +241,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3498db',
   },
   pickerOptionText: {
-    fontSize: 16,
     color: '#2c3e50',
   },
   pickerOptionTextSelected: {
@@ -197,17 +249,14 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: '#3498db',
-    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
   },
   submitButtonDisabled: {
     backgroundColor: '#95a5a6',
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });

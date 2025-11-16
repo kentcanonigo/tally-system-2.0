@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
+import { useResponsive } from '../utils/responsive';
 
 function HomeScreen() {
   const navigation = useNavigation();
+  const responsive = useResponsive();
   const [stats, setStats] = useState({
     customers: 0,
     plants: 0,
@@ -49,41 +51,123 @@ function HomeScreen() {
     );
   }
 
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+    },
+    contentContainer: {
+      ...styles.scrollContent,
+      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    contentWrapper: {
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    header: {
+      ...styles.header,
+      padding: responsive.padding.large,
+    },
+    title: {
+      ...styles.title,
+      fontSize: responsive.fontSize.xlarge,
+    },
+    subtitle: {
+      ...styles.subtitle,
+      fontSize: responsive.fontSize.medium,
+    },
+    statsContainer: {
+      ...styles.statsContainer,
+      padding: responsive.padding.medium,
+      flexWrap: responsive.isLargeTablet ? 'wrap' as const : 'nowrap' as const,
+    },
+    statCard: {
+      ...styles.statCard,
+      padding: responsive.padding.large,
+      margin: responsive.spacing.sm,
+      minWidth: responsive.isLargeTablet ? '22%' : undefined,
+      maxWidth: responsive.isLargeTablet ? '22%' : undefined,
+    },
+    statValue: {
+      ...styles.statValue,
+      fontSize: responsive.isTablet ? 40 : 32,
+    },
+    statLabel: {
+      ...styles.statLabel,
+      fontSize: responsive.fontSize.small,
+    },
+    button: {
+      ...styles.button,
+      padding: responsive.padding.medium,
+      margin: responsive.padding.large,
+      maxWidth: responsive.isTablet ? 400 : undefined,
+      alignSelf: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    buttonText: {
+      ...styles.buttonText,
+      fontSize: responsive.fontSize.medium,
+    },
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Tally System</Text>
-        <Text style={styles.subtitle}>Dashboard</Text>
-      </View>
+    <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
+      <View style={dynamicStyles.contentWrapper}>
+        <View style={dynamicStyles.header}>
+          <Text style={dynamicStyles.title}>Tally System</Text>
+          <Text style={dynamicStyles.subtitle}>Dashboard</Text>
+        </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.customers}</Text>
-          <Text style={styles.statLabel}>Customers</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.plants}</Text>
-          <Text style={styles.statLabel}>Plants</Text>
-        </View>
-      </View>
+        {responsive.isLargeTablet ? (
+          <View style={styles.statsContainer}>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.customers}</Text>
+              <Text style={dynamicStyles.statLabel}>Customers</Text>
+            </View>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.plants}</Text>
+              <Text style={dynamicStyles.statLabel}>Plants</Text>
+            </View>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.sessions}</Text>
+              <Text style={dynamicStyles.statLabel}>Total Sessions</Text>
+            </View>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.ongoingSessions}</Text>
+              <Text style={dynamicStyles.statLabel}>Ongoing</Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.statsContainer}>
+              <View style={dynamicStyles.statCard}>
+                <Text style={dynamicStyles.statValue}>{stats.customers}</Text>
+                <Text style={dynamicStyles.statLabel}>Customers</Text>
+              </View>
+              <View style={dynamicStyles.statCard}>
+                <Text style={dynamicStyles.statValue}>{stats.plants}</Text>
+                <Text style={dynamicStyles.statLabel}>Plants</Text>
+              </View>
+            </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.sessions}</Text>
-          <Text style={styles.statLabel}>Total Sessions</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.ongoingSessions}</Text>
-          <Text style={styles.statLabel}>Ongoing</Text>
-        </View>
-      </View>
+            <View style={styles.statsContainer}>
+              <View style={dynamicStyles.statCard}>
+                <Text style={dynamicStyles.statValue}>{stats.sessions}</Text>
+                <Text style={dynamicStyles.statLabel}>Total Sessions</Text>
+              </View>
+              <View style={dynamicStyles.statCard}>
+                <Text style={dynamicStyles.statValue}>{stats.ongoingSessions}</Text>
+                <Text style={dynamicStyles.statLabel}>Ongoing</Text>
+              </View>
+            </View>
+          </>
+        )}
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Sessions' as never, { screen: 'CreateTallySession' } as never)}
-      >
-        <Text style={styles.buttonText}>Create New Session</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={dynamicStyles.button}
+          onPress={() => navigation.navigate('Sessions' as never, { screen: 'CreateTallySession' } as never)}
+        >
+          <Text style={dynamicStyles.buttonText}>Create New Session</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -93,32 +177,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   header: {
-    padding: 20,
     backgroundColor: '#2c3e50',
   },
   title: {
-    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
   },
   subtitle: {
-    fontSize: 16,
     color: '#bdc3c7',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 15,
   },
   statCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 20,
     alignItems: 'center',
     flex: 1,
-    margin: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -126,25 +207,20 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statValue: {
-    fontSize: 32,
     fontWeight: 'bold',
     color: '#3498db',
     marginBottom: 5,
   },
   statLabel: {
-    fontSize: 14,
     color: '#7f8c8d',
   },
   button: {
     backgroundColor: '#3498db',
-    padding: 15,
     borderRadius: 8,
-    margin: 20,
     alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });

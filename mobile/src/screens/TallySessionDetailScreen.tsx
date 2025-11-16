@@ -9,10 +9,12 @@ import {
   weightClassificationsApi,
 } from '../services/api';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
+import { useResponsive } from '../utils/responsive';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
+  const responsive = useResponsive();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -114,91 +116,226 @@ function TallySessionDetailScreen() {
     );
   }
 
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+    },
+    contentContainer: {
+      ...styles.scrollContent,
+      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    contentWrapper: {
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    header: {
+      ...styles.header,
+      padding: responsive.padding.medium,
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    sessionId: {
+      ...styles.sessionId,
+      fontSize: responsive.fontSize.medium,
+    },
+    infoCard: {
+      ...styles.infoCard,
+      padding: responsive.padding.medium,
+      margin: responsive.spacing.md,
+    },
+    infoLabel: {
+      ...styles.infoLabel,
+      fontSize: responsive.fontSize.small,
+      marginTop: responsive.spacing.md,
+    },
+    infoValue: {
+      ...styles.infoValue,
+      fontSize: responsive.fontSize.medium,
+    },
+    actions: {
+      ...styles.actions,
+      padding: responsive.spacing.md,
+      flexDirection: responsive.isTablet ? 'row' as const : 'column' as const,
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    actionButton: {
+      ...styles.actionButton,
+      padding: responsive.padding.medium,
+      marginHorizontal: responsive.isTablet ? responsive.spacing.sm : 0,
+      marginVertical: responsive.isTablet ? 0 : responsive.spacing.sm,
+    },
+    actionButtonText: {
+      ...styles.actionButtonText,
+      fontSize: responsive.fontSize.small,
+    },
+    sectionTitle: {
+      ...styles.sectionTitle,
+      fontSize: responsive.fontSize.large,
+      padding: responsive.padding.medium,
+      paddingBottom: responsive.spacing.xs,
+    },
+    allocationCard: {
+      ...styles.allocationCard,
+      padding: responsive.padding.medium,
+      margin: responsive.spacing.md,
+    },
+    allocationTitle: {
+      ...styles.allocationTitle,
+      fontSize: responsive.fontSize.medium,
+    },
+    allocationLabel: {
+      ...styles.allocationLabel,
+      fontSize: responsive.fontSize.small,
+    },
+    allocationValue: {
+      ...styles.allocationValue,
+      fontSize: responsive.fontSize.small,
+    },
+    modalContent: {
+      ...styles.modalContent,
+      padding: responsive.padding.large,
+      width: responsive.isTablet ? Math.min(responsive.width * 0.6, 500) : '90%',
+      maxHeight: responsive.isTablet ? '85%' : '80%',
+    },
+    modalTitle: {
+      ...styles.modalTitle,
+      fontSize: responsive.fontSize.large,
+      marginBottom: responsive.spacing.lg,
+    },
+    label: {
+      ...styles.label,
+      fontSize: responsive.fontSize.small,
+      marginTop: responsive.spacing.md,
+      marginBottom: responsive.spacing.xs,
+    },
+    input: {
+      ...styles.input,
+      padding: responsive.padding.medium,
+      fontSize: responsive.fontSize.medium,
+    },
+    pickerContainer: {
+      ...styles.pickerContainer,
+      maxHeight: responsive.isTablet ? 200 : 150,
+    },
+    pickerOption: {
+      ...styles.pickerOption,
+      padding: responsive.padding.medium,
+    },
+    pickerOptionText: {
+      ...styles.pickerOptionText,
+      fontSize: responsive.fontSize.small,
+    },
+    modalActions: {
+      ...styles.modalActions,
+      marginTop: responsive.spacing.lg,
+      gap: responsive.spacing.md,
+    },
+    modalButton: {
+      ...styles.modalButton,
+      padding: responsive.padding.medium,
+    },
+    modalButtonText: {
+      ...styles.modalButtonText,
+      fontSize: responsive.fontSize.small,
+    },
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.sessionId}>Session #{session.id}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: session.status === 'ongoing' ? '#f39c12' : session.status === 'completed' ? '#27ae60' : '#e74c3c' }]}>
-          <Text style={styles.statusText}>{session.status}</Text>
+    <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
+      <View style={dynamicStyles.contentWrapper}>
+        <View style={dynamicStyles.header}>
+          <Text style={dynamicStyles.sessionId}>Session #{session.id}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: session.status === 'ongoing' ? '#f39c12' : session.status === 'completed' ? '#27ae60' : '#e74c3c' }]}>
+            <Text style={styles.statusText}>{session.status}</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoLabel}>Customer</Text>
-        <Text style={styles.infoValue}>{customer?.name}</Text>
-        <Text style={styles.infoLabel}>Plant</Text>
-        <Text style={styles.infoValue}>{plant?.name}</Text>
-        <Text style={styles.infoLabel}>Date</Text>
-        <Text style={styles.infoValue}>{new Date(session.date).toLocaleDateString()}</Text>
-      </View>
+        <View style={dynamicStyles.infoCard}>
+          <Text style={dynamicStyles.infoLabel}>Customer</Text>
+          <Text style={dynamicStyles.infoValue}>{customer?.name}</Text>
+          <Text style={dynamicStyles.infoLabel}>Plant</Text>
+          <Text style={dynamicStyles.infoValue}>{plant?.name}</Text>
+          <Text style={dynamicStyles.infoLabel}>Date</Text>
+          <Text style={dynamicStyles.infoValue}>{new Date(session.date).toLocaleDateString()}</Text>
+        </View>
 
-      <View style={styles.actions}>
-        {session.status === 'ongoing' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleUpdateStatus('completed')}
-            >
-              <Text style={styles.actionButtonText}>Mark Complete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.addButton]}
-              onPress={() => setShowAddModal(true)}
-            >
-              <Text style={styles.actionButtonText}>Add Allocation</Text>
-            </TouchableOpacity>
-          </>
+        <View style={dynamicStyles.actions}>
+          {session.status === 'ongoing' && (
+            <>
+              <TouchableOpacity
+                style={[dynamicStyles.actionButton, styles.completeButton]}
+                onPress={() => handleUpdateStatus('completed')}
+              >
+                <Text style={dynamicStyles.actionButtonText}>Mark Complete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.actionButton, styles.addButton]}
+                onPress={() => setShowAddModal(true)}
+              >
+                <Text style={dynamicStyles.actionButtonText}>Add Allocation</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
+        {allocations.length === 0 ? (
+          <Text style={styles.emptyText}>No allocations yet</Text>
+        ) : (
+          <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
+            {allocations.map((allocation) => {
+              const difference = allocation.allocated_bags - allocation.required_bags;
+              return (
+                <View 
+                  key={allocation.id} 
+                  style={[
+                    dynamicStyles.allocationCard,
+                    responsive.isLargeTablet && { width: '45%', marginHorizontal: '2.5%' }
+                  ]}
+                >
+                  <Text style={dynamicStyles.allocationTitle}>
+                    {getWeightClassificationName(allocation.weight_classification_id)}
+                  </Text>
+                  <View style={styles.allocationRow}>
+                    <Text style={dynamicStyles.allocationLabel}>Required:</Text>
+                    <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
+                  </View>
+                  <View style={styles.allocationRow}>
+                    <Text style={dynamicStyles.allocationLabel}>Allocated:</Text>
+                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags}</Text>
+                  </View>
+                  <View style={styles.allocationRow}>
+                    <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
+                    <Text style={[dynamicStyles.allocationValue, { color: difference >= 0 ? '#27ae60' : '#e74c3c' }]}>
+                      {difference >= 0 ? '+' : ''}{difference.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         )}
       </View>
 
-      <Text style={styles.sectionTitle}>Allocations</Text>
-      {allocations.length === 0 ? (
-        <Text style={styles.emptyText}>No allocations yet</Text>
-      ) : (
-        allocations.map((allocation) => {
-          const difference = allocation.allocated_bags - allocation.required_bags;
-          return (
-            <View key={allocation.id} style={styles.allocationCard}>
-              <Text style={styles.allocationTitle}>
-                {getWeightClassificationName(allocation.weight_classification_id)}
-              </Text>
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>Required:</Text>
-                <Text style={styles.allocationValue}>{allocation.required_bags}</Text>
-              </View>
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>Allocated:</Text>
-                <Text style={styles.allocationValue}>{allocation.allocated_bags}</Text>
-              </View>
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>Difference:</Text>
-                <Text style={[styles.allocationValue, { color: difference >= 0 ? '#27ae60' : '#e74c3c' }]}>
-                  {difference >= 0 ? '+' : ''}{difference.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-          );
-        })
-      )}
-
       {showAddModal && (
         <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Allocation</Text>
-            <Text style={styles.label}>Weight Classification</Text>
-            <ScrollView style={styles.pickerContainer}>
+          <View style={dynamicStyles.modalContent}>
+            <Text style={dynamicStyles.modalTitle}>Add Allocation</Text>
+            <Text style={dynamicStyles.label}>Weight Classification</Text>
+            <ScrollView style={dynamicStyles.pickerContainer}>
               {weightClassifications.map((wc) => (
                 <TouchableOpacity
                   key={wc.id}
                   style={[
-                    styles.pickerOption,
+                    dynamicStyles.pickerOption,
                     formData.weight_classification_id === wc.id && styles.pickerOptionSelected,
                   ]}
                   onPress={() => setFormData({ ...formData, weight_classification_id: wc.id })}
                 >
                   <Text
                     style={[
-                      styles.pickerOptionText,
+                      dynamicStyles.pickerOptionText,
                       formData.weight_classification_id === wc.id && styles.pickerOptionTextSelected,
                     ]}
                   >
@@ -207,34 +344,34 @@ function TallySessionDetailScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text style={styles.label}>Required Bags</Text>
+            <Text style={dynamicStyles.label}>Required Bags</Text>
             <TextInput
-              style={styles.input}
+              style={dynamicStyles.input}
               value={formData.required_bags}
               onChangeText={(text) => setFormData({ ...formData, required_bags: text })}
               keyboardType="numeric"
               placeholder="0"
             />
-            <Text style={styles.label}>Allocated Bags</Text>
+            <Text style={dynamicStyles.label}>Allocated Bags</Text>
             <TextInput
-              style={styles.input}
+              style={dynamicStyles.input}
               value={formData.allocated_bags}
               onChangeText={(text) => setFormData({ ...formData, allocated_bags: text })}
               keyboardType="numeric"
               placeholder="0"
             />
-            <View style={styles.modalActions}>
+            <View style={dynamicStyles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[dynamicStyles.modalButton, styles.cancelButton]}
                 onPress={() => setShowAddModal(false)}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Text style={dynamicStyles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
+                style={[dynamicStyles.modalButton, styles.saveButton]}
                 onPress={handleAddAllocation}
               >
-                <Text style={styles.modalButtonText}>Save</Text>
+                <Text style={dynamicStyles.modalButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -249,15 +386,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
     backgroundColor: '#2c3e50',
   },
   sessionId: {
-    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -273,28 +411,25 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: '#fff',
-    padding: 15,
-    margin: 10,
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   infoLabel: {
-    fontSize: 12,
     color: '#7f8c8d',
-    marginTop: 10,
   },
   infoValue: {
-    fontSize: 16,
     color: '#2c3e50',
     fontWeight: '500',
   },
   actions: {
-    flexDirection: 'row',
-    padding: 10,
-    gap: 10,
+    flexGrow: 1,
   },
   actionButton: {
     flex: 1,
-    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -309,21 +444,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sectionTitle: {
-    fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
-    padding: 15,
-    paddingBottom: 5,
   },
   emptyText: {
     textAlign: 'center',
     color: '#7f8c8d',
     padding: 20,
   },
+  allocationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
   allocationCard: {
     backgroundColor: '#fff',
-    padding: 15,
-    margin: 10,
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -332,7 +467,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   allocationTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 10,
@@ -343,11 +477,9 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   allocationLabel: {
-    fontSize: 14,
     color: '#7f8c8d',
   },
   allocationValue: {
-    fontSize: 14,
     fontWeight: '500',
     color: '#2c3e50',
   },
@@ -364,40 +496,28 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 20,
     fontWeight: 'bold',
     color: '#2c3e50',
-    marginBottom: 15,
   },
   label: {
-    fontSize: 14,
     fontWeight: '500',
     color: '#2c3e50',
-    marginTop: 10,
-    marginBottom: 5,
   },
   input: {
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
   },
   pickerContainer: {
-    maxHeight: 150,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
   },
   pickerOption: {
-    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
@@ -405,7 +525,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3498db',
   },
   pickerOptionText: {
-    fontSize: 14,
     color: '#2c3e50',
   },
   pickerOptionTextSelected: {
@@ -414,12 +533,9 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    marginTop: 20,
-    gap: 10,
   },
   modalButton: {
     flex: 1,
-    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },

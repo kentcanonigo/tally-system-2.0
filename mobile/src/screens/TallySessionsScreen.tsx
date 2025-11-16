@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } fr
 import { useNavigation } from '@react-navigation/native';
 import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
+import { useResponsive } from '../utils/responsive';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
+  const responsive = useResponsive();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -62,22 +64,6 @@ function TallySessionsScreen() {
     }
   };
 
-  const renderSession = ({ item }: { item: TallySession }) => (
-    <TouchableOpacity
-      style={styles.sessionCard}
-      onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
-    >
-      <View style={styles.sessionHeader}>
-        <Text style={styles.sessionId}>Session #{item.id}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
-        </View>
-      </View>
-      <Text style={styles.sessionInfo}>{getCustomerName(item.customer_id)}</Text>
-      <Text style={styles.sessionInfo}>{getPlantName(item.plant_id)}</Text>
-      <Text style={styles.sessionDate}>{new Date(item.date).toLocaleDateString()}</Text>
-    </TouchableOpacity>
-  );
 
   if (loading && sessions.length === 0) {
     return (
@@ -87,24 +73,87 @@ function TallySessionsScreen() {
     );
   }
 
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
+    },
+    header: {
+      ...styles.header,
+      padding: responsive.padding.medium,
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    title: {
+      ...styles.title,
+      fontSize: responsive.fontSize.large,
+    },
+    addButton: {
+      ...styles.addButton,
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.spacing.md,
+    },
+    addButtonText: {
+      ...styles.addButtonText,
+      fontSize: responsive.fontSize.small,
+    },
+    list: {
+      ...styles.list,
+      padding: responsive.padding.medium,
+      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      maxWidth: '100%',
+    },
+    sessionCard: {
+      ...styles.sessionCard,
+      padding: responsive.padding.medium,
+      marginBottom: responsive.spacing.md,
+    },
+    sessionId: {
+      ...styles.sessionId,
+      fontSize: responsive.fontSize.medium,
+    },
+    sessionInfo: {
+      ...styles.sessionInfo,
+      fontSize: responsive.fontSize.small,
+    },
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Tally Sessions</Text>
+    <View style={dynamicStyles.container}>
+      <View style={dynamicStyles.header}>
+        <Text style={dynamicStyles.title}>Tally Sessions</Text>
         <TouchableOpacity
-          style={styles.addButton}
+          style={dynamicStyles.addButton}
           onPress={() => navigation.navigate('CreateTallySession' as never)}
         >
-          <Text style={styles.addButtonText}>+ New</Text>
+          <Text style={dynamicStyles.addButtonText}>+ New</Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
+        key={`flatlist-${responsive.isLargeTablet ? 2 : 1}-columns`}
         data={sessions}
-        renderItem={renderSession}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={dynamicStyles.sessionCard}
+            onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
+          >
+            <View style={styles.sessionHeader}>
+              <Text style={dynamicStyles.sessionId}>Session #{item.id}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                <Text style={styles.statusText}>{item.status}</Text>
+              </View>
+            </View>
+            <Text style={dynamicStyles.sessionInfo}>{getCustomerName(item.customer_id)}</Text>
+            <Text style={dynamicStyles.sessionInfo}>{getPlantName(item.plant_id)}</Text>
+            <Text style={styles.sessionDate}>{new Date(item.date).toLocaleDateString()}</Text>
+          </TouchableOpacity>
+        )}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={dynamicStyles.list}
+        numColumns={responsive.isLargeTablet ? 2 : 1}
+        columnWrapperStyle={responsive.isLargeTablet ? styles.row : undefined}
       />
     </View>
   );
@@ -119,18 +168,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
     backgroundColor: '#2c3e50',
   },
   title: {
-    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
   },
   addButton: {
     backgroundColor: '#3498db',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
     borderRadius: 5,
   },
   addButtonText: {
@@ -138,18 +183,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   list: {
-    padding: 10,
+    flexGrow: 1,
+  },
+  row: {
+    justifyContent: 'space-between',
   },
   sessionCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flex: 1,
+    marginHorizontal: 5,
   },
   sessionHeader: {
     flexDirection: 'row',
@@ -158,7 +206,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sessionId: {
-    fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
   },
@@ -173,7 +220,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sessionInfo: {
-    fontSize: 14,
     color: '#7f8c8d',
     marginBottom: 5,
   },
