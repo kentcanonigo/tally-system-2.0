@@ -7,7 +7,7 @@ A full-stack inventory management system for tracking chicken parts from plants 
 - **Backend**: Python 3.11+ with FastAPI, SQLAlchemy, Alembic
 - **Web Dashboard**: React 18+ with TypeScript, Vite
 - **Mobile App**: React Native with TypeScript
-- **Database**: PostgreSQL (production) / SQLite (local dev)
+- **Database**: Azure SQL Database (production) / SQLite (local dev)
 - **Deployment**: Azure App Service (backend), Azure Static Web Apps (frontend)
 
 ## Project Structure
@@ -20,9 +20,21 @@ tally-system-2.0/
 └── .github/          # CI/CD workflows
 ```
 
-## Quick Start
+## 🚀 Getting Started
 
-### Backend
+**⚠️ Important: Always test locally first before deploying to Azure!**
+
+See the [Quick Start Guide](QUICK_START.md) for a 5-minute setup, or [Testing Guide](TESTING.md) for comprehensive testing instructions.
+
+### Prerequisites
+
+- Python 3.11+ (3.13+ supported)
+- Node.js 18+
+- Git
+
+## Local Development Setup
+
+### Step 1: Backend Setup
 
 1. Navigate to backend directory:
 ```bash
@@ -32,7 +44,10 @@ cd backend
 2. Create virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
 ```
 
 3. Install dependencies:
@@ -40,12 +55,18 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-   **Note:** If you get Rust/Cargo errors, see `INSTALL.md` for solutions. For local development with SQLite, you don't need PostgreSQL drivers.
+   **Note:** 
+   - For local development with SQLite, PostgreSQL drivers are not required
+   - If you encounter Rust/Cargo errors with Python 3.13, the requirements have been updated with compatible versions
+   - See `INSTALL.md` for troubleshooting
 
 4. Set up environment variables:
 ```bash
-cp .env.example .env
-# Edit .env with your database URL
+# Create .env file (or copy from .env.example if available)
+# For local SQLite development (default):
+DATABASE_URL=sqlite:///./tally_system.db
+API_V1_PREFIX=/api/v1
+DEBUG=True
 ```
 
 5. Run database migrations:
@@ -53,23 +74,40 @@ cp .env.example .env
 alembic upgrade head
 ```
 
-   Note: If you're using SQLite, the initial migration may need adjustments. You can regenerate it with:
-   ```bash
-   alembic revision --autogenerate -m "Initial migration"
-   alembic upgrade head
-   ```
+   This creates the SQLite database and all tables.
 
-6. Start the server:
+6. Start the development server:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
-API documentation at `http://localhost:8000/docs`
+✅ **Backend running at:** `http://localhost:8000`  
+✅ **API documentation at:** `http://localhost:8000/docs`  
+✅ **Health check at:** `http://localhost:8000/health`
 
-### Web Dashboard
+### Step 2: Test Backend Locally
 
-1. Navigate to web directory:
+**Quick Test (Recommended):**
+1. Open `http://localhost:8000/docs` in your browser
+2. Use the interactive Swagger UI to test endpoints
+3. Try creating a customer: `POST /api/v1/customers` with `{"name": "Test Customer"}`
+
+**Or use curl:**
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Create a customer
+curl -X POST "http://localhost:8000/api/v1/customers" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test Customer"}'
+```
+
+📖 **For detailed testing instructions, see [TESTING.md](TESTING.md)**
+
+### Step 3: Web Dashboard Setup
+
+1. Navigate to web directory (in a **new terminal**):
 ```bash
 cd web
 ```
@@ -79,8 +117,9 @@ cd web
 npm install
 ```
 
-3. Create `.env` file:
+3. Create `.env` file (optional, defaults to localhost):
 ```bash
+# .env
 VITE_API_URL=http://localhost:8000/api/v1
 ```
 
@@ -89,9 +128,14 @@ VITE_API_URL=http://localhost:8000/api/v1
 npm run dev
 ```
 
-The dashboard will be available at `http://localhost:3000`
+✅ **Dashboard running at:** `http://localhost:3000`
 
-### Mobile App
+**Quick Test:**
+- Open `http://localhost:3000`
+- Navigate to "Customers" and create a test customer
+- Verify it appears in the list
+
+### Step 4: Mobile App Setup (Optional)
 
 1. Navigate to mobile directory:
 ```bash
@@ -105,7 +149,14 @@ npm install
 
 3. Update API URL in `src/services/api.ts`:
 ```typescript
-const API_BASE_URL = 'http://YOUR_BACKEND_URL/api/v1';
+// For Android emulator:
+const API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+
+// For iOS simulator:
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+// For physical device, use your computer's IP:
+const API_BASE_URL = 'http://192.168.1.XXX:8000/api/v1';
 ```
 
 4. Run on Android:
@@ -113,17 +164,37 @@ const API_BASE_URL = 'http://YOUR_BACKEND_URL/api/v1';
 npx react-native run-android
 ```
 
+## Local Testing Workflow
+
+**Before deploying, ensure everything works locally:**
+
+1. ✅ Backend API starts and responds to health checks
+2. ✅ Can create/read/update/delete customers via API
+3. ✅ Can create/read/update/delete plants via API
+4. ✅ Can create weight classifications and tally sessions
+5. ✅ Web dashboard connects to backend and displays data
+6. ✅ Can perform CRUD operations via web dashboard
+7. ✅ Mobile app (if testing) can connect and view data
+
+See [TESTING.md](TESTING.md) for a complete testing checklist and detailed instructions.
+
 ## API Endpoints
 
+### Health & Info
+- `GET /health` - Basic health check
+- `GET /health/db` - Database connectivity check
+- `GET /docs` - Interactive API documentation (Swagger UI)
+- `GET /redoc` - Alternative API documentation (ReDoc)
+
 ### Customers
-- `GET /api/v1/customers` - List all customers
+- `GET /api/v1/customers` - List all customers (supports `skip` and `limit` query params)
 - `GET /api/v1/customers/{id}` - Get customer by ID
 - `POST /api/v1/customers` - Create customer
 - `PUT /api/v1/customers/{id}` - Update customer
 - `DELETE /api/v1/customers/{id}` - Delete customer
 
 ### Plants
-- `GET /api/v1/plants` - List all plants
+- `GET /api/v1/plants` - List all plants (supports `skip` and `limit` query params)
 - `GET /api/v1/plants/{id}` - Get plant by ID
 - `POST /api/v1/plants` - Create plant
 - `PUT /api/v1/plants/{id}` - Update plant
@@ -137,7 +208,7 @@ npx react-native run-android
 - `DELETE /api/v1/weight-classifications/{id}` - Delete classification
 
 ### Tally Sessions
-- `GET /api/v1/tally-sessions` - List sessions (supports query params: customer_id, plant_id, status)
+- `GET /api/v1/tally-sessions` - List sessions (supports query params: `customer_id`, `plant_id`, `status`, `skip`, `limit`)
 - `GET /api/v1/tally-sessions/{id}` - Get session by ID
 - `POST /api/v1/tally-sessions` - Create session
 - `PUT /api/v1/tally-sessions/{id}` - Update session
@@ -150,27 +221,53 @@ npx react-native run-android
 - `PUT /api/v1/allocations/{id}` - Update allocation
 - `DELETE /api/v1/allocations/{id}` - Delete allocation
 
-## Deployment
+## Database Compatibility
 
-### Azure Setup
+The system supports multiple databases:
 
-1. **Backend (Azure App Service)**
-   - Create an Azure App Service (Linux)
-   - Configure environment variables:
-     - `DATABASE_URL`: PostgreSQL connection string
-     - `API_V1_PREFIX`: `/api/v1`
-   - Set up GitHub Actions secrets:
-     - `AZURE_WEBAPP_PUBLISH_PROFILE`
+- **SQLite** (default for local development) - No setup required, works out of the box
+- **Azure SQL Database** (production) - Requires connection string configuration
+- **PostgreSQL** (optional) - Supported but not required for local development
 
-2. **Frontend (Azure Static Web Apps)**
-   - Create an Azure Static Web App
-   - Set up GitHub Actions secrets:
-     - `AZURE_STATIC_WEB_APPS_API_TOKEN`
-     - `VITE_API_URL`: Your backend API URL
+**Important Notes:**
+- SQL Server (Azure SQL) requires `ORDER BY` clauses when using `OFFSET`/`LIMIT` - this is already handled in the code
+- String columns have explicit lengths for SQL Server compatibility
+- Migrations are compatible with all supported databases
 
-3. **Database (Azure Database for PostgreSQL)**
-   - Create PostgreSQL database (free tier available)
-   - Update `DATABASE_URL` in backend environment variables
+## Deployment to Azure
+
+**⚠️ Only deploy after successful local testing!**
+
+### Prerequisites
+- Azure account (free tier available)
+- GitHub repository with code pushed
+- All local tests passing
+
+### Quick Deployment Guide
+
+See [AZURE_QUICK_START.md](AZURE_QUICK_START.md) for a streamlined deployment guide, or [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md) for detailed instructions.
+
+**Summary:**
+1. **Database**: Create Azure SQL Database (free tier available)
+2. **Backend**: Deploy to Azure App Service (Linux)
+3. **Frontend**: Deploy to Azure Static Web Apps
+4. **CI/CD**: GitHub Actions workflows handle automatic deployments
+
+### Azure Services Used
+
+- **Azure SQL Database** (Basic tier, free tier eligible)
+- **Azure App Service** (Linux, Free tier)
+- **Azure Static Web Apps** (Free tier)
+
+### Environment Variables for Azure
+
+**Backend (Azure App Service):**
+- `DATABASE_URL`: Azure SQL Database connection string (SQLAlchemy format)
+- `CORS_ORIGINS`: Comma-separated list of allowed origins (or `*` for all)
+- `DEBUG`: Set to `False` for production
+
+**Frontend (GitHub Secrets):**
+- `VITE_API_URL`: Your Azure backend API URL (e.g., `https://your-api.azurewebsites.net/api/v1`)
 
 ## Development
 
@@ -199,9 +296,74 @@ alembic upgrade head
 
 # Rollback migration
 alembic downgrade -1
+
+# Check migration status
+alembic current
+alembic history
 ```
+
+### Code Structure
+
+- **Backend**: FastAPI with SQLAlchemy ORM, Alembic for migrations
+- **Frontend**: React with TypeScript, Vite for build tooling
+- **Mobile**: React Native with TypeScript
+- **API**: RESTful API with OpenAPI/Swagger documentation
+
+## Troubleshooting
+
+### Backend Issues
+
+**Port already in use:**
+```bash
+# Use a different port
+uvicorn app.main:app --port 8001
+```
+
+**Migration errors:**
+```bash
+cd backend
+# Delete SQLite database if exists
+rm tally_system.db
+# Re-run migration
+alembic upgrade head
+```
+
+**Python 3.13 compatibility:**
+- Requirements have been updated for Python 3.13 compatibility
+- If issues persist, see `INSTALL.md`
+
+### Web Dashboard Issues
+
+**API connection errors:**
+- Verify backend is running on `http://localhost:8000`
+- Check `VITE_API_URL` in `.env` file
+- Check browser console for CORS errors
+- Ensure backend CORS is configured correctly
+
+### Mobile App Issues
+
+**Cannot connect to API:**
+- Android emulator: Use `10.0.2.2` instead of `localhost`
+- Physical device: Use your computer's local IP address
+- Check firewall settings
+
+### Azure Deployment Issues
+
+See [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md) for detailed troubleshooting.
+
+Common issues:
+- Database connection string format (SQLAlchemy vs ADO.NET)
+- CORS configuration
+- Environment variables not set correctly
+- GitHub Actions secrets not configured
+
+## Additional Resources
+
+- [Quick Start Guide](QUICK_START.md) - Get running in 5 minutes
+- [Testing Guide](TESTING.md) - Comprehensive testing instructions
+- [Azure Deployment Guide](AZURE_DEPLOYMENT.md) - Detailed Azure setup
+- [Azure Quick Start](AZURE_QUICK_START.md) - Streamlined Azure deployment
 
 ## License
 
 MIT
-
