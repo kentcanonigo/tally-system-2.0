@@ -11,7 +11,7 @@ echo Select services to start:
 echo 1. Backend only
 echo 2. Web Dashboard only
 echo 3. Backend + Web Dashboard
-echo 4. Backend + Web + Mobile (Metro)
+echo 4. Backend + Web + Mobile (Expo)
 echo 5. All services
 echo.
 set /p choice="Enter your choice (1-5): "
@@ -64,13 +64,13 @@ timeout /t 2 /nobreak >nul
 echo Starting Web Dashboard...
 start "Tally System - Web Dashboard" cmd /k "cd web && if not exist node_modules (npm install) && if not exist .env (echo VITE_API_URL=http://localhost:8000/api/v1 > .env) && npm run dev"
 timeout /t 2 /nobreak >nul
-echo Starting Mobile App (Metro Bundler)...
-start "Tally System - Metro Bundler" cmd /k "cd mobile && if not exist node_modules (npm install) && npm start"
+echo Starting Mobile App (Expo)...
+start "Tally System - Expo" cmd /k "cd mobile && if not exist node_modules (npm install) && npm start"
 echo.
 echo All services starting in separate windows
 echo Backend: http://localhost:8000
 echo Dashboard: http://localhost:3000
-echo Metro: Running (use 'npx react-native run-android' to launch app)
+echo Expo: Running (press 'a' for Android, 'i' for iOS, or scan QR code)
 goto end
 
 :end

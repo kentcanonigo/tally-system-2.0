@@ -1,5 +1,5 @@
 @echo off
-REM Start Mobile App Metro Bundler only
+REM Start Mobile App with Expo
 
 cd mobile
 
@@ -9,9 +9,9 @@ if not exist node_modules (
     npm install
 )
 
-REM Start Metro bundler
-echo Starting Metro bundler...
-echo Note: Run 'npx react-native run-android' in another terminal to launch the app
+REM Start Expo development server
+echo Starting Expo development server...
+echo Press 'a' for Android, 'i' for iOS, or scan QR code with Expo Go app
 npm start
 
 pause

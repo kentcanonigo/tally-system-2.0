@@ -1,5 +1,33 @@
 {
-  "name": "TallySystem",
-  "displayName": "Tally System"
+  "expo": {
+    "name": "Tally System",
+    "slug": "tally-system",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tallysystemmobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.tallysystemmobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
 }
 

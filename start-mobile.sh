@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start Mobile App Metro Bundler only
+# Start Mobile App with Expo
 
 cd mobile
 
@@ -9,8 +9,8 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Start Metro bundler
-echo "Starting Metro bundler..."
-echo "Note: Run 'npx react-native run-android' in another terminal to launch the app"
+# Start Expo development server
+echo "Starting Expo development server..."
+echo "Press 'a' for Android, 'i' for iOS, or scan QR code with Expo Go app"
 npm start
 

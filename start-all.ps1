@@ -63,17 +63,17 @@ pause
     Start-Process powershell -ArgumentList "-NoExit", "-Command", $webScript
 }
 
-# Function to start mobile app (Metro bundler)
+# Function to start mobile app (Expo)
 function Start-Mobile {
-    Write-Host "🚀 Starting Mobile App (Metro Bundler)..." -ForegroundColor Yellow
+    Write-Host "🚀 Starting Mobile App (Expo)..." -ForegroundColor Yellow
     $mobileScript = @"
 cd mobile
 if (-not (Test-Path node_modules)) {
     Write-Host "⚠️  node_modules not found. Installing dependencies..." -ForegroundColor Yellow
     npm install
 }
-Write-Host "Starting Metro bundler..." -ForegroundColor Green
-Write-Host "⚠️  Note: Run 'npx react-native run-android' or 'npx react-native run-ios' in another terminal to launch the app" -ForegroundColor Yellow
+Write-Host "Starting Expo development server..." -ForegroundColor Green
+Write-Host "⚠️  Press 'a' for Android, 'i' for iOS, or scan QR code with Expo Go app" -ForegroundColor Yellow
 npm start
 pause
 "@
@@ -85,7 +85,7 @@ Write-Host "Select services to start:" -ForegroundColor Cyan
 Write-Host "1. Backend only" -ForegroundColor White
 Write-Host "2. Web Dashboard only" -ForegroundColor White
 Write-Host "3. Backend + Web Dashboard" -ForegroundColor White
-Write-Host "4. Backend + Web + Mobile (Metro)" -ForegroundColor White
+Write-Host "4. Backend + Web + Mobile (Expo)" -ForegroundColor White
 Write-Host "5. All services" -ForegroundColor White
 Write-Host ""
 $choice = Read-Host "Enter your choice (1-5)"
@@ -123,7 +123,7 @@ switch ($choice) {
         Write-Host "✅ All services starting in separate windows" -ForegroundColor Green
         Write-Host "   Backend: http://localhost:8000" -ForegroundColor Gray
         Write-Host "   Dashboard: http://localhost:3000" -ForegroundColor Gray
-        Write-Host "   Metro: Running (use 'npx react-native run-android' to launch app)" -ForegroundColor Gray
+        Write-Host "   Expo: Running (press 'a' for Android, 'i' for iOS, or scan QR code)" -ForegroundColor Gray
     }
     "5" {
         Start-Backend
@@ -135,7 +135,7 @@ switch ($choice) {
         Write-Host "✅ All services starting in separate windows" -ForegroundColor Green
         Write-Host "   Backend: http://localhost:8000" -ForegroundColor Gray
         Write-Host "   Dashboard: http://localhost:3000" -ForegroundColor Gray
-        Write-Host "   Metro: Running (use 'npx react-native run-android' to launch app)" -ForegroundColor Gray
+        Write-Host "   Expo: Running (press 'a' for Android, 'i' for iOS, or scan QR code)" -ForegroundColor Gray
     }
     default {
         Write-Host "❌ Invalid choice. Exiting." -ForegroundColor Red

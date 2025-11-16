@@ -37,7 +37,7 @@ echo -e "${CYAN}Select services to start:${NC}"
 echo "1. Backend only"
 echo "2. Web Dashboard only"
 echo "3. Backend + Web Dashboard"
-echo "4. Backend + Web + Mobile (Metro)"
+echo "4. Backend + Web + Mobile (Expo)"
 echo "5. All services"
 echo ""
 read -p "Enter your choice (1-5): " choice
@@ -86,20 +86,20 @@ start_web() {
 
 start_mobile() {
     echo ""
-    echo -e "${YELLOW}🚀 Starting Mobile App (Metro Bundler)...${NC}"
+    echo -e "${YELLOW}🚀 Starting Mobile App (Expo)...${NC}"
     (
         cd mobile
         if [ ! -d "node_modules" ]; then
             echo -e "${YELLOW}⚠️  node_modules not found. Installing dependencies...${NC}"
             npm install
         fi
-        echo -e "${GREEN}Starting Metro bundler...${NC}"
-        echo -e "${YELLOW}⚠️  Note: Run 'npx react-native run-android' or 'npx react-native run-ios' in another terminal to launch the app${NC}"
+        echo -e "${GREEN}Starting Expo development server...${NC}"
+        echo -e "${YELLOW}⚠️  Press 'a' for Android, 'i' for iOS, or scan QR code with Expo Go app${NC}"
         npm start
     ) &
     MOBILE_PID=$!
-    echo -e "${GREEN}✅ Metro bundler starting (PID: $MOBILE_PID)${NC}"
-    echo "   Use 'npx react-native run-android' to launch the app"
+    echo -e "${GREEN}✅ Expo starting (PID: $MOBILE_PID)${NC}"
+    echo "   Press 'a' for Android, 'i' for iOS, or scan QR code"
 }
 
 case $choice in
