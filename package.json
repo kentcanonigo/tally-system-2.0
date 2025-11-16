@@ -1,0 +1,25 @@
+{
+  "name": "tally-system-2.0",
+  "version": "2.0.0",
+  "description": "Full-stack inventory management system for tracking chicken parts",
+  "scripts": {
+    "start": "node -e \"console.log('Use start-all.bat (Windows) or ./start-all.sh (Unix) to start all services')\"",
+    "start:backend": "cd backend && if exist venv\\Scripts\\activate.bat (call venv\\Scripts\\activate.bat && alembic upgrade head && uvicorn app.main:app --reload) else (echo Virtual environment not found. Please run: cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt)",
+    "start:web": "cd web && if not exist .env (echo VITE_API_URL=http://localhost:8000/api/v1 > .env) && npm run dev",
+    "start:mobile": "cd mobile && npm start",
+    "install:backend": "cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt",
+    "install:web": "cd web && npm install",
+    "install:mobile": "cd mobile && npm install",
+    "install:all": "npm run install:backend && npm run install:web && npm run install:mobile"
+  },
+  "keywords": [
+    "inventory",
+    "management",
+    "fastapi",
+    "react",
+    "react-native"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

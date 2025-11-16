@@ -24,7 +24,16 @@ tally-system-2.0/
 
 **⚠️ Important: Always test locally first before deploying to Azure!**
 
-See the [Quick Start Guide](QUICK_START.md) for a 5-minute setup, or [Testing Guide](TESTING.md) for comprehensive testing instructions.
+### Quick Start Options
+
+1. **Use Startup Scripts (Easiest)** - See [SCRIPTS.md](SCRIPTS.md)
+   - Windows: Double-click `start-all.bat` or run `start-all.ps1`
+   - Git Bash/Linux/Mac: Run `./start-all.sh`
+   - Choose which services to start from a menu
+
+2. **Manual Setup** - See [Quick Start Guide](QUICK_START.md) for step-by-step instructions
+
+3. **Comprehensive Testing** - See [Testing Guide](TESTING.md) for detailed testing instructions
 
 ### Prerequisites
 
