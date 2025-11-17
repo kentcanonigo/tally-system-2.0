@@ -16,6 +16,7 @@ function WeightClassifications() {
     category: '',
     isCatchAll: false,
     isUpRange: false,
+    isDownRange: false,
   });
 
   useEffect(() => {
@@ -64,6 +65,7 @@ function WeightClassifications() {
       category: '',
       isCatchAll: false,
       isUpRange: false,
+      isDownRange: false,
     });
     setShowModal(true);
   };
@@ -71,6 +73,7 @@ function WeightClassifications() {
   const handleEdit = (classification: WeightClassification) => {
     const isCatchAll = classification.min_weight === null && classification.max_weight === null;
     const isUpRange = classification.min_weight !== null && classification.max_weight === null;
+    const isDownRange = classification.min_weight === null && classification.max_weight !== null;
     
     setEditingClassification(classification);
     setFormData({
@@ -80,6 +83,7 @@ function WeightClassifications() {
       category: classification.category,
       isCatchAll,
       isUpRange,
+      isDownRange,
     });
     setShowModal(true);
   };
@@ -100,6 +104,9 @@ function WeightClassifications() {
     } else if (formData.isUpRange) {
       submitData.min_weight = formData.min_weight;
       submitData.max_weight = null;
+    } else if (formData.isDownRange) {
+      submitData.min_weight = null;
+      submitData.max_weight = formData.max_weight;
     } else {
       submitData.min_weight = formData.min_weight;
       submitData.max_weight = formData.max_weight;
@@ -122,6 +129,9 @@ function WeightClassifications() {
   const formatWeightRange = (wc: WeightClassification): string => {
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
+    }
+    if (wc.min_weight === null && wc.max_weight !== null) {
+      return `Up to ${wc.max_weight}`;
     }
     if (wc.max_weight === null) {
       return `${wc.min_weight} and up`;
@@ -257,18 +267,38 @@ function WeightClassifications() {
               {!formData.isCatchAll && (
                 <>
                   <div className="form-group">
-                    <label>Min Weight</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.min_weight ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setFormData({ ...formData, min_weight: value });
-                      }}
-                      required
-                    />
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={formData.isDownRange}
+                        onChange={(e) => {
+                          const isDownRange = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            isDownRange,
+                            isUpRange: isDownRange ? false : formData.isUpRange,
+                            min_weight: isDownRange ? null : formData.min_weight,
+                          });
+                        }}
+                      />
+                      {' '}Down range (no lower limit - up to X)
+                    </label>
                   </div>
+                  {!formData.isDownRange && (
+                    <div className="form-group">
+                      <label>Min Weight</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.min_weight ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                          setFormData({ ...formData, min_weight: value });
+                        }}
+                        required
+                      />
+                    </div>
+                  )}
                   <div className="form-group">
                     <label>
                       <input
@@ -279,11 +309,12 @@ function WeightClassifications() {
                           setFormData({
                             ...formData,
                             isUpRange,
+                            isDownRange: isUpRange ? false : formData.isDownRange,
                             max_weight: isUpRange ? null : formData.max_weight,
                           });
                         }}
                       />
-                      {' '}Up range (no upper limit)
+                      {' '}Up range (no upper limit - X and up)
                     </label>
                   </div>
                   {!formData.isUpRange && (

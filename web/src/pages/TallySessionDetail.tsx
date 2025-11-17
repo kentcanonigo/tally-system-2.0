@@ -112,6 +112,9 @@ function TallySessionDetail() {
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
+    if (wc.min_weight === null && wc.max_weight !== null) {
+      return `Up to ${wc.max_weight}`;
+    }
     if (wc.max_weight === null) {
       return `${wc.min_weight} and up`;
     }

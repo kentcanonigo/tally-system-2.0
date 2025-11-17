@@ -114,6 +114,9 @@ function TallySessionDetailScreen() {
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
+    if (wc.min_weight === null && wc.max_weight !== null) {
+      return `Up to ${wc.max_weight}`;
+    }
     if (wc.max_weight === null) {
       return `${wc.min_weight} and up`;
     }
@@ -121,7 +124,7 @@ function TallySessionDetailScreen() {
   };
 
   const findWeightClassification = (weight: number): WeightClassification | null => {
-    // Priority order: regular ranges > "up" ranges > catch-all
+    // Priority order: regular ranges > "up" ranges > "down" ranges > catch-all
     
     // First, check regular ranges (most specific)
     for (const wc of weightClassifications) {
@@ -136,6 +139,15 @@ function TallySessionDetailScreen() {
     for (const wc of weightClassifications) {
       if (wc.min_weight !== null && wc.max_weight === null) {
         if (weight >= wc.min_weight) {
+          return wc;
+        }
+      }
+    }
+    
+    // Then check "down" ranges (less specific)
+    for (const wc of weightClassifications) {
+      if (wc.min_weight === null && wc.max_weight !== null) {
+        if (weight <= wc.max_weight) {
           return wc;
         }
       }

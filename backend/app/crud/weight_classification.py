@@ -10,18 +10,23 @@ def _ranges_overlap(
 ) -> bool:
     """
     Check if two weight ranges overlap.
-    None max_weight means "up" (infinity), None min_weight means catch-all.
+    - Catch-all (both None): overlaps with everything
+    - "Up" range (min set, max None): >= min_weight
+    - "Down" range (min None, max set): <= max_weight
+    - Regular range (both set): min_weight <= weight <= max_weight
     """
     # Catch-all overlaps with everything
     if (min1 is None and max1 is None) or (min2 is None and max2 is None):
         return True
     
-    # Convert None max_weight to infinity for comparison
+    # Convert None to appropriate infinity/negative infinity for comparison
+    min1_val = float('-inf') if min1 is None else min1
     max1_val = float('inf') if max1 is None else max1
+    min2_val = float('-inf') if min2 is None else min2
     max2_val = float('inf') if max2 is None else max2
     
     # Ranges overlap if: min1 <= max2 AND min2 <= max1
-    return min1 <= max2_val and min2 <= max1_val
+    return min1_val <= max2_val and min2_val <= max1_val
 
 
 def _check_overlaps(

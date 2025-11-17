@@ -27,14 +27,19 @@ class WeightClassificationBase(BaseModel):
         if self.min_weight is None and self.max_weight is None:
             return self  # Valid catch-all
         
-        # Regular range: min_weight must be set
-        if self.min_weight is None:
-            raise ValueError('min_weight is required unless this is a catch-all classification (both min and max null)')
+        # "Down" range: min_weight is null, max_weight is set (means <= max_weight)
+        if self.min_weight is None and self.max_weight is not None:
+            return self  # Valid "down" range (up to X)
         
-        # "Up" range: max_weight can be null (means >= min_weight)
-        if self.max_weight is not None:
+        # "Up" range: min_weight is set, max_weight is null (means >= min_weight)
+        if self.min_weight is not None and self.max_weight is None:
+            return self  # Valid "up" range (X and up)
+        
+        # Regular range: both min and max are set
+        if self.min_weight is not None and self.max_weight is not None:
             if self.max_weight < self.min_weight:
                 raise ValueError('max_weight must be greater than or equal to min_weight')
+            return self
         
         return self
 
@@ -58,6 +63,20 @@ class WeightClassificationUpdate(BaseModel):
         if v not in allowed_categories:
             raise ValueError(f'category must be one of: {", ".join(allowed_categories)}')
         return v
+
+    @model_validator(mode='after')
+    def validate_weights(self):
+        # Only validate if at least one weight is being set
+        if self.min_weight is None and self.max_weight is None:
+            return self  # No weights being updated, skip validation
+        
+        # If both are being set, validate the range
+        if self.min_weight is not None and self.max_weight is not None:
+            if self.max_weight < self.min_weight:
+                raise ValueError('max_weight must be greater than or equal to min_weight')
+        
+        # All other combinations are valid (partial updates will be merged with existing data)
+        return self
 
 
 class WeightClassificationResponse(WeightClassificationBase):
