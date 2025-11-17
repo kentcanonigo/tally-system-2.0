@@ -1,8 +1,9 @@
 import React from 'react';
+import { registerRootComponent } from 'expo';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './navigation/AppNavigator';
 
-function App(): JSX.Element {
+function App() {
   return (
     <SafeAreaProvider>
       <AppNavigator />
@@ -11,4 +12,6 @@ function App(): JSX.Element {
 }
 
 export default App;
+
+registerRootComponent(App);
 
