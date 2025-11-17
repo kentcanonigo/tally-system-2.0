@@ -578,35 +578,36 @@ function TallySessionDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Three display fields in a row */}
-            <View style={styles.tallyDisplayRow}>
-              <View style={[styles.tallyDisplayField, { flex: 2 }]}>
-                <Text style={styles.tallyDisplayLabel}>Classification</Text>
-                <Text style={styles.tallyDisplayValue} numberOfLines={1}>
-                  {matchedWC ? matchedWC.classification : '-'}
-                </Text>
+            <View style={styles.tallyScrollContent}>
+              {/* Three display fields in a row */}
+              <View style={styles.tallyDisplayRow}>
+                <View style={[styles.tallyDisplayField, { flex: 2 }]}>
+                  <Text style={styles.tallyDisplayLabel}>Classification</Text>
+                  <Text style={styles.tallyDisplayValue} numberOfLines={1}>
+                    {matchedWC ? matchedWC.classification : '-'}
+                  </Text>
+                </View>
+                <View style={[styles.tallyDisplayField, { flex: 2 }]}>
+                  <Text style={styles.tallyDisplayLabel}>Allocated / Required</Text>
+                  <Text style={styles.tallyDisplayValue}>
+                    {currentAllocation
+                      ? `${tallyRole === 'tally' ? currentAllocation.allocated_bags_tally : currentAllocation.allocated_bags_dispatcher} / ${currentAllocation.required_bags}`
+                      : '- / -'}
+                  </Text>
+                </View>
+                <View style={[styles.tallyDisplayField, { flex: 1.5 }]}>
+                  <Text style={styles.tallyDisplayLabel}>Weight</Text>
+                  <Text style={[styles.tallyDisplayValue, { fontSize: responsive.isTablet ? 28 : 24 }]}>
+                    {tallyInput}
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.tallyDisplayField, { flex: 2 }]}>
-                <Text style={styles.tallyDisplayLabel}>Allocated / Required</Text>
-                <Text style={styles.tallyDisplayValue}>
-                  {currentAllocation
-                    ? `${tallyRole === 'tally' ? currentAllocation.allocated_bags_tally : currentAllocation.allocated_bags_dispatcher} / ${currentAllocation.required_bags}`
-                    : '- / -'}
-                </Text>
-              </View>
-              <View style={[styles.tallyDisplayField, { flex: 1.5 }]}>
-                <Text style={styles.tallyDisplayLabel}>Weight</Text>
-                <Text style={[styles.tallyDisplayValue, { fontSize: responsive.isTablet ? 28 : 24 }]}>
-                  {tallyInput}
-                </Text>
-              </View>
-            </View>
 
-            {/* Calculator buttons */}
-            <View style={styles.tallyButtonsContainer}>
-              {/* Number pad */}
-              <View style={styles.tallyNumberPad}>
-                <View style={styles.tallyButtonRow}>
+              {/* Calculator buttons */}
+              <View style={styles.tallyButtonsContainer}>
+                {/* Number pad */}
+                <View style={styles.tallyNumberPad}>
+                  <View style={styles.tallyButtonRow}>
                   <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('7')}>
                     <Text style={styles.tallyButtonText}>7</Text>
                   </TouchableOpacity>
@@ -650,22 +651,62 @@ function TallySessionDetailScreen() {
                     <Text style={styles.tallyButtonText}>⌫</Text>
                   </TouchableOpacity>
                 </View>
+                </View>
+
+                {/* Action buttons */}
+                <View style={styles.tallyActionButtons}>
+                  <TouchableOpacity
+                    style={[styles.tallyActionButton, styles.clearButton]}
+                    onPress={handleTallyClear}
+                  >
+                    <Text style={styles.tallyActionButtonText}>Clear</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.tallyActionButton, styles.enterButton]}
+                    onPress={handleTallyEnter}
+                  >
+                    <Text style={styles.tallyActionButtonText}>Enter</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              {/* Action buttons */}
-              <View style={styles.tallyActionButtons}>
-                <TouchableOpacity
-                  style={[styles.tallyActionButton, styles.clearButton]}
-                  onPress={handleTallyClear}
-                >
-                  <Text style={styles.tallyActionButtonText}>Clear</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tallyActionButton, styles.enterButton]}
-                  onPress={handleTallyEnter}
-                >
-                  <Text style={styles.tallyActionButtonText}>Enter</Text>
-                </TouchableOpacity>
+              {/* Summary table */}
+              <View style={styles.tallySummaryContainer}>
+                <Text style={styles.tallySummaryTitle}>Allocations Summary</Text>
+                <View style={styles.tallySummaryTable}>
+                  <View style={styles.tallySummaryHeader}>
+                    <Text style={[styles.tallySummaryHeaderText, { flex: 2 }]}>Label</Text>
+                    <Text style={[styles.tallySummaryHeaderText, { flex: 2 }]}>Allocated / Required</Text>
+                    <Text style={[styles.tallySummaryHeaderText, { flex: 1 }]}>Sum</Text>
+                  </View>
+                  {allocations.map((allocation) => {
+                    const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                    if (!wc) return null;
+                    
+                    const allocatedBags = tallyRole === 'tally' 
+                      ? allocation.allocated_bags_tally 
+                      : allocation.allocated_bags_dispatcher;
+                    
+                    return (
+                      <View key={allocation.id} style={styles.tallySummaryRow}>
+                        <Text style={[styles.tallySummaryCell, { flex: 2 }]} numberOfLines={1}>
+                          {wc.classification}
+                        </Text>
+                        <Text style={[styles.tallySummaryCell, { flex: 2 }]}>
+                          {allocatedBags} / {allocation.required_bags}
+                        </Text>
+                        <Text style={[styles.tallySummaryCell, { flex: 1 }]}>-</Text>
+                      </View>
+                    );
+                  })}
+                  {allocations.length === 0 && (
+                    <View style={styles.tallySummaryRow}>
+                      <Text style={[styles.tallySummaryCell, { flex: 1, textAlign: 'center' }]}>
+                        No allocations yet
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
           </View>
@@ -796,6 +837,12 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     maxHeight: '90%',
     padding: 20,
+  },
+  tallyScrollContent: {
+    // No height constraint - let content determine size
+  },
+  tallyScrollContentContainer: {
+    paddingBottom: 10,
   },
   modalTitle: {
     fontWeight: 'bold',
@@ -941,6 +988,50 @@ const styles = StyleSheet.create({
   },
   enterButton: {
     backgroundColor: '#27ae60',
+  },
+  tallySummaryContainer: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#bdc3c7',
+  },
+  tallySummaryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  tallySummaryTable: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    overflow: 'hidden',
+  },
+  tallySummaryHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#34495e',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#bdc3c7',
+  },
+  tallySummaryHeaderText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  tallySummaryRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  tallySummaryCell: {
+    fontSize: 14,
+    color: '#2c3e50',
+    paddingHorizontal: 4,
   },
 });
 
