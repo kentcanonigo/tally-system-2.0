@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import { useResponsive } from '../utils/responsive';
@@ -14,12 +14,19 @@ function HomeScreen() {
     ongoingSessions: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchStats();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
       const [customersRes, plantsRes, sessionsRes] = await Promise.all([
         customersApi.getAll(),
@@ -40,7 +47,12 @@ function HomeScreen() {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    fetchStats(true);
   };
 
   if (loading) {
@@ -109,7 +121,13 @@ function HomeScreen() {
   };
 
   return (
-    <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
+    <ScrollView 
+      style={dynamicStyles.container} 
+      contentContainerStyle={dynamicStyles.contentContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={dynamicStyles.contentWrapper}>
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.title}>Tally System</Text>
