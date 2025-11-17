@@ -216,12 +216,15 @@ function WeightClassifications() {
               </div>
               <div className="form-group">
                 <label>Category</label>
-                <input
-                  type="text"
+                <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   required
-                />
+                >
+                  <option value="">Select a category</option>
+                  <option value="Dressed">Dressed</option>
+                  <option value="Byproduct">Byproduct</option>
+                </select>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
