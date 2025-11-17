@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import type { Customer, Plant, TallySession } from '../types';
 
 function TallySessions() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    customer_id: '',
+    plant_id: '',
+    date: new Date().toISOString().split('T')[0], // Today's date as default
+    status: 'ongoing',
+  });
   const [filters, setFilters] = useState({
     customer_id: '',
     plant_id: '',
@@ -91,6 +99,34 @@ function TallySessions() {
     }
   };
 
+  const handleCreate = () => {
+    setFormData({
+      customer_id: '',
+      plant_id: '',
+      date: new Date().toISOString().split('T')[0],
+      status: 'ongoing',
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await tallySessionsApi.create({
+        customer_id: Number(formData.customer_id),
+        plant_id: Number(formData.plant_id),
+        date: formData.date,
+        status: formData.status as any,
+      });
+      setShowModal(false);
+      // Navigate to the newly created session detail page
+      navigate(`/tally-sessions/${response.data.id}`);
+    } catch (error: any) {
+      console.error('Error creating session:', error);
+      alert(error.response?.data?.detail || 'Error creating tally session');
+    }
+  };
+
   if (loading && sessions.length === 0) {
     return <div>Loading...</div>;
   }
@@ -100,6 +136,12 @@ function TallySessions() {
       <div className="page-header">
         <h1>Tally Sessions</h1>
         <p>View and manage tally sessions</p>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <button className="btn btn-primary" onClick={handleCreate}>
+          Create New Session
+        </button>
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
@@ -202,6 +244,77 @@ function TallySessions() {
           </tbody>
         </table>
       </div>
+
+      {showModal && (
+        <div className="modal" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Create New Tally Session</h2>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Customer</label>
+                <select
+                  value={formData.customer_id}
+                  onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select a customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Plant</label>
+                <select
+                  value={formData.plant_id}
+                  onChange={(e) => setFormData({ ...formData, plant_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select a plant</option>
+                  {plants.map((plant) => (
+                    <option key={plant.id} value={plant.id}>
+                      {plant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  required
+                >
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
