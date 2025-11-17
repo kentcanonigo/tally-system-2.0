@@ -17,7 +17,8 @@ function TallySessionDetail() {
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: 0,
-    allocated_bags: 0,
+    allocated_bags_tally: 0,
+    allocated_bags_dispatcher: 0,
   });
 
   useEffect(() => {
@@ -58,7 +59,8 @@ function TallySessionDetail() {
     setFormData({
       weight_classification_id: weightClassifications[0]?.id || 0,
       required_bags: 0,
-      allocated_bags: 0,
+      allocated_bags_tally: 0,
+      allocated_bags_dispatcher: 0,
     });
     setShowModal(true);
   };
@@ -68,7 +70,8 @@ function TallySessionDetail() {
     setFormData({
       weight_classification_id: allocation.weight_classification_id,
       required_bags: allocation.required_bags,
-      allocated_bags: allocation.allocated_bags,
+      allocated_bags_tally: allocation.allocated_bags_tally,
+      allocated_bags_dispatcher: allocation.allocated_bags_dispatcher,
     });
     setShowModal(true);
   };
@@ -151,22 +154,24 @@ function TallySessionDetail() {
               <th>ID</th>
               <th>Weight Classification</th>
               <th>Required Bags</th>
-              <th>Allocated Bags</th>
+              <th>Allocated (Tally)</th>
+              <th>Allocated (Dispatcher)</th>
               <th>Difference</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {allocations.map((allocation) => {
-              const difference = allocation.allocated_bags - allocation.required_bags;
+              const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
               return (
                 <tr key={allocation.id}>
                   <td>{allocation.id}</td>
                   <td>{getWeightClassificationName(allocation.weight_classification_id)}</td>
                   <td>{allocation.required_bags}</td>
-                  <td>{allocation.allocated_bags}</td>
-                  <td style={{ color: difference >= 0 ? '#27ae60' : '#e74c3c' }}>
-                    {difference >= 0 ? '+' : ''}{difference.toFixed(2)}
+                  <td>{allocation.allocated_bags_tally}</td>
+                  <td>{allocation.allocated_bags_dispatcher}</td>
+                  <td style={{ color: difference === 0 ? '#27ae60' : '#e74c3c', fontWeight: difference === 0 ? 'normal' : 'bold' }}>
+                    {difference === 0 ? 'Match' : difference.toFixed(2)}
                   </td>
                   <td>
                     <button
@@ -222,12 +227,22 @@ function TallySessionDetail() {
                 />
               </div>
               <div className="form-group">
-                <label>Allocated Bags</label>
+                <label>Allocated Bags (Tally)</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.allocated_bags}
-                  onChange={(e) => setFormData({ ...formData, allocated_bags: parseFloat(e.target.value) })}
+                  value={formData.allocated_bags_tally}
+                  onChange={(e) => setFormData({ ...formData, allocated_bags_tally: parseFloat(e.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Allocated Bags (Dispatcher)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.allocated_bags_dispatcher}
+                  onChange={(e) => setFormData({ ...formData, allocated_bags_dispatcher: parseFloat(e.target.value) })}
                   required
                 />
               </div>

@@ -82,13 +82,14 @@ def test_endpoints():
         "tally_session_id": session_id,
         "weight_classification_id": wc_id,
         "required_bags": 100.0,
-        "allocated_bags": 95.0
+        "allocated_bags_tally": 95.0,
+        "allocated_bags_dispatcher": 95.0
     }
     response = requests.post(f"{BASE_URL}/tally-sessions/{session_id}/allocations", json=allocation_data)
     if response.status_code == 201:
         allocation = response.json()
         print(f"   ✅ Allocation created: ID={allocation['id']}")
-        print(f"      Required: {allocation['required_bags']}, Allocated: {allocation['allocated_bags']}\n")
+        print(f"      Required: {allocation['required_bags']}, Allocated (Tally): {allocation['allocated_bags_tally']}, Allocated (Dispatcher): {allocation['allocated_bags_dispatcher']}\n")
     else:
         print(f"   ❌ Error: {response.status_code} - {response.text}\n")
         return

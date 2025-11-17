@@ -26,7 +26,8 @@ function TallySessionDetailScreen() {
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: '',
-    allocated_bags: '',
+    allocated_bags_tally: '',
+    allocated_bags_dispatcher: '',
   });
 
   useEffect(() => {
@@ -65,7 +66,7 @@ function TallySessionDetailScreen() {
   };
 
   const handleAddAllocation = async () => {
-    if (!formData.weight_classification_id || !formData.required_bags || !formData.allocated_bags) {
+    if (!formData.weight_classification_id || !formData.required_bags || !formData.allocated_bags_tally || !formData.allocated_bags_dispatcher) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
@@ -74,10 +75,16 @@ function TallySessionDetailScreen() {
       await allocationDetailsApi.create(sessionId, {
         weight_classification_id: formData.weight_classification_id,
         required_bags: parseFloat(formData.required_bags),
-        allocated_bags: parseFloat(formData.allocated_bags),
+        allocated_bags_tally: parseFloat(formData.allocated_bags_tally),
+        allocated_bags_dispatcher: parseFloat(formData.allocated_bags_dispatcher),
       });
       setShowAddModal(false);
-      setFormData({ weight_classification_id: weightClassifications[0]?.id || 0, required_bags: '', allocated_bags: '' });
+      setFormData({ 
+        weight_classification_id: weightClassifications[0]?.id || 0, 
+        required_bags: '', 
+        allocated_bags_tally: '', 
+        allocated_bags_dispatcher: '' 
+      });
       fetchData();
     } catch (error: any) {
       console.error('Error creating allocation:', error);
@@ -295,7 +302,7 @@ function TallySessionDetailScreen() {
         ) : (
           <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
             {allocations.map((allocation) => {
-              const difference = allocation.allocated_bags - allocation.required_bags;
+              const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
               return (
                 <View 
                   key={allocation.id} 
@@ -312,13 +319,23 @@ function TallySessionDetailScreen() {
                     <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
                   </View>
                   <View style={styles.allocationRow}>
-                    <Text style={dynamicStyles.allocationLabel}>Allocated:</Text>
-                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags}</Text>
+                    <Text style={dynamicStyles.allocationLabel}>Allocated (Tally):</Text>
+                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_tally}</Text>
+                  </View>
+                  <View style={styles.allocationRow}>
+                    <Text style={dynamicStyles.allocationLabel}>Allocated (Dispatcher):</Text>
+                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_dispatcher}</Text>
                   </View>
                   <View style={styles.allocationRow}>
                     <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
-                    <Text style={[dynamicStyles.allocationValue, { color: difference >= 0 ? '#27ae60' : '#e74c3c' }]}>
-                      {difference >= 0 ? '+' : ''}{difference.toFixed(2)}
+                    <Text style={[
+                      dynamicStyles.allocationValue, 
+                      { 
+                        color: difference === 0 ? '#27ae60' : '#e74c3c',
+                        fontWeight: difference === 0 ? 'normal' : 'bold'
+                      }
+                    ]}>
+                      {difference === 0 ? 'Match' : difference.toFixed(2)}
                     </Text>
                   </View>
                 </View>
@@ -362,11 +379,19 @@ function TallySessionDetailScreen() {
               keyboardType="numeric"
               placeholder="0"
             />
-            <Text style={dynamicStyles.label}>Allocated Bags</Text>
+            <Text style={dynamicStyles.label}>Allocated Bags (Tally)</Text>
             <TextInput
               style={dynamicStyles.input}
-              value={formData.allocated_bags}
-              onChangeText={(text) => setFormData({ ...formData, allocated_bags: text })}
+              value={formData.allocated_bags_tally}
+              onChangeText={(text) => setFormData({ ...formData, allocated_bags_tally: text })}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+            <Text style={dynamicStyles.label}>Allocated Bags (Dispatcher)</Text>
+            <TextInput
+              style={dynamicStyles.input}
+              value={formData.allocated_bags_dispatcher}
+              onChangeText={(text) => setFormData({ ...formData, allocated_bags_dispatcher: text })}
               keyboardType="numeric"
               placeholder="0"
             />

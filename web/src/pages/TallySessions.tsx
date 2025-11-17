@@ -65,6 +65,32 @@ function TallySessions() {
     return <span className={`status-badge status-${status}`}>{status}</span>;
   };
 
+  const handleDelete = async (sessionId: number) => {
+    if (!confirm('Are you sure you want to delete this tally session? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await tallySessionsApi.delete(sessionId);
+      // Refresh the sessions list
+      fetchSessions();
+    } catch (error: any) {
+      console.error('Error deleting session:', error);
+      alert(error.response?.data?.detail || 'Error deleting tally session');
+    }
+  };
+
+  const handleStatusChange = async (sessionId: number, newStatus: string) => {
+    try {
+      await tallySessionsApi.update(sessionId, { status: newStatus as any });
+      // Refresh the sessions list
+      fetchSessions();
+    } catch (error: any) {
+      console.error('Error updating session status:', error);
+      alert(error.response?.data?.detail || 'Error updating session status');
+    }
+  };
+
   if (loading && sessions.length === 0) {
     return <div>Loading...</div>;
   }
@@ -128,6 +154,7 @@ function TallySessions() {
               <th>Plant</th>
               <th>Date</th>
               <th>Status</th>
+              <th>Change Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -140,9 +167,35 @@ function TallySessions() {
                 <td>{new Date(session.date).toLocaleDateString()}</td>
                 <td>{getStatusBadge(session.status)}</td>
                 <td>
-                  <Link to={`/tally-sessions/${session.id}`}>
-                    <button className="btn btn-primary">View Details</button>
-                  </Link>
+                  <select
+                    value={session.status}
+                    onChange={(e) => handleStatusChange(session.id, e.target.value)}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <Link to={`/tally-sessions/${session.id}`}>
+                      <button className="btn btn-primary">View Details</button>
+                    </Link>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => handleDelete(session.id)}
+                      style={{ marginLeft: '5px' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -11,7 +11,8 @@ class AllocationDetails(Base):
     tally_session_id = Column(Integer, ForeignKey("tally_sessions.id"), nullable=False, index=True)
     weight_classification_id = Column(Integer, ForeignKey("weight_classifications.id"), nullable=False, index=True)
     required_bags = Column(Float, nullable=False, default=0.0)
-    allocated_bags = Column(Float, nullable=False, default=0.0)
+    allocated_bags_tally = Column(Float, nullable=False, default=0.0)
+    allocated_bags_dispatcher = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
