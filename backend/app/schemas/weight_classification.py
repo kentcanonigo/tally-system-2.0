@@ -9,8 +9,8 @@ CategoryType = Literal['Dressed', 'Byproduct']
 
 class WeightClassificationBase(BaseModel):
     classification: str
-    min_weight: float
-    max_weight: float
+    min_weight: Optional[float] = None  # Nullable for catch-all
+    max_weight: Optional[float] = None  # Nullable for "up" ranges and catch-all
     category: CategoryType
 
     @field_validator('category')
@@ -23,8 +23,19 @@ class WeightClassificationBase(BaseModel):
 
     @model_validator(mode='after')
     def validate_weights(self):
-        if self.max_weight < self.min_weight:
-            raise ValueError('max_weight must be greater than or equal to min_weight')
+        # Catch-all: both min and max must be null
+        if self.min_weight is None and self.max_weight is None:
+            return self  # Valid catch-all
+        
+        # Regular range: min_weight must be set
+        if self.min_weight is None:
+            raise ValueError('min_weight is required unless this is a catch-all classification (both min and max null)')
+        
+        # "Up" range: max_weight can be null (means >= min_weight)
+        if self.max_weight is not None:
+            if self.max_weight < self.min_weight:
+                raise ValueError('max_weight must be greater than or equal to min_weight')
+        
         return self
 
 

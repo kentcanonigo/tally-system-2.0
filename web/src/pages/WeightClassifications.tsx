@@ -11,9 +11,11 @@ function WeightClassifications() {
   const [editingClassification, setEditingClassification] = useState<WeightClassification | null>(null);
   const [formData, setFormData] = useState({
     classification: '',
-    min_weight: 0,
-    max_weight: 0,
+    min_weight: null as number | null,
+    max_weight: null as number | null,
     category: '',
+    isCatchAll: false,
+    isUpRange: false,
   });
 
   useEffect(() => {
@@ -55,17 +57,29 @@ function WeightClassifications() {
 
   const handleCreate = () => {
     setEditingClassification(null);
-    setFormData({ classification: '', min_weight: 0, max_weight: 0, category: '' });
+    setFormData({ 
+      classification: '', 
+      min_weight: null, 
+      max_weight: null, 
+      category: '',
+      isCatchAll: false,
+      isUpRange: false,
+    });
     setShowModal(true);
   };
 
   const handleEdit = (classification: WeightClassification) => {
+    const isCatchAll = classification.min_weight === null && classification.max_weight === null;
+    const isUpRange = classification.min_weight !== null && classification.max_weight === null;
+    
     setEditingClassification(classification);
     setFormData({
       classification: classification.classification,
-      min_weight: classification.min_weight,
-      max_weight: classification.max_weight,
+      min_weight: classification.min_weight ?? null,
+      max_weight: classification.max_weight ?? null,
       category: classification.category,
+      isCatchAll,
+      isUpRange,
     });
     setShowModal(true);
   };
@@ -73,11 +87,29 @@ function WeightClassifications() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlantId) return;
+    
+    // Prepare data based on catch-all and up range flags
+    let submitData: any = {
+      classification: formData.classification,
+      category: formData.category,
+    };
+    
+    if (formData.isCatchAll) {
+      submitData.min_weight = null;
+      submitData.max_weight = null;
+    } else if (formData.isUpRange) {
+      submitData.min_weight = formData.min_weight;
+      submitData.max_weight = null;
+    } else {
+      submitData.min_weight = formData.min_weight;
+      submitData.max_weight = formData.max_weight;
+    }
+    
     try {
       if (editingClassification) {
-        await weightClassificationsApi.update(editingClassification.id, formData);
+        await weightClassificationsApi.update(editingClassification.id, submitData);
       } else {
-        await weightClassificationsApi.create(selectedPlantId, formData);
+        await weightClassificationsApi.create(selectedPlantId, submitData);
       }
       setShowModal(false);
       fetchClassifications();
@@ -85,6 +117,16 @@ function WeightClassifications() {
       console.error('Error saving classification:', error);
       alert(error.response?.data?.detail || 'Error saving weight classification');
     }
+  };
+  
+  const formatWeightRange = (wc: WeightClassification): string => {
+    if (wc.min_weight === null && wc.max_weight === null) {
+      return 'All Sizes';
+    }
+    if (wc.max_weight === null) {
+      return `${wc.min_weight} and up`;
+    }
+    return `${wc.min_weight}-${wc.max_weight}`;
   };
 
   const handleDelete = async (id: number) => {
@@ -143,8 +185,7 @@ function WeightClassifications() {
                   <tr>
                     <th>ID</th>
                     <th>Classification</th>
-                    <th>Min Weight</th>
-                    <th>Max Weight</th>
+                    <th>Weight Range</th>
                     <th>Category</th>
                     <th>Actions</th>
                   </tr>
@@ -154,8 +195,7 @@ function WeightClassifications() {
                     <tr key={classification.id}>
                       <td>{classification.id}</td>
                       <td>{classification.classification}</td>
-                      <td>{classification.min_weight}</td>
-                      <td>{classification.max_weight}</td>
+                      <td>{formatWeightRange(classification)}</td>
                       <td>{classification.category}</td>
                       <td>
                         <button
@@ -195,25 +235,74 @@ function WeightClassifications() {
                 />
               </div>
               <div className="form-group">
-                <label>Min Weight</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.min_weight}
-                  onChange={(e) => setFormData({ ...formData, min_weight: parseFloat(e.target.value) })}
-                  required
-                />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.isCatchAll}
+                    onChange={(e) => {
+                      const isCatchAll = e.target.checked;
+                      setFormData({
+                        ...formData,
+                        isCatchAll,
+                        isUpRange: isCatchAll ? false : formData.isUpRange,
+                        min_weight: isCatchAll ? null : formData.min_weight,
+                        max_weight: isCatchAll ? null : formData.max_weight,
+                      });
+                    }}
+                  />
+                  {' '}Catch-all (All Sizes)
+                </label>
               </div>
-              <div className="form-group">
-                <label>Max Weight</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.max_weight}
-                  onChange={(e) => setFormData({ ...formData, max_weight: parseFloat(e.target.value) })}
-                  required
-                />
-              </div>
+              
+              {!formData.isCatchAll && (
+                <>
+                  <div className="form-group">
+                    <label>Min Weight</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.min_weight ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setFormData({ ...formData, min_weight: value });
+                      }}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={formData.isUpRange}
+                        onChange={(e) => {
+                          const isUpRange = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            isUpRange,
+                            max_weight: isUpRange ? null : formData.max_weight,
+                          });
+                        }}
+                      />
+                      {' '}Up range (no upper limit)
+                    </label>
+                  </div>
+                  {!formData.isUpRange && (
+                    <div className="form-group">
+                      <label>Max Weight</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.max_weight ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                          setFormData({ ...formData, max_weight: value });
+                        }}
+                        required
+                      />
+                    </div>
+                  )}
+                </>
+              )}
               <div className="form-group">
                 <label>Category</label>
                 <select

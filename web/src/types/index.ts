@@ -16,8 +16,8 @@ export interface WeightClassification {
   id: number;
   plant_id: number;
   classification: string;
-  min_weight: number;
-  max_weight: number;
+  min_weight: number | null;
+  max_weight: number | null;
   category: string;
   created_at: string;
   updated_at: string;

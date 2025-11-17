@@ -99,6 +99,16 @@ function TallySessionDetailScreen() {
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || `WC ${wcId}`;
   };
+  
+  const formatWeightRange = (wc: WeightClassification): string => {
+    if (wc.min_weight === null && wc.max_weight === null) {
+      return 'All Sizes';
+    }
+    if (wc.max_weight === null) {
+      return `${wc.min_weight} and up`;
+    }
+    return `${wc.min_weight}-${wc.max_weight}`;
+  };
 
   if (loading) {
     return (
@@ -339,7 +349,7 @@ function TallySessionDetailScreen() {
                       formData.weight_classification_id === wc.id && styles.pickerOptionTextSelected,
                     ]}
                   >
-                    {wc.classification} ({wc.category})
+                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
                   </Text>
                 </TouchableOpacity>
               ))}

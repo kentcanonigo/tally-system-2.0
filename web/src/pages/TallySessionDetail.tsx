@@ -104,6 +104,16 @@ function TallySessionDetail() {
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
   };
+  
+  const formatWeightRange = (wc: WeightClassification): string => {
+    if (wc.min_weight === null && wc.max_weight === null) {
+      return 'All Sizes';
+    }
+    if (wc.max_weight === null) {
+      return `${wc.min_weight} and up`;
+    }
+    return `${wc.min_weight}-${wc.max_weight}`;
+  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -196,7 +206,7 @@ function TallySessionDetail() {
                   <option value="">Select classification</option>
                   {weightClassifications.map((wc) => (
                     <option key={wc.id} value={wc.id}>
-                      {wc.classification} ({wc.category})
+                      {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
                     </option>
                   ))}
                 </select>
