@@ -212,6 +212,15 @@ function TallySessionDetailScreen() {
     setTallyInput('0');
   };
 
+  const handleTallyBackspace = () => {
+    setTallyInput((prev) => {
+      if (prev.length > 1) {
+        return prev.slice(0, -1);
+      }
+      return '0';
+    });
+  };
+
   const handleTallyEnter = async () => {
     const weight = parseFloat(tallyInput);
     if (isNaN(weight) || weight <= 0) {
@@ -637,7 +646,9 @@ function TallySessionDetailScreen() {
                   <TouchableOpacity style={styles.tallyNumberButton} onPress={handleTallyDecimal}>
                     <Text style={styles.tallyButtonText}>.</Text>
                   </TouchableOpacity>
-                  <View style={styles.tallyNumberButton} />
+                  <TouchableOpacity style={styles.tallyNumberButton} onPress={handleTallyBackspace}>
+                    <Text style={styles.tallyButtonText}>⌫</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
