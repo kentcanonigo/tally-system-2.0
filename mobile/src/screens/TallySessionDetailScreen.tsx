@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate } from '../utils/dateFormat';
@@ -28,6 +27,7 @@ function TallySessionDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: '',
@@ -122,6 +122,7 @@ function TallySessionDetailScreen() {
 
   const handleUpdateStatus = async (status: string) => {
     if (!session) return;
+    setShowStatusDropdown(false);
     try {
       await tallySessionsApi.update(session.id, { status: status as any });
       fetchData();
@@ -129,6 +130,15 @@ function TallySessionDetailScreen() {
       console.error('Error updating status:', error);
       Alert.alert('Error', 'Failed to update status');
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: { [key: string]: string } = {
+      ongoing: 'Ongoing',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+    };
+    return labels[status] || status;
   };
 
   const getWeightClassificationName = (wcId: number) => {
@@ -226,8 +236,55 @@ function TallySessionDetailScreen() {
       ...styles.statusPickerContainer,
       minWidth: responsive.isTablet ? 150 : 120,
     },
-    statusPicker: {
-      ...styles.statusPicker,
+    statusDropdownButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.small,
+      minHeight: 40,
+    },
+    statusDropdownText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '500',
+      flex: 1,
+    },
+    statusDropdownIcon: {
+      color: '#2c3e50',
+      fontSize: 10,
+      marginLeft: responsive.spacing.xs,
+    },
+    statusDropdownMenu: {
+      backgroundColor: '#fff',
+      borderRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 5,
+      minWidth: responsive.isTablet ? 150 : 120,
+      overflow: 'hidden',
+    },
+    statusDropdownOption: {
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.medium,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    },
+    statusDropdownOptionLast: {
+      borderBottomWidth: 0,
+    },
+    statusDropdownOptionSelected: {
+      backgroundColor: '#3498db',
+    },
+    statusDropdownOptionText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+    },
+    statusDropdownOptionTextSelected: {
+      color: '#fff',
+      fontWeight: '600',
     },
     infoCard: {
       ...styles.infoCard,
@@ -344,16 +401,15 @@ function TallySessionDetailScreen() {
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.sessionId}>Session #{session.id}</Text>
           <View style={dynamicStyles.statusPickerContainer}>
-            <Picker
-              selectedValue={session.status}
-              onValueChange={(value) => handleUpdateStatus(value)}
-              style={dynamicStyles.statusPicker}
-              dropdownIconColor="#2c3e50"
+            <TouchableOpacity
+              style={dynamicStyles.statusDropdownButton}
+              onPress={() => setShowStatusDropdown(true)}
             >
-              <Picker.Item label="Ongoing" value="ongoing" />
-              <Picker.Item label="Completed" value="completed" />
-              <Picker.Item label="Cancelled" value="cancelled" />
-            </Picker>
+              <Text style={dynamicStyles.statusDropdownText}>
+                {getStatusLabel(session.status)}
+              </Text>
+              <Text style={dynamicStyles.statusDropdownIcon}>▼</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -439,6 +495,76 @@ function TallySessionDetailScreen() {
           </View>
         )}
       </View>
+
+      {showStatusDropdown && (
+        <Modal
+          transparent
+          visible={showStatusDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowStatusDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowStatusDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.statusDropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.statusDropdownOption,
+                  session.status === 'ongoing' && dynamicStyles.statusDropdownOptionSelected,
+                ]}
+                onPress={() => handleUpdateStatus('ongoing')}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.statusDropdownOptionText,
+                    session.status === 'ongoing' && dynamicStyles.statusDropdownOptionTextSelected,
+                  ]}
+                >
+                  Ongoing
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.statusDropdownOption,
+                  session.status === 'completed' && dynamicStyles.statusDropdownOptionSelected,
+                ]}
+                onPress={() => handleUpdateStatus('completed')}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.statusDropdownOptionText,
+                    session.status === 'completed' && dynamicStyles.statusDropdownOptionTextSelected,
+                  ]}
+                >
+                  Completed
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.statusDropdownOption,
+                  dynamicStyles.statusDropdownOptionLast,
+                  session.status === 'cancelled' && dynamicStyles.statusDropdownOptionSelected,
+                ]}
+                onPress={() => handleUpdateStatus('cancelled')}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.statusDropdownOptionText,
+                    session.status === 'cancelled' && dynamicStyles.statusDropdownOptionTextSelected,
+                  ]}
+                >
+                  Cancelled
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {showAddModal && (
         <View style={styles.modal}>
@@ -536,9 +662,11 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     overflow: 'hidden',
   },
-  statusPicker: {
-    height: Platform.OS === 'ios' ? 200 : 50,
-    width: '100%',
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoCard: {
     backgroundColor: '#fff',
