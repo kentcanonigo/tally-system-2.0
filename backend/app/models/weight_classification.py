@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from ..database import Base
+from .utils import utcnow
 
 
 class WeightClassification(Base):
@@ -13,8 +13,8 @@ class WeightClassification(Base):
     min_weight = Column(Float, nullable=True)  # Nullable for catch-all classifications
     max_weight = Column(Float, nullable=True)  # Nullable for "up" ranges and catch-all
     category = Column(String(100), nullable=False)  # Must be "Dressed" or "Byproduct" (enforced by CHECK constraint)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # Relationships
     plant = relationship("Plant", back_populates="weight_classifications")

@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, ForeignKey, Date, String, DateTime, Index, Enum as SQLEnum
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import enum
 from ..database import Base
+from .utils import utcnow
 
 
 class TallySessionStatus(str, enum.Enum):
@@ -19,8 +19,8 @@ class TallySession(Base):
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
     status = Column(SQLEnum(TallySessionStatus), nullable=False, default=TallySessionStatus.ONGOING, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # Relationships
     customer = relationship("Customer", back_populates="tally_sessions")

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, ForeignKey, Float, DateTime, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from ..database import Base
+from .utils import utcnow
 
 
 class AllocationDetails(Base):
@@ -13,8 +13,8 @@ class AllocationDetails(Base):
     required_bags = Column(Float, nullable=False, default=0.0)
     allocated_bags_tally = Column(Float, nullable=False, default=0.0)
     allocated_bags_dispatcher = Column(Float, nullable=False, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     # Relationships
     tally_session = relationship("TallySession", back_populates="allocation_details")

@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, ForeignKey, Float, DateTime, String, Enum as SQLEnum, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import enum
 from ..database import Base
+from .utils import utcnow
 
 
 class TallyLogEntryRole(str, enum.Enum):
@@ -19,7 +19,7 @@ class TallyLogEntry(Base):
     role = Column(SQLEnum(TallyLogEntryRole), nullable=False, index=True)
     weight = Column(Float, nullable=False)
     notes = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 
     # Relationships
     tally_session = relationship("TallySession", back_populates="tally_log_entries")
