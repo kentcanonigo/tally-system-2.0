@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatTime } from '../utils/dateFormat';
@@ -37,6 +36,10 @@ function TallySessionLogsScreen() {
   });
   const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
+  const [showSortByDropdown, setShowSortByDropdown] = useState(false);
+  const [showSortOrderDropdown, setShowSortOrderDropdown] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -112,6 +115,33 @@ function TallySessionLogsScreen() {
       return `${wc.min_weight} and up`;
     }
     return `${wc.min_weight}-${wc.max_weight}`;
+  };
+
+  const getRoleLabel = (role: TallyLogEntryRole | 'all') => {
+    if (role === 'all') return 'All Roles';
+    if (role === TallyLogEntryRole.TALLY) return 'Tally-er';
+    return 'Dispatcher';
+  };
+
+  const getWeightClassLabel = (wcId: number | 'all') => {
+    if (wcId === 'all') return 'All Weight Classes';
+    const wc = weightClassifications.find((wc) => wc.id === wcId);
+    if (!wc) return `WC ${wcId}`;
+    return `${wc.classification} - ${formatWeightRange(wc)}`;
+  };
+
+  const getSortByLabel = (sortBy: 'class' | 'weight' | 'time' | 'id') => {
+    const labels: { [key: string]: string } = {
+      time: 'Time',
+      class: 'Class',
+      weight: 'Weight',
+      id: 'ID',
+    };
+    return labels[sortBy] || sortBy;
+  };
+
+  const getSortOrderLabel = (order: 'asc' | 'desc') => {
+    return order === 'asc' ? 'Ascending' : 'Descending';
   };
 
   // Filter and sort log entries based on current filters and sort settings
@@ -255,8 +285,59 @@ function TallySessionLogsScreen() {
       ...styles.pickerWrapper,
       marginBottom: responsive.spacing.md,
     },
-    picker: {
-      ...styles.picker,
+    dropdownButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.small,
+      minHeight: 40,
+    },
+    dropdownText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '500',
+      flex: 1,
+    },
+    dropdownIcon: {
+      color: '#2c3e50',
+      fontSize: 10,
+      marginLeft: responsive.spacing.xs,
+    },
+    dropdownMenu: {
+      backgroundColor: '#fff',
+      borderRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 5,
+      minWidth: 200,
+      maxWidth: '90%',
+      overflow: 'hidden',
+    },
+    dropdownMenuScroll: {
+      maxHeight: '80%',
+    },
+    dropdownOption: {
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.medium,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    },
+    dropdownOptionLast: {
+      borderBottomWidth: 0,
+    },
+    dropdownOptionSelected: {
+      backgroundColor: '#3498db',
+    },
+    dropdownOptionText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+    },
+    dropdownOptionTextSelected: {
+      color: '#fff',
+      fontWeight: '600',
     },
     sectionTitle: {
       ...styles.sectionTitle,
@@ -311,68 +392,54 @@ function TallySessionLogsScreen() {
       <View style={dynamicStyles.filterContainer}>
         <Text style={dynamicStyles.filterLabel}>Filter by Role:</Text>
         <View style={dynamicStyles.pickerWrapper}>
-          <Picker
-            selectedValue={filters.role}
-            onValueChange={(value) => setFilters({ ...filters, role: value })}
-            style={dynamicStyles.picker}
-            dropdownIconColor="#2c3e50"
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowRoleDropdown(true)}
           >
-            <Picker.Item label="All Roles" value="all" />
-            <Picker.Item label="Tally-er" value={TallyLogEntryRole.TALLY} />
-            <Picker.Item label="Dispatcher" value={TallyLogEntryRole.DISPATCHER} />
-          </Picker>
+            <Text style={dynamicStyles.dropdownText}>
+              {getRoleLabel(filters.role)}
+            </Text>
+            <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[dynamicStyles.filterLabel, { marginTop: 16 }]}>Filter by Weight Class:</Text>
         <View style={dynamicStyles.pickerWrapper}>
-          <Picker
-            selectedValue={filters.weight_classification_id}
-            onValueChange={(value) =>
-              setFilters({
-                ...filters,
-                weight_classification_id: value === 'all' ? 'all' : Number(value),
-              })
-            }
-            style={dynamicStyles.picker}
-            dropdownIconColor="#2c3e50"
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowWeightClassDropdown(true)}
           >
-            <Picker.Item label="All Weight Classes" value="all" />
-            {weightClassifications.map((wc) => (
-              <Picker.Item
-                key={wc.id}
-                label={`${wc.classification} - ${formatWeightRange(wc)}`}
-                value={wc.id}
-              />
-            ))}
-          </Picker>
+            <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
+              {getWeightClassLabel(filters.weight_classification_id)}
+            </Text>
+            <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[dynamicStyles.filterLabel, { marginTop: 16 }]}>Sort By:</Text>
         <View style={dynamicStyles.pickerWrapper}>
-          <Picker
-            selectedValue={sortBy}
-            onValueChange={(value) => setSortBy(value as 'class' | 'weight' | 'time' | 'id')}
-            style={dynamicStyles.picker}
-            dropdownIconColor="#2c3e50"
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowSortByDropdown(true)}
           >
-            <Picker.Item label="Time" value="time" />
-            <Picker.Item label="Class" value="class" />
-            <Picker.Item label="Weight" value="weight" />
-            <Picker.Item label="ID" value="id" />
-          </Picker>
+            <Text style={dynamicStyles.dropdownText}>
+              {getSortByLabel(sortBy)}
+            </Text>
+            <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[dynamicStyles.filterLabel, { marginTop: 16 }]}>Order:</Text>
         <View style={dynamicStyles.pickerWrapper}>
-          <Picker
-            selectedValue={sortOrder}
-            onValueChange={(value) => setSortOrder(value as 'asc' | 'desc')}
-            style={dynamicStyles.picker}
-            dropdownIconColor="#2c3e50"
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowSortOrderDropdown(true)}
           >
-            <Picker.Item label="Descending" value="desc" />
-            <Picker.Item label="Ascending" value="asc" />
-          </Picker>
+            <Text style={dynamicStyles.dropdownText}>
+              {getSortOrderLabel(sortOrder)}
+            </Text>
+            <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -502,6 +569,312 @@ function TallySessionLogsScreen() {
           </View>
         )}
       </View>
+
+      {/* Role Dropdown Modal */}
+      {showRoleDropdown && (
+        <Modal
+          transparent
+          visible={showRoleDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowRoleDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRoleDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.role === 'all' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, role: 'all' });
+                  setShowRoleDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.role === 'all' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  All Roles
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.role === TallyLogEntryRole.TALLY && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, role: TallyLogEntryRole.TALLY });
+                  setShowRoleDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.role === TallyLogEntryRole.TALLY && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Tally-er
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  dynamicStyles.dropdownOptionLast,
+                  filters.role === TallyLogEntryRole.DISPATCHER && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, role: TallyLogEntryRole.DISPATCHER });
+                  setShowRoleDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.role === TallyLogEntryRole.DISPATCHER && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Dispatcher
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Weight Class Dropdown Modal */}
+      {showWeightClassDropdown && (
+        <Modal
+          transparent
+          visible={showWeightClassDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowWeightClassDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowWeightClassDropdown(false)}
+          >
+            <ScrollView 
+              style={dynamicStyles.dropdownMenuScroll}
+              contentContainerStyle={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.weight_classification_id === 'all' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, weight_classification_id: 'all' });
+                  setShowWeightClassDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.weight_classification_id === 'all' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  All Weight Classes
+                </Text>
+              </TouchableOpacity>
+              {weightClassifications.map((wc, index) => (
+                <TouchableOpacity
+                  key={wc.id}
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    index === weightClassifications.length - 1 && dynamicStyles.dropdownOptionLast,
+                    filters.weight_classification_id === wc.id && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setFilters({ ...filters, weight_classification_id: wc.id });
+                    setShowWeightClassDropdown(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.dropdownOptionText,
+                      filters.weight_classification_id === wc.id && dynamicStyles.dropdownOptionTextSelected,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {wc.classification} - {formatWeightRange(wc)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Sort By Dropdown Modal */}
+      {showSortByDropdown && (
+        <Modal
+          transparent
+          visible={showSortByDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowSortByDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowSortByDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  sortBy === 'time' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortBy('time');
+                  setShowSortByDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortBy === 'time' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Time
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  sortBy === 'class' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortBy('class');
+                  setShowSortByDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortBy === 'class' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Class
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  sortBy === 'weight' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortBy('weight');
+                  setShowSortByDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortBy === 'weight' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Weight
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  dynamicStyles.dropdownOptionLast,
+                  sortBy === 'id' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortBy('id');
+                  setShowSortByDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortBy === 'id' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  ID
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Sort Order Dropdown Modal */}
+      {showSortOrderDropdown && (
+        <Modal
+          transparent
+          visible={showSortOrderDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowSortOrderDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowSortOrderDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  sortOrder === 'desc' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortOrder('desc');
+                  setShowSortOrderDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortOrder === 'desc' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Descending
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  dynamicStyles.dropdownOptionLast,
+                  sortOrder === 'asc' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setSortOrder('asc');
+                  setShowSortOrderDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    sortOrder === 'asc' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Ascending
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -559,9 +932,11 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     overflow: 'hidden',
   },
-  picker: {
-    height: Platform.OS === 'ios' ? 200 : 50,
-    width: '100%',
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontWeight: 'bold',
