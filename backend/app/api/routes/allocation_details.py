@@ -79,3 +79,26 @@ def delete_allocation_detail(allocation_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Allocation detail not found")
     return None
 
+
+@router.post("/tally-sessions/{session_id}/allocations/reset-tally", status_code=status.HTTP_200_OK)
+def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
+    """Reset allocated_bags_tally to 0 for all allocations in a session."""
+    # Verify session exists
+    session = session_crud.get_tally_session(db, session_id=session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tally session not found")
+    
+    updated_count = crud.reset_allocated_bags_for_session(db, session_id, reset_tally=True, reset_dispatcher=False)
+    return {"message": f"Reset tally allocations for {updated_count} allocation(s)", "updated_count": updated_count}
+
+
+@router.post("/tally-sessions/{session_id}/allocations/reset-dispatcher", status_code=status.HTTP_200_OK)
+def reset_dispatcher_allocations(session_id: int, db: Session = Depends(get_db)):
+    """Reset allocated_bags_dispatcher to 0 for all allocations in a session."""
+    # Verify session exists
+    session = session_crud.get_tally_session(db, session_id=session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tally session not found")
+    
+    updated_count = crud.reset_allocated_bags_for_session(db, session_id, reset_tally=False, reset_dispatcher=True)
+    return {"message": f"Reset dispatcher allocations for {updated_count} allocation(s)", "updated_count": updated_count}

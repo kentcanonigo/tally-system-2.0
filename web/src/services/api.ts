@@ -75,6 +75,10 @@ export const allocationDetailsApi = {
   update: (id: number, data: Partial<AllocationDetails>) =>
     api.put<AllocationDetails>(`/allocations/${id}`, data),
   delete: (id: number) => api.delete(`/allocations/${id}`),
+  resetTally: (sessionId: number) =>
+    api.post<{ message: string; updated_count: number }>(`/tally-sessions/${sessionId}/allocations/reset-tally`),
+  resetDispatcher: (sessionId: number) =>
+    api.post<{ message: string; updated_count: number }>(`/tally-sessions/${sessionId}/allocations/reset-dispatcher`),
 };
 
 // Tally Log Entries API

@@ -45,10 +45,11 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
         db.flush()  # Flush to get the ID without committing
     
     # Increment the appropriate allocated_bags field based on role
+    # Each log entry represents one bag/item, so increment by 1 (not by weight)
     if log_entry.role == TallyLogEntryRole.TALLY:
-        allocation.allocated_bags_tally += log_entry.weight
+        allocation.allocated_bags_tally += 1
     elif log_entry.role == TallyLogEntryRole.DISPATCHER:
-        allocation.allocated_bags_dispatcher += log_entry.weight
+        allocation.allocated_bags_dispatcher += 1
     
     # Create the log entry
     db_log_entry = TallyLogEntry(

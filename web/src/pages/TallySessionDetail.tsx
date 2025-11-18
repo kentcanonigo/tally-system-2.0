@@ -104,6 +104,36 @@ function TallySessionDetail() {
     }
   };
 
+  const handleResetTally = async () => {
+    if (!id) return;
+    if (!confirm('Are you sure you want to reset all Tally-er allocations for this session? This will set all allocated_bags_tally values to 0.')) {
+      return;
+    }
+    try {
+      await allocationDetailsApi.resetTally(Number(id));
+      alert('Tally-er allocations reset successfully');
+      fetchData();
+    } catch (error: any) {
+      console.error('Error resetting tally allocations:', error);
+      alert(error.response?.data?.detail || 'Error resetting tally allocations');
+    }
+  };
+
+  const handleResetDispatcher = async () => {
+    if (!id) return;
+    if (!confirm('Are you sure you want to reset all Dispatcher allocations for this session? This will set all allocated_bags_dispatcher values to 0.')) {
+      return;
+    }
+    try {
+      await allocationDetailsApi.resetDispatcher(Number(id));
+      alert('Dispatcher allocations reset successfully');
+      fetchData();
+    } catch (error: any) {
+      console.error('Error resetting dispatcher allocations:', error);
+      alert(error.response?.data?.detail || 'Error resetting dispatcher allocations');
+    }
+  };
+
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
   };
@@ -144,12 +174,26 @@ function TallySessionDetail() {
         </p>
       </div>
 
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={handleCreate}>
           Add Allocation
         </button>
         <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}/logs`)}>
           View Logs
+        </button>
+        <button 
+          className="btn btn-warning" 
+          onClick={handleResetTally}
+          style={{ backgroundColor: '#f39c12', color: 'white' }}
+        >
+          Reset Tally-er Allocations
+        </button>
+        <button 
+          className="btn btn-warning" 
+          onClick={handleResetDispatcher}
+          style={{ backgroundColor: '#e67e22', color: 'white' }}
+        >
+          Reset Dispatcher Allocations
         </button>
       </div>
 
