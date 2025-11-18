@@ -40,6 +40,12 @@ function TallySessionLogsScreen() {
   const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
   const [showSortByDropdown, setShowSortByDropdown] = useState(false);
   const [showSortOrderDropdown, setShowSortOrderDropdown] = useState(false);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    id: true,
+    description: true,
+    range: true,
+  });
 
   useEffect(() => {
     if (sessionId) {
@@ -339,11 +345,97 @@ function TallySessionLogsScreen() {
       color: '#fff',
       fontWeight: '600',
     },
+    sectionTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: responsive.spacing.sm,
+      marginTop: responsive.spacing.md,
+    },
     sectionTitle: {
       ...styles.sectionTitle,
       fontSize: responsive.fontSize.medium,
-      marginBottom: responsive.spacing.sm,
-      marginTop: responsive.spacing.md,
+      flex: 1,
+    },
+    settingsButton: {
+      padding: responsive.spacing.xs,
+      marginLeft: responsive.spacing.sm,
+    },
+    settingsButtonText: {
+      fontSize: responsive.fontSize.medium,
+    },
+    columnSettingsModal: {
+      backgroundColor: '#fff',
+      borderRadius: 12,
+      padding: responsive.padding.large,
+      width: responsive.isTablet ? Math.min(responsive.width * 0.5, 400) : '85%',
+      maxWidth: 400,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    columnSettingsTitle: {
+      fontSize: responsive.fontSize.large,
+      fontWeight: 'bold',
+      color: '#2c3e50',
+      marginBottom: responsive.spacing.xs,
+    },
+    columnSettingsSubtitle: {
+      fontSize: responsive.fontSize.small,
+      color: '#7f8c8d',
+      marginBottom: responsive.spacing.lg,
+    },
+    columnSettingsOption: {
+      paddingVertical: responsive.padding.medium,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    },
+    columnSettingsOptionLast: {
+      borderBottomWidth: 0,
+      marginBottom: responsive.spacing.md,
+    },
+    checkboxContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderWidth: 2,
+      borderColor: '#bdc3c7',
+      borderRadius: 4,
+      marginRight: responsive.spacing.md,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#fff',
+    },
+    checkboxChecked: {
+      backgroundColor: '#3498db',
+      borderColor: '#3498db',
+    },
+    checkboxCheckmark: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    columnSettingsOptionText: {
+      fontSize: responsive.fontSize.medium,
+      color: '#2c3e50',
+      fontWeight: '500',
+    },
+    columnSettingsButton: {
+      backgroundColor: '#3498db',
+      borderRadius: 8,
+      padding: responsive.padding.medium,
+      alignItems: 'center',
+      marginTop: responsive.spacing.sm,
+    },
+    columnSettingsButtonText: {
+      color: '#fff',
+      fontSize: responsive.fontSize.medium,
+      fontWeight: '600',
     },
     tableContainer: {
       ...styles.tableContainer,
@@ -511,14 +603,28 @@ function TallySessionLogsScreen() {
       </View>
 
       {/* Log Entries Table */}
-      <Text style={dynamicStyles.sectionTitle}>Log Entries ({filteredEntries.length})</Text>
+      <View style={dynamicStyles.sectionTitleContainer}>
+        <Text style={dynamicStyles.sectionTitle}>Log Entries ({filteredEntries.length})</Text>
+        <TouchableOpacity
+          style={dynamicStyles.settingsButton}
+          onPress={() => setShowColumnSettings(true)}
+        >
+          <Text style={dynamicStyles.settingsButtonText}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
       <View style={dynamicStyles.tableContainer}>
         <View style={dynamicStyles.tableHeader}>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>ID</Text>
+          {visibleColumns.id && (
+            <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>ID</Text>
+          )}
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Role</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Class</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Desc</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Range</Text>
+          {visibleColumns.description && (
+            <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Desc</Text>
+          )}
+          {visibleColumns.range && (
+            <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Range</Text>
+          )}
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
         </View>
@@ -527,7 +633,9 @@ function TallySessionLogsScreen() {
             const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
             return (
               <View key={entry.id} style={dynamicStyles.tableRow}>
-                <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>{entry.id}</Text>
+                {visibleColumns.id && (
+                  <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>{entry.id}</Text>
+                )}
                 <View style={[dynamicStyles.tableCell, { flex: 1 }]}>
                   <View
                     style={[
@@ -546,12 +654,16 @@ function TallySessionLogsScreen() {
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {getWeightClassificationName(entry.weight_classification_id)}
                 </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 9 }]} numberOfLines={1}>
-                  {wc?.description || '-'}
-                </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1, fontSize: 10 }]} numberOfLines={1}>
-                  {wc ? formatWeightRange(wc) : '-'}
-                </Text>
+                {visibleColumns.description && (
+                  <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 9 }]} numberOfLines={1}>
+                    {wc?.description || '-'}
+                  </Text>
+                )}
+                {visibleColumns.range && (
+                  <Text style={[dynamicStyles.tableCell, { flex: 1, fontSize: 10 }]} numberOfLines={1}>
+                    {wc ? formatWeightRange(wc) : '-'}
+                  </Text>
+                )}
                 <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
                   {entry.weight.toFixed(2)}
                 </Text>
@@ -870,6 +982,84 @@ function TallySessionLogsScreen() {
                 >
                   Ascending
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Column Settings Modal */}
+      {showColumnSettings && (
+        <Modal
+          transparent
+          visible={showColumnSettings}
+          animationType="fade"
+          onRequestClose={() => setShowColumnSettings(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowColumnSettings(false)}
+          >
+            <View 
+              style={dynamicStyles.columnSettingsModal}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={dynamicStyles.columnSettingsTitle}>Show Columns</Text>
+              <Text style={dynamicStyles.columnSettingsSubtitle}>
+                Select which columns to display in the log entries table
+              </Text>
+              
+              <TouchableOpacity
+                style={dynamicStyles.columnSettingsOption}
+                onPress={() => setVisibleColumns({ ...visibleColumns, id: !visibleColumns.id })}
+              >
+                <View style={dynamicStyles.checkboxContainer}>
+                  <View style={[
+                    dynamicStyles.checkbox,
+                    visibleColumns.id && dynamicStyles.checkboxChecked
+                  ]}>
+                    {visibleColumns.id && <Text style={dynamicStyles.checkboxCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={dynamicStyles.columnSettingsOptionText}>ID</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={dynamicStyles.columnSettingsOption}
+                onPress={() => setVisibleColumns({ ...visibleColumns, description: !visibleColumns.description })}
+              >
+                <View style={dynamicStyles.checkboxContainer}>
+                  <View style={[
+                    dynamicStyles.checkbox,
+                    visibleColumns.description && dynamicStyles.checkboxChecked
+                  ]}>
+                    {visibleColumns.description && <Text style={dynamicStyles.checkboxCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={dynamicStyles.columnSettingsOptionText}>Description</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[dynamicStyles.columnSettingsOption, dynamicStyles.columnSettingsOptionLast]}
+                onPress={() => setVisibleColumns({ ...visibleColumns, range: !visibleColumns.range })}
+              >
+                <View style={dynamicStyles.checkboxContainer}>
+                  <View style={[
+                    dynamicStyles.checkbox,
+                    visibleColumns.range && dynamicStyles.checkboxChecked
+                  ]}>
+                    {visibleColumns.range && <Text style={dynamicStyles.checkboxCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={dynamicStyles.columnSettingsOptionText}>Range</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={dynamicStyles.columnSettingsButton}
+                onPress={() => setShowColumnSettings(false)}
+              >
+                <Text style={dynamicStyles.columnSettingsButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
