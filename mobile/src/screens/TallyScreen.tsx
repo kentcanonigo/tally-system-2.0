@@ -24,6 +24,7 @@ function TallyScreen() {
   const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
   const [tallyInput, setTallyInput] = useState('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine if we should use landscape layout (side by side)
   // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
@@ -130,6 +131,11 @@ function TallyScreen() {
   };
 
   const handleTallyEnter = async () => {
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
+
     const weight = parseFloat(tallyInput);
     if (isNaN(weight) || weight <= 0) {
       Alert.alert('Error', 'Please enter a valid weight');
@@ -142,14 +148,29 @@ function TallyScreen() {
       return;
     }
 
+    if (!sessionId) {
+      Alert.alert('Error', 'Session ID is missing');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
+      console.log('Creating tally log entry:', {
+        sessionId,
+        weight_classification_id: matchedWC.id,
+        role: tallyRole,
+        weight,
+      });
+
       // Create log entry - this will also increment the allocation
-      await tallyLogEntriesApi.create(sessionId, {
+      const response = await tallyLogEntriesApi.create(sessionId, {
         weight_classification_id: matchedWC.id,
         role: tallyRole as TallyLogEntryRole,
         weight: weight,
         notes: null,
       });
+
+      console.log('Tally log entry created successfully:', response.data);
 
       // Reset input
       setTallyInput('0');
@@ -157,12 +178,24 @@ function TallyScreen() {
       // Refresh allocations to show updated counts
       const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
       setAllocations(allocationsRes.data);
+
+      // Show success feedback (optional - you can remove this if it's too much)
+      // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
     } catch (error: any) {
       console.error('Error creating tally log entry:', error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.detail || 'Failed to log tally entry. Please try again.'
-      );
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      const errorMessage = error.response?.data?.detail 
+        || error.message 
+        || 'Failed to log tally entry. Please try again.';
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -393,10 +426,17 @@ function TallyScreen() {
                 <Text style={dynamicStyles.actionButtonText}>Clear</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[dynamicStyles.actionButton, styles.enterButton]}
+                style={[
+                  dynamicStyles.actionButton,
+                  styles.enterButton,
+                  isSubmitting && { opacity: 0.6 }
+                ]}
                 onPress={handleTallyEnter}
+                disabled={isSubmitting}
               >
-                <Text style={dynamicStyles.actionButtonText}>Enter</Text>
+                <Text style={dynamicStyles.actionButtonText}>
+                  {isSubmitting ? 'Saving...' : 'Enter'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
