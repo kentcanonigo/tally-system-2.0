@@ -166,49 +166,86 @@ function TallyScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      console.log('Creating tally log entry:', {
-        sessionId,
-        weight_classification_id: matchedWC.id,
-        role: tallyRole,
-        weight,
-      });
-
-      // Create log entry - this will also increment the allocation
-      const response = await tallyLogEntriesApi.create(sessionId, {
-        weight_classification_id: matchedWC.id,
-        role: tallyRole as TallyLogEntryRole,
-        weight: weight,
-        notes: null,
-      });
-
-      console.log('Tally log entry created successfully:', response.data);
-
-      // Reset input
-      setTallyInput('0');
-
-      // Refresh allocations to show updated counts
-      const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
-      setAllocations(allocationsRes.data);
-
-      // Show success feedback (optional - you can remove this if it's too much)
-      // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
-    } catch (error: any) {
-      console.error('Error creating tally log entry:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
+    // Check for over-allocation before proceeding
+    const currentAllocation = getCurrentAllocation(matchedWC.id);
+    if (currentAllocation && currentAllocation.required_bags > 0) {
+      const currentAllocated = tallyRole === 'tally' 
+        ? currentAllocation.allocated_bags_tally 
+        : currentAllocation.allocated_bags_dispatcher;
+      const newAllocated = currentAllocated + 1; // We increment by 1
       
-      const errorMessage = error.response?.data?.detail 
-        || error.message 
-        || 'Failed to log tally entry. Please try again.';
-      
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setIsSubmitting(false);
+      if (newAllocated > currentAllocation.required_bags) {
+        // Show confirmation dialog for over-allocation
+        Alert.alert(
+          'Over-Allocation Warning',
+          `This entry would cause over-allocation for ${matchedWC.classification}.\n\n` +
+          `Required: ${currentAllocation.required_bags}\n` +
+          `Current: ${currentAllocated}\n` +
+          `After this entry: ${newAllocated}\n\n` +
+          `Do you want to proceed?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Proceed',
+              onPress: () => createLogEntry(),
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    // No over-allocation, proceed directly
+    createLogEntry();
+
+    async function createLogEntry() {
+      setIsSubmitting(true);
+      try {
+        console.log('Creating tally log entry:', {
+          sessionId,
+          weight_classification_id: matchedWC.id,
+          role: tallyRole,
+          weight,
+        });
+
+        // Create log entry - this will also increment the allocation
+        const response = await tallyLogEntriesApi.create(sessionId, {
+          weight_classification_id: matchedWC.id,
+          role: tallyRole as TallyLogEntryRole,
+          weight: weight,
+          notes: null,
+        });
+
+        console.log('Tally log entry created successfully:', response.data);
+
+        // Reset input
+        setTallyInput('0');
+
+        // Refresh allocations to show updated counts
+        const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+        setAllocations(allocationsRes.data);
+
+        // Show success feedback (optional - you can remove this if it's too much)
+        // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
+      } catch (error: any) {
+        console.error('Error creating tally log entry:', error);
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+        });
+        
+        const errorMessage = error.response?.data?.detail 
+          || error.message 
+          || 'Failed to log tally entry. Please try again.';
+        
+        Alert.alert('Error', errorMessage);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
