@@ -4,10 +4,13 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDate } from '../utils/dateFormat';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { timezone } = useTimezone();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -165,7 +168,7 @@ function TallySessionsScreen() {
             </View>
             <Text style={dynamicStyles.sessionInfo}>{getCustomerName(item.customer_id)}</Text>
             <Text style={dynamicStyles.sessionInfo}>{getPlantName(item.plant_id)}</Text>
-            <Text style={styles.sessionDate}>{new Date(item.date).toLocaleDateString()}</Text>
+            <Text style={styles.sessionDate}>{formatDate(item.date, timezone)}</Text>
           </TouchableOpacity>
         )}
         keyExtractor={(item) => item.id.toString()}

@@ -9,6 +9,7 @@ import CreateTallySessionScreen from '../screens/CreateTallySessionScreen';
 import TallyScreen from '../screens/TallyScreen';
 import TallySessionLogsScreen from '../screens/TallySessionLogsScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,6 +33,7 @@ function AppNavigator() {
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} />
+        <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );

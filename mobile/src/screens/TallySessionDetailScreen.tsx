@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDate } from '../utils/dateFormat';
 import {
   tallySessionsApi,
   allocationDetailsApi,
@@ -16,6 +18,7 @@ function TallySessionDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { timezone } = useTimezone();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -355,7 +358,7 @@ function TallySessionDetailScreen() {
           <Text style={dynamicStyles.infoLabel}>Plant</Text>
           <Text style={dynamicStyles.infoValue}>{plant?.name}</Text>
           <Text style={dynamicStyles.infoLabel}>Date</Text>
-          <Text style={dynamicStyles.infoValue}>{new Date(session.date).toLocaleDateString()}</Text>
+          <Text style={dynamicStyles.infoValue}>{formatDate(session.date, timezone)}</Text>
         </View>
 
         <View style={dynamicStyles.actions}>

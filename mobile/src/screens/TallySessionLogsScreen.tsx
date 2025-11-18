@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDate, formatTime } from '../utils/dateFormat';
 import {
   tallySessionsApi,
   customersApi,
@@ -17,6 +19,7 @@ function TallySessionLogsScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { timezone } = useTimezone();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -152,7 +155,7 @@ function TallySessionLogsScreen() {
     });
 
     return filtered;
-  }, [logEntries, filters, sortBy, sortOrder, weightClassifications]);
+  }, [logEntries, filters, sortBy, sortOrder, weightClassifications, timezone]);
 
   // Calculate aggregations by weight classification
   const aggregations = useMemo(() => {
@@ -295,7 +298,7 @@ function TallySessionLogsScreen() {
           {customer?.name} | {plant?.name}
         </Text>
         <Text style={dynamicStyles.infoText}>
-          {new Date(session.date).toLocaleDateString()} | {session.status}
+          {formatDate(session.date, timezone)} | {session.status}
         </Text>
       </View>
 
@@ -477,7 +480,7 @@ function TallySessionLogsScreen() {
                   {entry.weight.toFixed(2)}
                 </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 1.5, fontSize: 10 }]} numberOfLines={1}>
-                  {new Date(entry.created_at).toLocaleTimeString()}
+                  {formatTime(entry.created_at, timezone)}
                 </Text>
               </View>
             );
