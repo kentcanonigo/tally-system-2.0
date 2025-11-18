@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import {
@@ -37,6 +37,17 @@ function TallyScreen() {
       fetchData();
     }
   }, [sessionId]);
+
+  // Update navigation title when data is loaded
+  useLayoutEffect(() => {
+    if (plant && customer && session) {
+      const titleParts = [plant.name, customer.name, `Session #${session.id}`];
+      const titleText = `${titleParts.join(' - ')} (${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'})`;
+      navigation.setOptions({ title: titleText });
+    } else {
+      navigation.setOptions({ title: `Tally - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}` });
+    }
+  }, [plant, customer, session, tallyRole, navigation]);
 
   const fetchData = async () => {
     try {
@@ -281,27 +292,6 @@ function TallyScreen() {
       ...styles.container,
       padding: responsive.padding.medium,
     },
-    header: {
-      ...styles.header,
-      padding: responsive.padding.medium,
-      marginBottom: responsive.spacing.md,
-      minHeight: responsive.isTablet ? 60 : 50,
-    },
-    headerTitle: {
-      ...styles.headerTitle,
-      fontSize: responsive.fontSize.medium,
-      flex: 1,
-      marginRight: responsive.spacing.sm,
-    },
-    closeButton: {
-      ...styles.closeButton,
-      width: responsive.isTablet ? 36 : 32,
-      height: responsive.isTablet ? 36 : 32,
-    },
-    closeButtonText: {
-      ...styles.closeButtonText,
-      fontSize: responsive.isTablet ? 20 : 18,
-    },
     contentContainer: {
       flexDirection: isLandscape ? ('row-reverse' as const) : ('column' as const),
       flex: isLandscape ? 1 : undefined,
@@ -402,15 +392,6 @@ function TallyScreen() {
       fontSize: responsive.fontSize.small,
     },
   };
-
-  // Build title with plant, customer, and session info
-  const titleParts = [];
-  if (plant) titleParts.push(plant.name);
-  if (customer) titleParts.push(customer.name);
-  if (session) titleParts.push(`Session #${session.id}`);
-  const titleText = titleParts.length > 0 
-    ? `${titleParts.join(' - ')} (${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'})`
-    : `Tally - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}`;
 
   const content = (
     <View style={dynamicStyles.contentContainer}>
@@ -582,18 +563,6 @@ function TallyScreen() {
 
   return (
     <View style={dynamicStyles.container}>
-      <View style={dynamicStyles.header}>
-        <Text style={dynamicStyles.headerTitle} numberOfLines={2}>
-          {titleText}
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={dynamicStyles.closeButton}
-        >
-          <Text style={dynamicStyles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
-      </View>
-
       {isLandscape ? (
         content
       ) : (
@@ -613,33 +582,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerTitle: {
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    flexShrink: 1,
-  },
-  closeButton: {
-    borderRadius: 18,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   displayRow: {
     flexDirection: 'row',
