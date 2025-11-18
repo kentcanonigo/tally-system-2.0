@@ -38,6 +38,21 @@ def update_allocation_detail(db: Session, allocation_id: int, allocation_update:
         return None
     
     update_data = allocation_update.model_dump(exclude_unset=True)
+    
+    # Check if weight_classification_id is being updated and if it would create a duplicate
+    if 'weight_classification_id' in update_data:
+        new_wc_id = update_data['weight_classification_id']
+        # Only check for duplicates if the weight classification is actually changing
+        if new_wc_id != db_allocation.weight_classification_id:
+            existing = db.query(AllocationDetails).filter(
+                AllocationDetails.tally_session_id == db_allocation.tally_session_id,
+                AllocationDetails.weight_classification_id == new_wc_id,
+                AllocationDetails.id != allocation_id  # Exclude the current allocation
+            ).first()
+            
+            if existing:
+                raise ValueError("Allocation detail already exists for this session and weight classification")
+    
     for field, value in update_data.items():
         setattr(db_allocation, field, value)
     

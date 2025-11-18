@@ -61,6 +61,12 @@ def update_allocation_detail(
     allocation_detail: AllocationDetailsUpdate,
     db: Session = Depends(get_db)
 ):
+    # Verify weight classification exists if it's being updated
+    if allocation_detail.weight_classification_id is not None:
+        wc = wc_crud.get_weight_classification(db, wc_id=allocation_detail.weight_classification_id)
+        if wc is None:
+            raise HTTPException(status_code=404, detail="Weight classification not found")
+    
     try:
         db_allocation = crud.update_allocation_detail(
             db, allocation_id=allocation_id, allocation_update=allocation_detail

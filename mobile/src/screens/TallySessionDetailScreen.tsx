@@ -29,6 +29,7 @@ function TallySessionDetailScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
@@ -101,6 +102,16 @@ function TallySessionDetailScreen() {
       return;
     }
 
+    // Check if weight classification already exists for this session
+    const existingAllocation = allocations.find(
+      (alloc) => alloc.weight_classification_id === formData.weight_classification_id
+    );
+    if (existingAllocation) {
+      const wcName = getWeightClassificationName(formData.weight_classification_id);
+      Alert.alert('Error', `An allocation with weight classification "${wcName}" already exists for this session. Please choose a different classification.`);
+      return;
+    }
+
     try {
       await allocationDetailsApi.create(sessionId, {
         weight_classification_id: formData.weight_classification_id,
@@ -115,10 +126,12 @@ function TallySessionDetailScreen() {
         allocated_bags_tally: '', 
         allocated_bags_dispatcher: '' 
       });
-      fetchData();
+      // Force refresh to ensure UI updates
+      await fetchData();
     } catch (error: any) {
       console.error('Error creating allocation:', error);
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to create allocation');
+      const errorMessage = error.response?.data?.detail || 'Failed to create allocation';
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -139,6 +152,20 @@ function TallySessionDetailScreen() {
       return;
     }
 
+    // Check if weight classification is being changed to one that already exists
+    if (formData.weight_classification_id !== editingAllocation.weight_classification_id) {
+      const existingAllocation = allocations.find(
+        (alloc) => 
+          alloc.weight_classification_id === formData.weight_classification_id &&
+          alloc.id !== editingAllocation.id
+      );
+      if (existingAllocation) {
+        const wcName = getWeightClassificationName(formData.weight_classification_id);
+        Alert.alert('Error', `An allocation with weight classification "${wcName}" already exists for this session. Please choose a different classification.`);
+        return;
+      }
+    }
+
     try {
       await allocationDetailsApi.update(editingAllocation.id, {
         weight_classification_id: formData.weight_classification_id,
@@ -154,10 +181,12 @@ function TallySessionDetailScreen() {
         allocated_bags_tally: '', 
         allocated_bags_dispatcher: '' 
       });
-      fetchData();
+      // Force refresh to ensure UI updates
+      await fetchData();
     } catch (error: any) {
       console.error('Error updating allocation:', error);
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to update allocation');
+      const errorMessage = error.response?.data?.detail || 'Failed to update allocation';
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -243,6 +272,12 @@ function TallySessionDetailScreen() {
 
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || `WC ${wcId}`;
+  };
+
+  const getWeightClassificationLabel = (wcId: number) => {
+    const wc = weightClassifications.find((wc) => wc.id === wcId);
+    if (!wc) return 'Select Weight Classification';
+    return `${wc.classification} (${wc.category}) - ${formatWeightRange(wc)}`;
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
@@ -462,6 +497,64 @@ function TallySessionDetailScreen() {
       padding: responsive.padding.medium,
       fontSize: responsive.fontSize.medium,
     },
+    pickerWrapper: {
+      ...styles.pickerWrapper,
+      marginBottom: responsive.spacing.md,
+    },
+    dropdownButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.small,
+      minHeight: 40,
+    },
+    dropdownText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '500',
+      flex: 1,
+    },
+    dropdownIcon: {
+      color: '#2c3e50',
+      fontSize: 10,
+      marginLeft: responsive.spacing.xs,
+    },
+    weightClassDropdownMenu: {
+      backgroundColor: '#fff',
+      borderRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 5,
+      minWidth: 200,
+      maxWidth: '90%',
+      overflow: 'hidden',
+    },
+    weightClassDropdownMenuScroll: {
+      maxHeight: '80%',
+    },
+    weightClassDropdownOption: {
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.medium,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    },
+    weightClassDropdownOptionLast: {
+      borderBottomWidth: 0,
+    },
+    weightClassDropdownOptionSelected: {
+      backgroundColor: '#3498db',
+    },
+    weightClassDropdownOptionText: {
+      color: '#2c3e50',
+      fontSize: responsive.fontSize.small,
+    },
+    weightClassDropdownOptionTextSelected: {
+      color: '#fff',
+      fontWeight: '600',
+    },
     pickerContainer: {
       ...styles.pickerContainer,
       maxHeight: responsive.isTablet ? 200 : 150,
@@ -477,7 +570,6 @@ function TallySessionDetailScreen() {
     modalActions: {
       ...styles.modalActions,
       marginTop: responsive.spacing.lg,
-      gap: responsive.spacing.md,
     },
     modalButton: {
       ...styles.modalButton,
@@ -693,27 +785,19 @@ function TallySessionDetailScreen() {
           <View style={dynamicStyles.modalContent}>
             <Text style={dynamicStyles.modalTitle}>Edit Allocation</Text>
             <Text style={dynamicStyles.label}>Weight Classification</Text>
-            <ScrollView style={dynamicStyles.pickerContainer}>
-              {weightClassifications.map((wc) => (
-                <TouchableOpacity
-                  key={wc.id}
-                  style={[
-                    dynamicStyles.pickerOption,
-                    formData.weight_classification_id === wc.id && styles.pickerOptionSelected,
-                  ]}
-                  onPress={() => setFormData({ ...formData, weight_classification_id: wc.id })}
-                >
-                  <Text
-                    style={[
-                      dynamicStyles.pickerOptionText,
-                      formData.weight_classification_id === wc.id && styles.pickerOptionTextSelected,
-                    ]}
-                  >
-                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={dynamicStyles.pickerWrapper}>
+              <TouchableOpacity
+                style={dynamicStyles.dropdownButton}
+                onPress={() => setShowWeightClassDropdown(true)}
+              >
+                <Text style={dynamicStyles.dropdownText} numberOfLines={2}>
+                  {formData.weight_classification_id > 0 
+                    ? getWeightClassificationLabel(formData.weight_classification_id)
+                    : 'Select Weight Classification'}
+                </Text>
+                <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={dynamicStyles.label}>Required Bags</Text>
             <TextInput
               style={dynamicStyles.input}
@@ -770,27 +854,19 @@ function TallySessionDetailScreen() {
           <View style={dynamicStyles.modalContent}>
             <Text style={dynamicStyles.modalTitle}>Add Allocation</Text>
             <Text style={dynamicStyles.label}>Weight Classification</Text>
-            <ScrollView style={dynamicStyles.pickerContainer}>
-              {weightClassifications.map((wc) => (
-                <TouchableOpacity
-                  key={wc.id}
-                  style={[
-                    dynamicStyles.pickerOption,
-                    formData.weight_classification_id === wc.id && styles.pickerOptionSelected,
-                  ]}
-                  onPress={() => setFormData({ ...formData, weight_classification_id: wc.id })}
-                >
-                  <Text
-                    style={[
-                      dynamicStyles.pickerOptionText,
-                      formData.weight_classification_id === wc.id && styles.pickerOptionTextSelected,
-                    ]}
-                  >
-                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={dynamicStyles.pickerWrapper}>
+              <TouchableOpacity
+                style={dynamicStyles.dropdownButton}
+                onPress={() => setShowWeightClassDropdown(true)}
+              >
+                <Text style={dynamicStyles.dropdownText} numberOfLines={2}>
+                  {formData.weight_classification_id > 0 
+                    ? getWeightClassificationLabel(formData.weight_classification_id)
+                    : 'Select Weight Classification'}
+                </Text>
+                <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={dynamicStyles.label}>Required Bags</Text>
             <TextInput
               style={dynamicStyles.input}
@@ -831,6 +907,71 @@ function TallySessionDetailScreen() {
             </View>
           </View>
         </View>
+      )}
+
+      {/* Weight Classification Dropdown Modal */}
+      {showWeightClassDropdown && (
+        <Modal
+          transparent
+          visible={showWeightClassDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowWeightClassDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowWeightClassDropdown(false)}
+          >
+            <ScrollView 
+              style={dynamicStyles.weightClassDropdownMenuScroll}
+              contentContainerStyle={dynamicStyles.weightClassDropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              {weightClassifications
+                .filter((wc) => {
+                  // When editing, allow the current allocation's weight classification
+                  if (showEditModal && editingAllocation && wc.id === editingAllocation.weight_classification_id) {
+                    return true;
+                  }
+                  // When adding or editing to a different one, exclude already used classifications
+                  const isUsed = allocations.some(
+                    (alloc) => {
+                      // When editing, exclude the current allocation from the check
+                      if (showEditModal && editingAllocation && alloc.id === editingAllocation.id) {
+                        return false;
+                      }
+                      return alloc.weight_classification_id === wc.id;
+                    }
+                  );
+                  return !isUsed;
+                })
+                .map((wc, index, filtered) => (
+                  <TouchableOpacity
+                    key={wc.id}
+                    style={[
+                      dynamicStyles.weightClassDropdownOption,
+                      index === filtered.length - 1 && dynamicStyles.weightClassDropdownOptionLast,
+                      formData.weight_classification_id === wc.id && dynamicStyles.weightClassDropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setFormData({ ...formData, weight_classification_id: wc.id });
+                      setShowWeightClassDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        dynamicStyles.weightClassDropdownOptionText,
+                        formData.weight_classification_id === wc.id && dynamicStyles.weightClassDropdownOptionTextSelected,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </Modal>
       )}
     </ScrollView>
   );
@@ -972,6 +1113,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+  pickerWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
+  },
   pickerContainer: {
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
@@ -999,6 +1147,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   cancelButton: {
     backgroundColor: '#95a5a6',

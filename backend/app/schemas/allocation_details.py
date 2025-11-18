@@ -22,6 +22,7 @@ class AllocationDetailsCreate(AllocationDetailsBase):
 
 
 class AllocationDetailsUpdate(BaseModel):
+    weight_classification_id: Optional[int] = None
     required_bags: Optional[float] = None
     allocated_bags_tally: Optional[float] = None
     allocated_bags_dispatcher: Optional[float] = None
