@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl } from 'react-native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   tallySessionsApi,
   allocationDetailsApi,
@@ -22,6 +22,7 @@ function TallySessionDetailScreen() {
   const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
@@ -36,8 +37,25 @@ function TallySessionDetailScreen() {
     }
   }, [sessionId]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  // Refresh data when screen comes into focus (e.g., when returning from tally screen)
+  useFocusEffect(
+    useCallback(() => {
+      if (sessionId) {
+        // Only refresh if we already have data (not on initial load)
+        // This prevents double-fetching on initial mount
+        const hasData = session !== null || allocations.length > 0;
+        if (hasData && !loading && !refreshing) {
+          fetchData(false);
+        }
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionId])
+  );
+
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const sessionRes = await tallySessionsApi.getById(sessionId);
       const sessionData = sessionRes.data;
@@ -62,7 +80,13 @@ function TallySessionDetailScreen() {
       Alert.alert('Error', 'Failed to load session details');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData(false);
   };
 
   const handleAddAllocation = async () => {
@@ -293,7 +317,13 @@ function TallySessionDetailScreen() {
   };
 
   return (
-    <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
+    <ScrollView 
+      style={dynamicStyles.container} 
+      contentContainerStyle={dynamicStyles.contentContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={dynamicStyles.contentWrapper}>
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.sessionId}>Session #{session.id}</Text>
