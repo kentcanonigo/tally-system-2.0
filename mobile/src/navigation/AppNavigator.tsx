@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import TallySessionsScreen from '../screens/TallySessionsScreen';
 import TallySessionDetailScreen from '../screens/TallySessionDetailScreen';
@@ -29,7 +30,29 @@ function SessionsStack() {
 function AppNavigator() {
   return (
     <NavigationContainer>
-      <Tab.Navigator>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: any;
+
+            if (route.name === 'Home') {
+              iconName = 'home';
+            } else if (route.name === 'Sessions') {
+              iconName = 'list';
+            } else if (route.name === 'Calculator') {
+              iconName = 'calculate';
+            } else if (route.name === 'Settings') {
+              iconName = 'settings';
+            } else {
+              iconName = 'help';
+            }
+
+            return <MaterialIcons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: '#3498db',
+          tabBarInactiveTintColor: '#7f8c8d',
+        })}
+      >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} />
