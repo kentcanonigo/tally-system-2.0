@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   tallySessionsApi,
@@ -213,6 +214,13 @@ function TallySessionDetailScreen() {
       ...styles.sessionId,
       fontSize: responsive.fontSize.medium,
     },
+    statusPickerContainer: {
+      ...styles.statusPickerContainer,
+      minWidth: responsive.isTablet ? 150 : 120,
+    },
+    statusPicker: {
+      ...styles.statusPicker,
+    },
     infoCard: {
       ...styles.infoCard,
       padding: responsive.padding.medium,
@@ -327,8 +335,17 @@ function TallySessionDetailScreen() {
       <View style={dynamicStyles.contentWrapper}>
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.sessionId}>Session #{session.id}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: session.status === 'ongoing' ? '#f39c12' : session.status === 'completed' ? '#27ae60' : '#e74c3c' }]}>
-            <Text style={styles.statusText}>{session.status}</Text>
+          <View style={dynamicStyles.statusPickerContainer}>
+            <Picker
+              selectedValue={session.status}
+              onValueChange={(value) => handleUpdateStatus(value)}
+              style={dynamicStyles.statusPicker}
+              dropdownIconColor="#2c3e50"
+            >
+              <Picker.Item label="Ongoing" value="ongoing" />
+              <Picker.Item label="Completed" value="completed" />
+              <Picker.Item label="Cancelled" value="cancelled" />
+            </Picker>
           </View>
         </View>
 
@@ -342,6 +359,12 @@ function TallySessionDetailScreen() {
         </View>
 
         <View style={dynamicStyles.actions}>
+          <TouchableOpacity
+            style={[dynamicStyles.actionButton, styles.viewLogsButton]}
+            onPress={() => navigation.navigate('TallySessionLogs' as never, { sessionId: session.id } as never)}
+          >
+            <Text style={dynamicStyles.actionButtonText}>View Logs</Text>
+          </TouchableOpacity>
           {session.status === 'ongoing' && (
             <>
               <TouchableOpacity
@@ -349,12 +372,6 @@ function TallySessionDetailScreen() {
                 onPress={handleStartTally}
               >
                 <Text style={dynamicStyles.actionButtonText}>Start Tally</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[dynamicStyles.actionButton, styles.completeButton]}
-                onPress={() => handleUpdateStatus('completed')}
-              >
-                <Text style={dynamicStyles.actionButtonText}>Mark Complete</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[dynamicStyles.actionButton, styles.addButton]}
@@ -504,15 +521,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  statusPickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
   },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
+  statusPicker: {
+    height: Platform.OS === 'ios' ? 200 : 50,
+    width: '100%',
   },
   infoCard: {
     backgroundColor: '#fff',
@@ -543,6 +561,9 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#3498db',
+  },
+  viewLogsButton: {
+    backgroundColor: '#9b59b6',
   },
   actionButtonText: {
     color: '#fff',

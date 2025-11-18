@@ -20,6 +20,8 @@ function TallySessionLogs() {
     role: 'all',
     weight_classification_id: 'all',
   });
+  const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     if (id) {
@@ -71,9 +73,9 @@ function TallySessionLogs() {
     return `${wc.min_weight}-${wc.max_weight}`;
   };
 
-  // Filter log entries based on current filters
+  // Filter and sort log entries based on current filters and sort settings
   const filteredEntries = useMemo(() => {
-    return logEntries.filter((entry) => {
+    let filtered = logEntries.filter((entry) => {
       if (filters.role !== 'all' && entry.role !== filters.role) {
         return false;
       }
@@ -82,7 +84,42 @@ function TallySessionLogs() {
       }
       return true;
     });
-  }, [logEntries, filters]);
+
+    // Sort the filtered entries
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      let timeComparison = 0;
+      
+      switch (sortBy) {
+        case 'class':
+          const aWc = weightClassifications.find((wc) => wc.id === a.weight_classification_id);
+          const bWc = weightClassifications.find((wc) => wc.id === b.weight_classification_id);
+          const aClass = aWc?.classification || '';
+          const bClass = bWc?.classification || '';
+          comparison = aClass.localeCompare(bClass);
+          break;
+        case 'weight':
+          comparison = a.weight - b.weight;
+          break;
+        case 'time':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'id':
+          comparison = a.id - b.id;
+          break;
+      }
+      
+      // Secondary sort by time (descending - newest first) if primary comparison is equal and time is not the primary sort
+      if (comparison === 0 && sortBy !== 'time') {
+        timeComparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); // Descending order
+        return timeComparison;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [logEntries, filters, sortBy, sortOrder, weightClassifications]);
 
   // Calculate aggregations by weight classification
   const aggregations = useMemo(() => {
@@ -189,6 +226,32 @@ function TallySessionLogs() {
             ))}
           </select>
         </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontWeight: 'bold' }}>Sort By:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'class' | 'weight' | 'time' | 'id')}
+            style={{ padding: '8px', minWidth: '150px' }}
+          >
+            <option value="time">Time</option>
+            <option value="class">Class</option>
+            <option value="weight">Weight</option>
+            <option value="id">ID</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontWeight: 'bold' }}>Order:</label>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+            style={{ padding: '8px', minWidth: '120px' }}
+          >
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
       </div>
 
       {/* Aggregation Summary */}
@@ -257,6 +320,7 @@ function TallySessionLogs() {
                 <th>ID</th>
                 <th>Role</th>
                 <th>Weight Classification</th>
+                <th>Weight Range</th>
                 <th>Weight</th>
                 <th>Notes</th>
                 <th>Timestamp</th>
@@ -264,31 +328,35 @@ function TallySessionLogs() {
             </thead>
             <tbody>
               {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>{entry.id}</td>
-                    <td>
-                      <span
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: entry.role === TallyLogEntryRole.TALLY ? '#3498db' : '#9b59b6',
-                          color: 'white',
-                          fontSize: '12px',
-                        }}
-                      >
-                        {entry.role === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'}
-                      </span>
-                    </td>
-                    <td>{getWeightClassificationName(entry.weight_classification_id)}</td>
-                    <td>{entry.weight.toFixed(2)}</td>
-                    <td>{entry.notes || '-'}</td>
-                    <td>{new Date(entry.created_at).toLocaleString()}</td>
-                  </tr>
-                ))
+                filteredEntries.map((entry) => {
+                  const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
+                  return (
+                    <tr key={entry.id}>
+                      <td>{entry.id}</td>
+                      <td>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: entry.role === TallyLogEntryRole.TALLY ? '#3498db' : '#9b59b6',
+                            color: 'white',
+                            fontSize: '12px',
+                          }}
+                        >
+                          {entry.role === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'}
+                        </span>
+                      </td>
+                      <td>{getWeightClassificationName(entry.weight_classification_id)}</td>
+                      <td>{wc ? formatWeightRange(wc) : '-'}</td>
+                      <td>{entry.weight.toFixed(2)}</td>
+                      <td>{entry.notes || '-'}</td>
+                      <td>{new Date(entry.created_at).toLocaleString()}</td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center' }}>
+                  <td colSpan={7} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
@@ -13,13 +13,32 @@ function TallySessionsScreen() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const hasInitiallyLoaded = useRef(false);
 
   useEffect(() => {
-    fetchData();
+    fetchData().then(() => {
+      hasInitiallyLoaded.current = true;
+    });
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  // Refresh sessions when screen comes into focus (e.g., when returning from session details)
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we've already loaded data initially (not on first mount)
+      if (hasInitiallyLoaded.current && !loading && !refreshing) {
+        // Use a small delay to ensure the previous screen has fully navigated away
+        const timeoutId = setTimeout(() => {
+          fetchData(false); // Don't show loading spinner on refresh
+        }, 100);
+        return () => clearTimeout(timeoutId);
+      }
+    }, [loading, refreshing])
+  );
+
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const [sessionsRes, customersRes, plantsRes] = await Promise.all([
         tallySessionsApi.getAll(),
