@@ -24,10 +24,10 @@ class AllocationDetailsCreate(AllocationDetailsBase):
 class AllocationDetailsUpdate(BaseModel):
     weight_classification_id: Optional[int] = None
     required_bags: Optional[float] = None
-    allocated_bags_tally: Optional[float] = None
-    allocated_bags_dispatcher: Optional[float] = None
+    # Note: allocated_bags_tally and allocated_bags_dispatcher are not editable
+    # They are automatically calculated from tally log entries
 
-    @field_validator('required_bags', 'allocated_bags_tally', 'allocated_bags_dispatcher')
+    @field_validator('required_bags')
     @classmethod
     def validate_bags(cls, v):
         if v is not None and v < 0:

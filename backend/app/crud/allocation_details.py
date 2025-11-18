@@ -39,11 +39,28 @@ def update_allocation_detail(db: Session, allocation_id: int, allocation_update:
     
     update_data = allocation_update.model_dump(exclude_unset=True)
     
-    # Check if weight_classification_id is being updated and if it would create a duplicate
+    # Remove allocated_bags fields if they were somehow included (they shouldn't be editable)
+    update_data.pop('allocated_bags_tally', None)
+    update_data.pop('allocated_bags_dispatcher', None)
+    
+    # Check if weight_classification_id is being updated
     if 'weight_classification_id' in update_data:
         new_wc_id = update_data['weight_classification_id']
-        # Only check for duplicates if the weight classification is actually changing
+        # Only check if the weight classification is actually changing
         if new_wc_id != db_allocation.weight_classification_id:
+            # Check if there are existing log entries for this allocation
+            log_entry_count = db.query(TallyLogEntry).filter(
+                TallyLogEntry.tally_session_id == db_allocation.tally_session_id,
+                TallyLogEntry.weight_classification_id == db_allocation.weight_classification_id
+            ).count()
+            
+            if log_entry_count > 0:
+                raise ValueError(
+                    f"Cannot change weight classification because there are {log_entry_count} existing log entry/entries "
+                    "for this allocation. Please delete the log entries from the view logs screen first for safety."
+                )
+            
+            # Check if the new weight classification would create a duplicate
             existing = db.query(AllocationDetails).filter(
                 AllocationDetails.tally_session_id == db_allocation.tally_session_id,
                 AllocationDetails.weight_classification_id == new_wc_id,
@@ -66,6 +83,13 @@ def delete_allocation_detail(db: Session, allocation_id: int) -> bool:
     if not db_allocation:
         return False
     
+    # Delete associated log entries for this allocation's session and weight classification
+    deleted_count = db.query(TallyLogEntry).filter(
+        TallyLogEntry.tally_session_id == db_allocation.tally_session_id,
+        TallyLogEntry.weight_classification_id == db_allocation.weight_classification_id
+    ).delete(synchronize_session=False)
+    
+    # Delete the allocation
     db.delete(db_allocation)
     db.commit()
     return True

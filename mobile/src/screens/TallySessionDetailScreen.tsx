@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -9,8 +9,9 @@ import {
   customersApi,
   plantsApi,
   weightClassificationsApi,
+  tallyLogEntriesApi,
 } from '../services/api';
-import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
+import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { useResponsive } from '../utils/responsive';
 
 function TallySessionDetailScreen() {
@@ -24,6 +25,7 @@ function TallySessionDetailScreen() {
   const [plant, setPlant] = useState<Plant | null>(null);
   const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
+  const [logEntries, setLogEntries] = useState<TallyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,26 +36,34 @@ function TallySessionDetailScreen() {
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: '',
-    allocated_bags_tally: '',
-    allocated_bags_dispatcher: '',
   });
+
+  // Track if we've done the initial fetch to prevent double-fetching
+  const hasInitialFetchedRef = useRef(false);
+  const previousSessionIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (sessionId) {
-      fetchData();
+      // Reset flag when sessionId changes
+      if (previousSessionIdRef.current !== sessionId) {
+        hasInitialFetchedRef.current = false;
+        previousSessionIdRef.current = sessionId;
+      }
+      
+      if (!hasInitialFetchedRef.current) {
+        fetchData();
+        hasInitialFetchedRef.current = true;
+      }
     }
   }, [sessionId]);
 
   // Refresh data when screen comes into focus (e.g., when returning from tally screen)
   useFocusEffect(
     useCallback(() => {
-      if (sessionId) {
-        // Only refresh if we already have data (not on initial load)
-        // This prevents double-fetching on initial mount
-        const hasData = session !== null || allocations.length > 0;
-        if (hasData && !loading && !refreshing) {
-          fetchData(false);
-        }
+      if (sessionId && hasInitialFetchedRef.current) {
+        // Refresh when returning to the screen if we've already done initial fetch
+        // This ensures allocations are updated after tally entries are created
+        fetchData(false);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId])
@@ -68,17 +78,19 @@ function TallySessionDetailScreen() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
-      const [customerRes, plantRes, allocationsRes, wcRes] = await Promise.all([
+      const [customerRes, plantRes, allocationsRes, wcRes, logEntriesRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
+        tallyLogEntriesApi.getBySession(sessionId),
       ]);
 
       setCustomer(customerRes.data);
       setPlant(plantRes.data);
       setAllocations(allocationsRes.data);
       setWeightClassifications(wcRes.data);
+      setLogEntries(logEntriesRes.data);
       if (wcRes.data.length > 0) {
         setFormData((prev) => ({ ...prev, weight_classification_id: wcRes.data[0].id }));
       }
@@ -97,7 +109,7 @@ function TallySessionDetailScreen() {
   };
 
   const handleAddAllocation = async () => {
-    if (!formData.weight_classification_id || !formData.required_bags || !formData.allocated_bags_tally || !formData.allocated_bags_dispatcher) {
+    if (!formData.weight_classification_id || !formData.required_bags) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
@@ -116,15 +128,13 @@ function TallySessionDetailScreen() {
       await allocationDetailsApi.create(sessionId, {
         weight_classification_id: formData.weight_classification_id,
         required_bags: parseFloat(formData.required_bags),
-        allocated_bags_tally: parseFloat(formData.allocated_bags_tally),
-        allocated_bags_dispatcher: parseFloat(formData.allocated_bags_dispatcher),
+        allocated_bags_tally: 0.0, // Will be incremented as log entries are created
+        allocated_bags_dispatcher: 0.0, // Will be incremented as log entries are created
       });
       setShowAddModal(false);
       setFormData({ 
         weight_classification_id: weightClassifications[0]?.id || 0, 
         required_bags: '', 
-        allocated_bags_tally: '', 
-        allocated_bags_dispatcher: '' 
       });
       // Force refresh to ensure UI updates
       await fetchData();
@@ -140,20 +150,34 @@ function TallySessionDetailScreen() {
     setFormData({
       weight_classification_id: allocation.weight_classification_id,
       required_bags: allocation.required_bags.toString(),
-      allocated_bags_tally: allocation.allocated_bags_tally.toString(),
-      allocated_bags_dispatcher: allocation.allocated_bags_dispatcher.toString(),
     });
     setShowEditModal(true);
   };
 
   const handleUpdateAllocation = async () => {
-    if (!editingAllocation || !formData.weight_classification_id || !formData.required_bags || !formData.allocated_bags_tally || !formData.allocated_bags_dispatcher) {
+    if (!editingAllocation || !formData.weight_classification_id || !formData.required_bags) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
 
-    // Check if weight classification is being changed to one that already exists
+    // Check if weight classification is being changed
     if (formData.weight_classification_id !== editingAllocation.weight_classification_id) {
+      // Check if there are existing log entries for this allocation
+      const hasLogEntries = logEntries.some(
+        (entry) => 
+          entry.tally_session_id === sessionId &&
+          entry.weight_classification_id === editingAllocation.weight_classification_id
+      );
+      
+      if (hasLogEntries) {
+        Alert.alert(
+          'Cannot Change Weight Classification',
+          'This allocation has existing log entries. Please delete the log entries from the view logs screen first for safety before changing the weight classification.'
+        );
+        return;
+      }
+
+      // Check if the new weight classification would create a duplicate
       const existingAllocation = allocations.find(
         (alloc) => 
           alloc.weight_classification_id === formData.weight_classification_id &&
@@ -170,16 +194,12 @@ function TallySessionDetailScreen() {
       await allocationDetailsApi.update(editingAllocation.id, {
         weight_classification_id: formData.weight_classification_id,
         required_bags: parseFloat(formData.required_bags),
-        allocated_bags_tally: parseFloat(formData.allocated_bags_tally),
-        allocated_bags_dispatcher: parseFloat(formData.allocated_bags_dispatcher),
       });
       setShowEditModal(false);
       setEditingAllocation(null);
       setFormData({ 
         weight_classification_id: weightClassifications[0]?.id || 0, 
         required_bags: '', 
-        allocated_bags_tally: '', 
-        allocated_bags_dispatcher: '' 
       });
       // Force refresh to ensure UI updates
       await fetchData();
@@ -806,22 +826,6 @@ function TallySessionDetailScreen() {
               keyboardType="numeric"
               placeholder="0"
             />
-            <Text style={dynamicStyles.label}>Allocated Bags (Tally)</Text>
-            <TextInput
-              style={dynamicStyles.input}
-              value={formData.allocated_bags_tally}
-              onChangeText={(text) => setFormData({ ...formData, allocated_bags_tally: text })}
-              keyboardType="numeric"
-              placeholder="0"
-            />
-            <Text style={dynamicStyles.label}>Allocated Bags (Dispatcher)</Text>
-            <TextInput
-              style={dynamicStyles.input}
-              value={formData.allocated_bags_dispatcher}
-              onChangeText={(text) => setFormData({ ...formData, allocated_bags_dispatcher: text })}
-              keyboardType="numeric"
-              placeholder="0"
-            />
             <View style={dynamicStyles.modalActions}>
               <TouchableOpacity
                 style={[dynamicStyles.modalButton, styles.cancelButton]}
@@ -831,8 +835,6 @@ function TallySessionDetailScreen() {
                   setFormData({ 
                     weight_classification_id: weightClassifications[0]?.id || 0, 
                     required_bags: '', 
-                    allocated_bags_tally: '', 
-                    allocated_bags_dispatcher: '' 
                   });
                 }}
               >
@@ -875,26 +877,16 @@ function TallySessionDetailScreen() {
               keyboardType="numeric"
               placeholder="0"
             />
-            <Text style={dynamicStyles.label}>Allocated Bags (Tally)</Text>
-            <TextInput
-              style={dynamicStyles.input}
-              value={formData.allocated_bags_tally}
-              onChangeText={(text) => setFormData({ ...formData, allocated_bags_tally: text })}
-              keyboardType="numeric"
-              placeholder="0"
-            />
-            <Text style={dynamicStyles.label}>Allocated Bags (Dispatcher)</Text>
-            <TextInput
-              style={dynamicStyles.input}
-              value={formData.allocated_bags_dispatcher}
-              onChangeText={(text) => setFormData({ ...formData, allocated_bags_dispatcher: text })}
-              keyboardType="numeric"
-              placeholder="0"
-            />
             <View style={dynamicStyles.modalActions}>
               <TouchableOpacity
                 style={[dynamicStyles.modalButton, styles.cancelButton]}
-                onPress={() => setShowAddModal(false)}
+                onPress={() => {
+                  setShowAddModal(false);
+                  setFormData({ 
+                    weight_classification_id: weightClassifications[0]?.id || 0, 
+                    required_bags: '', 
+                  });
+                }}
               >
                 <Text style={dynamicStyles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
