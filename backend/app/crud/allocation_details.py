@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models.allocation_details import AllocationDetails
+from ..models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
 from ..schemas.allocation_details import AllocationDetailsCreate, AllocationDetailsUpdate
 
 
@@ -60,17 +61,35 @@ def reset_allocated_bags_for_session(
     session_id: int, 
     reset_tally: bool = False, 
     reset_dispatcher: bool = False
-) -> int:
+) -> dict:
     """
-    Reset allocated bags for all allocations in a session.
-    Returns the number of allocations updated.
+    Reset allocated bags for all allocations in a session and delete associated tally log entries.
+    Returns a dictionary with the number of allocations updated and log entries deleted.
     """
     allocations = get_allocation_details_by_session(db, session_id)
     
     if not allocations:
-        return 0
+        return {"allocations_updated": 0, "log_entries_deleted": 0}
     
     updated_count = 0
+    log_entries_deleted = 0
+    
+    # Delete tally log entries based on role
+    if reset_tally:
+        deleted_count = db.query(TallyLogEntry).filter(
+            TallyLogEntry.tally_session_id == session_id,
+            TallyLogEntry.role == TallyLogEntryRole.TALLY
+        ).delete(synchronize_session=False)
+        log_entries_deleted += deleted_count
+    
+    if reset_dispatcher:
+        deleted_count = db.query(TallyLogEntry).filter(
+            TallyLogEntry.tally_session_id == session_id,
+            TallyLogEntry.role == TallyLogEntryRole.DISPATCHER
+        ).delete(synchronize_session=False)
+        log_entries_deleted += deleted_count
+    
+    # Reset allocated bags
     for allocation in allocations:
         updated = False
         if reset_tally:
@@ -83,7 +102,7 @@ def reset_allocated_bags_for_session(
         if updated:
             updated_count += 1
     
-    if updated_count > 0:
+    if updated_count > 0 or log_entries_deleted > 0:
         db.commit()
     
-    return updated_count
+    return {"allocations_updated": updated_count, "log_entries_deleted": log_entries_deleted}
