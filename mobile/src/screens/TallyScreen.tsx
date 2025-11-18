@@ -102,6 +102,19 @@ function TallyScreen() {
     return allocations.find((a) => a.weight_classification_id === wcId) || null;
   };
 
+  const formatWeightRange = (wc: WeightClassification): string => {
+    if (wc.min_weight === null && wc.max_weight === null) {
+      return 'All Sizes';
+    }
+    if (wc.min_weight === null && wc.max_weight !== null) {
+      return `Up to ${wc.max_weight}`;
+    }
+    if (wc.max_weight === null) {
+      return `${wc.min_weight} and up`;
+    }
+    return `${wc.min_weight}-${wc.max_weight}`;
+  };
+
   const handleTallyNumberPress = (num: string) => {
     setTallyInput((prev) => {
       if (prev === '0') {
@@ -449,6 +462,7 @@ function TallyScreen() {
             <View style={dynamicStyles.summaryTable}>
               <View style={dynamicStyles.summaryHeader}>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Label</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Weight Range</Text>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Allocated / Required</Text>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Sum</Text>
               </View>
@@ -464,6 +478,9 @@ function TallyScreen() {
                   <View key={allocation.id} style={dynamicStyles.summaryRow}>
                     <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
                       {wc.classification}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                      {formatWeightRange(wc)}
                     </Text>
                     <Text style={[dynamicStyles.summaryCell, { flex: 2 }]}>
                       {allocatedBags} / {allocation.required_bags}
