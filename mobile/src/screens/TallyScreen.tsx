@@ -103,6 +103,11 @@ function TallyScreen() {
   };
 
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
@@ -498,9 +503,10 @@ function TallyScreen() {
             <Text style={dynamicStyles.summaryTitle}>Allocations Summary</Text>
             <View style={dynamicStyles.summaryTable}>
               <View style={dynamicStyles.summaryHeader}>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Label</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Weight Range</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Allocated / Required</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Description</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Weight Range</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Allocated / Required</Text>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Sum</Text>
               </View>
               {allocations.map((allocation) => {
@@ -513,13 +519,16 @@ function TallyScreen() {
                 
                 return (
                   <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
                       {wc.classification}
                     </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5, fontSize: 11 }]} numberOfLines={1}>
+                      {wc.description || '-'}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
                       {formatWeightRange(wc)}
                     </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]}>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]}>
                       {allocatedBags} / {allocation.required_bags}
                     </Text>
                     <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>-</Text>

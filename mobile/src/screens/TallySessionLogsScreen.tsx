@@ -97,6 +97,11 @@ function TallySessionLogsScreen() {
   };
 
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
@@ -444,10 +449,11 @@ function TallySessionLogsScreen() {
         <View style={dynamicStyles.tableHeader}>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>ID</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Role</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.5 }]}>Class</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Range</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Weight</Text>
-          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.5 }]}>Time</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Class</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Desc</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Range</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
         </View>
         {filteredEntries.length > 0 ? (
           filteredEntries.map((entry) => {
@@ -470,16 +476,19 @@ function TallySessionLogsScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.5 }]} numberOfLines={1}>
+                <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {getWeightClassificationName(entry.weight_classification_id)}
                 </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
+                <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 9 }]} numberOfLines={1}>
+                  {wc?.description || '-'}
+                </Text>
+                <Text style={[dynamicStyles.tableCell, { flex: 1, fontSize: 10 }]} numberOfLines={1}>
                   {wc ? formatWeightRange(wc) : '-'}
                 </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1 }]}>
+                <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
                   {entry.weight.toFixed(2)}
                 </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.5, fontSize: 10 }]} numberOfLines={1}>
+                <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}
                 </Text>
               </View>

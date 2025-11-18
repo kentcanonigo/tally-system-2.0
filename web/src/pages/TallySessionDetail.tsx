@@ -141,6 +141,11 @@ function TallySessionDetail() {
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
@@ -215,10 +220,14 @@ function TallySessionDetail() {
           <tbody>
             {allocations.map((allocation) => {
               const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+              const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
               return (
                 <tr key={allocation.id}>
                   <td>{allocation.id}</td>
-                  <td>{getWeightClassificationName(allocation.weight_classification_id)}</td>
+                  <td>
+                    {getWeightClassificationName(allocation.weight_classification_id)}
+                    {wc?.description && <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{wc.description}</div>}
+                  </td>
                   <td>{allocation.required_bags}</td>
                   <td>{allocation.allocated_bags_tally}</td>
                   <td>{allocation.allocated_bags_dispatcher}</td>

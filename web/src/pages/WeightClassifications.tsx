@@ -11,6 +11,7 @@ function WeightClassifications() {
   const [editingClassification, setEditingClassification] = useState<WeightClassification | null>(null);
   const [formData, setFormData] = useState({
     classification: '',
+    description: '',
     min_weight: null as number | null,
     max_weight: null as number | null,
     category: '',
@@ -60,6 +61,7 @@ function WeightClassifications() {
     setEditingClassification(null);
     setFormData({ 
       classification: '', 
+      description: '',
       min_weight: null, 
       max_weight: null, 
       category: '',
@@ -78,6 +80,7 @@ function WeightClassifications() {
     setEditingClassification(classification);
     setFormData({
       classification: classification.classification,
+      description: classification.description ?? '',
       min_weight: classification.min_weight ?? null,
       max_weight: classification.max_weight ?? null,
       category: classification.category,
@@ -92,13 +95,24 @@ function WeightClassifications() {
     e.preventDefault();
     if (!selectedPlantId) return;
     
+    // Validate description for Byproduct
+    if (formData.category === 'Byproduct' && (!formData.description || !formData.description.trim())) {
+      alert('Description is required for Byproduct category');
+      return;
+    }
+    
     // Prepare data based on catch-all and up range flags
     let submitData: any = {
       classification: formData.classification,
       category: formData.category,
+      description: formData.description.trim() || null,
     };
     
-    if (formData.isCatchAll) {
+    // For Byproduct, always set weights to null
+    if (formData.category === 'Byproduct') {
+      submitData.min_weight = null;
+      submitData.max_weight = null;
+    } else if (formData.isCatchAll) {
       submitData.min_weight = null;
       submitData.max_weight = null;
     } else if (formData.isUpRange) {
@@ -127,6 +141,11 @@ function WeightClassifications() {
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
@@ -195,6 +214,7 @@ function WeightClassifications() {
                   <tr>
                     <th>ID</th>
                     <th>Classification</th>
+                    <th>Description</th>
                     <th>Weight Range</th>
                     <th>Category</th>
                     <th>Actions</th>
@@ -205,6 +225,7 @@ function WeightClassifications() {
                     <tr key={classification.id}>
                       <td>{classification.id}</td>
                       <td>{classification.classification}</td>
+                      <td>{classification.description || '-'}</td>
                       <td>{formatWeightRange(classification)}</td>
                       <td>{classification.category}</td>
                       <td>
@@ -246,99 +267,33 @@ function WeightClassifications() {
               </div>
               <div className="form-group">
                 <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.isCatchAll}
-                    onChange={(e) => {
-                      const isCatchAll = e.target.checked;
-                      setFormData({
-                        ...formData,
-                        isCatchAll,
-                        isUpRange: isCatchAll ? false : formData.isUpRange,
-                        min_weight: isCatchAll ? null : formData.min_weight,
-                        max_weight: isCatchAll ? null : formData.max_weight,
-                      });
-                    }}
-                  />
-                  {' '}Catch-all (All Sizes)
+                  Description {formData.category === 'Byproduct' && <span style={{ color: 'red' }}>*</span>}
                 </label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  required={formData.category === 'Byproduct'}
+                  placeholder={formData.category === 'Byproduct' ? 'Required for Byproduct' : 'Optional'}
+                />
               </div>
-              
-              {!formData.isCatchAll && (
-                <>
-                  <div className="form-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formData.isDownRange}
-                        onChange={(e) => {
-                          const isDownRange = e.target.checked;
-                          setFormData({
-                            ...formData,
-                            isDownRange,
-                            isUpRange: isDownRange ? false : formData.isUpRange,
-                            min_weight: isDownRange ? null : formData.min_weight,
-                          });
-                        }}
-                      />
-                      {' '}Down range (no lower limit - up to X)
-                    </label>
-                  </div>
-                  {!formData.isDownRange && (
-                    <div className="form-group">
-                      <label>Min Weight</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.min_weight ?? ''}
-                        onChange={(e) => {
-                          const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                          setFormData({ ...formData, min_weight: value });
-                        }}
-                        required
-                      />
-                    </div>
-                  )}
-                  <div className="form-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formData.isUpRange}
-                        onChange={(e) => {
-                          const isUpRange = e.target.checked;
-                          setFormData({
-                            ...formData,
-                            isUpRange,
-                            isDownRange: isUpRange ? false : formData.isDownRange,
-                            max_weight: isUpRange ? null : formData.max_weight,
-                          });
-                        }}
-                      />
-                      {' '}Up range (no upper limit - X and up)
-                    </label>
-                  </div>
-                  {!formData.isUpRange && (
-                    <div className="form-group">
-                      <label>Max Weight</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.max_weight ?? ''}
-                        onChange={(e) => {
-                          const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                          setFormData({ ...formData, max_weight: value });
-                        }}
-                        required
-                      />
-                    </div>
-                  )}
-                </>
-              )}
               <div className="form-group">
                 <label>Category</label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) => {
+                    const newCategory = e.target.value;
+                    setFormData({
+                      ...formData,
+                      category: newCategory,
+                      // Clear weight values when switching to Byproduct
+                      min_weight: newCategory === 'Byproduct' ? null : formData.min_weight,
+                      max_weight: newCategory === 'Byproduct' ? null : formData.max_weight,
+                      isCatchAll: newCategory === 'Byproduct' ? false : formData.isCatchAll,
+                      isUpRange: newCategory === 'Byproduct' ? false : formData.isUpRange,
+                      isDownRange: newCategory === 'Byproduct' ? false : formData.isDownRange,
+                    });
+                  }}
                   required
                 >
                   <option value="">Select a category</option>
@@ -346,6 +301,105 @@ function WeightClassifications() {
                   <option value="Byproduct">Byproduct</option>
                 </select>
               </div>
+              {formData.category === 'Dressed' && (
+                <>
+                  <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={formData.isCatchAll}
+                        onChange={(e) => {
+                          const isCatchAll = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            isCatchAll,
+                            isUpRange: isCatchAll ? false : formData.isUpRange,
+                            min_weight: isCatchAll ? null : formData.min_weight,
+                            max_weight: isCatchAll ? null : formData.max_weight,
+                          });
+                        }}
+                      />
+                      {' '}Catch-all (All Sizes)
+                    </label>
+                  </div>
+                  
+                  {!formData.isCatchAll && (
+                    <>
+                      <div className="form-group">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={formData.isDownRange}
+                            onChange={(e) => {
+                              const isDownRange = e.target.checked;
+                              setFormData({
+                                ...formData,
+                                isDownRange,
+                                isUpRange: isDownRange ? false : formData.isUpRange,
+                                min_weight: isDownRange ? null : formData.min_weight,
+                              });
+                            }}
+                          />
+                          {' '}Down range (no lower limit - up to X)
+                        </label>
+                      </div>
+                      {!formData.isDownRange && (
+                        <div className="form-group">
+                          <label>Min Weight</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.min_weight ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setFormData({ ...formData, min_weight: value });
+                            }}
+                            required
+                          />
+                        </div>
+                      )}
+                      <div className="form-group">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={formData.isUpRange}
+                            onChange={(e) => {
+                              const isUpRange = e.target.checked;
+                              setFormData({
+                                ...formData,
+                                isUpRange,
+                                isDownRange: isUpRange ? false : formData.isDownRange,
+                                max_weight: isUpRange ? null : formData.max_weight,
+                              });
+                            }}
+                          />
+                          {' '}Up range (no upper limit - X and up)
+                        </label>
+                      </div>
+                      {!formData.isUpRange && (
+                        <div className="form-group">
+                          <label>Max Weight</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.max_weight ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setFormData({ ...formData, max_weight: value });
+                            }}
+                            required
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+              {formData.category === 'Byproduct' && (
+                <div style={{ padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px', marginBottom: '15px' }}>
+                  <small>Note: Byproduct items do not use weight ranges. Only classification and description are required.</small>
+                </div>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   Cancel

@@ -10,6 +10,7 @@ class WeightClassification(Base):
     id = Column(Integer, primary_key=True, index=True)
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False, index=True)
     classification = Column(String(255), nullable=False)
+    description = Column(String(500), nullable=True)  # Optional description, required for Byproduct category
     min_weight = Column(Float, nullable=True)  # Nullable for catch-all classifications
     max_weight = Column(Float, nullable=True)  # Nullable for "up" ranges and catch-all
     category = Column(String(100), nullable=False)  # Must be "Dressed" or "Byproduct" (enforced by CHECK constraint)

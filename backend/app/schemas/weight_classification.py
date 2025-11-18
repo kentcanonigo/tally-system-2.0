@@ -9,6 +9,7 @@ CategoryType = Literal['Dressed', 'Byproduct']
 
 class WeightClassificationBase(BaseModel):
     classification: str
+    description: Optional[str] = None  # Optional for Dressed, required for Byproduct
     min_weight: Optional[float] = None  # Nullable for catch-all
     max_weight: Optional[float] = None  # Nullable for "up" ranges and catch-all
     category: CategoryType
@@ -22,7 +23,13 @@ class WeightClassificationBase(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def validate_weights(self):
+    def validate_description_and_weights(self):
+        # Validate description: required for Byproduct, optional for Dressed
+        if self.category == 'Byproduct':
+            if not self.description or not self.description.strip():
+                raise ValueError('description is required for Byproduct category')
+        
+        # Validate weights
         # Catch-all: both min and max must be null
         if self.min_weight is None and self.max_weight is None:
             return self  # Valid catch-all
@@ -50,6 +57,7 @@ class WeightClassificationCreate(WeightClassificationBase):
 
 class WeightClassificationUpdate(BaseModel):
     classification: Optional[str] = None
+    description: Optional[str] = None
     min_weight: Optional[float] = None
     max_weight: Optional[float] = None
     category: Optional[CategoryType] = None
@@ -65,8 +73,12 @@ class WeightClassificationUpdate(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def validate_weights(self):
-        # Only validate if at least one weight is being set
+    def validate_description_and_weights(self):
+        # Note: For updates, we can't fully validate description requirement without the existing category
+        # The validation will be handled at the API/CRUD level if needed
+        # If category is being updated to Byproduct, description should be provided
+        
+        # Only validate weights if at least one weight is being set
         if self.min_weight is None and self.max_weight is None:
             return self  # No weights being updated, skip validation
         

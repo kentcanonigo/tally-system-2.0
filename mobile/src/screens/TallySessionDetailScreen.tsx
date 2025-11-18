@@ -136,6 +136,11 @@ function TallySessionDetailScreen() {
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }

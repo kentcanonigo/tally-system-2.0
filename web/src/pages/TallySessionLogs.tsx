@@ -61,6 +61,11 @@ function TallySessionLogs() {
   };
 
   const formatWeightRange = (wc: WeightClassification): string => {
+    // For Byproduct with both weights null, show N/A
+    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
+      return 'N/A';
+    }
+    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
       return 'All Sizes';
     }
@@ -320,6 +325,7 @@ function TallySessionLogs() {
                 <th>ID</th>
                 <th>Role</th>
                 <th>Weight Classification</th>
+                <th>Description</th>
                 <th>Weight Range</th>
                 <th>Weight</th>
                 <th>Notes</th>
@@ -347,6 +353,7 @@ function TallySessionLogs() {
                         </span>
                       </td>
                       <td>{getWeightClassificationName(entry.weight_classification_id)}</td>
+                      <td>{wc?.description || '-'}</td>
                       <td>{wc ? formatWeightRange(wc) : '-'}</td>
                       <td>{entry.weight.toFixed(2)}</td>
                       <td>{entry.notes || '-'}</td>
@@ -356,7 +363,7 @@ function TallySessionLogs() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center' }}>
+                  <td colSpan={8} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>
