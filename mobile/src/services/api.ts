@@ -143,12 +143,14 @@ export const tallySessionsApi = {
     api.post<TallySession>('/tally-sessions', data),
   update: (id: number, data: Partial<TallySession>) =>
     api.put<TallySession>(`/tally-sessions/${id}`, data),
+  delete: (id: number) => api.delete(`/tally-sessions/${id}`),
 };
 
 // Allocation Details API
 export const allocationDetailsApi = {
   getBySession: (sessionId: number) =>
     api.get<AllocationDetails[]>(`/tally-sessions/${sessionId}/allocations`),
+  getById: (id: number) => api.get<AllocationDetails>(`/allocations/${id}`),
   create: (sessionId: number, data: Omit<AllocationDetails, 'id' | 'tally_session_id' | 'created_at' | 'updated_at'>) =>
     api.post<AllocationDetails>(`/tally-sessions/${sessionId}/allocations`, {
       ...data,
@@ -156,6 +158,7 @@ export const allocationDetailsApi = {
     }),
   update: (id: number, data: Partial<AllocationDetails>) =>
     api.put<AllocationDetails>(`/allocations/${id}`, data),
+  delete: (id: number) => api.delete(`/allocations/${id}`),
 };
 
 // Tally Log Entries API

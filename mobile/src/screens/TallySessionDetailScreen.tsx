@@ -27,7 +27,9 @@ function TallySessionDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: '',
@@ -118,6 +120,104 @@ function TallySessionDetailScreen() {
       console.error('Error creating allocation:', error);
       Alert.alert('Error', error.response?.data?.detail || 'Failed to create allocation');
     }
+  };
+
+  const handleEditAllocation = (allocation: AllocationDetails) => {
+    setEditingAllocation(allocation);
+    setFormData({
+      weight_classification_id: allocation.weight_classification_id,
+      required_bags: allocation.required_bags.toString(),
+      allocated_bags_tally: allocation.allocated_bags_tally.toString(),
+      allocated_bags_dispatcher: allocation.allocated_bags_dispatcher.toString(),
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateAllocation = async () => {
+    if (!editingAllocation || !formData.weight_classification_id || !formData.required_bags || !formData.allocated_bags_tally || !formData.allocated_bags_dispatcher) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    try {
+      await allocationDetailsApi.update(editingAllocation.id, {
+        weight_classification_id: formData.weight_classification_id,
+        required_bags: parseFloat(formData.required_bags),
+        allocated_bags_tally: parseFloat(formData.allocated_bags_tally),
+        allocated_bags_dispatcher: parseFloat(formData.allocated_bags_dispatcher),
+      });
+      setShowEditModal(false);
+      setEditingAllocation(null);
+      setFormData({ 
+        weight_classification_id: weightClassifications[0]?.id || 0, 
+        required_bags: '', 
+        allocated_bags_tally: '', 
+        allocated_bags_dispatcher: '' 
+      });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating allocation:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to update allocation');
+    }
+  };
+
+  const handleDeleteAllocation = async (allocationId: number) => {
+    Alert.alert(
+      'Delete Allocation',
+      'Are you sure you want to delete this allocation? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await allocationDetailsApi.delete(allocationId);
+              fetchData();
+            } catch (error: any) {
+              console.error('Error deleting allocation:', error);
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to delete allocation');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteSession = async () => {
+    if (!session) return;
+
+    Alert.alert(
+      'Delete Session',
+      `Are you sure you want to delete Session #${session.id}? This will delete all associated allocations and log entries. This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await tallySessionsApi.delete(session.id);
+              Alert.alert('Success', 'Session deleted successfully', [
+                {
+                  text: 'OK',
+                  onPress: () => navigation.goBack(),
+                },
+              ]);
+            } catch (error: any) {
+              console.error('Error deleting session:', error);
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to delete session');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleUpdateStatus = async (status: string) => {
@@ -445,6 +545,12 @@ function TallySessionDetailScreen() {
               </TouchableOpacity>
             </>
           )}
+          <TouchableOpacity
+            style={[dynamicStyles.actionButton, styles.deleteButton]}
+            onPress={handleDeleteSession}
+          >
+            <Text style={dynamicStyles.actionButtonText}>Delete Session</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
@@ -452,7 +558,7 @@ function TallySessionDetailScreen() {
           <Text style={styles.emptyText}>No allocations yet</Text>
         ) : (
           <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
-            {allocations.map((allocation) => {
+              {allocations.map((allocation) => {
               const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
               return (
                 <View 
@@ -462,9 +568,25 @@ function TallySessionDetailScreen() {
                     responsive.isLargeTablet && { width: '45%', marginHorizontal: '2.5%' }
                   ]}
                 >
-                  <Text style={dynamicStyles.allocationTitle}>
-                    {getWeightClassificationName(allocation.weight_classification_id)}
-                  </Text>
+                  <View style={styles.allocationHeader}>
+                    <Text style={dynamicStyles.allocationTitle}>
+                      {getWeightClassificationName(allocation.weight_classification_id)}
+                    </Text>
+                    <View style={styles.allocationActions}>
+                      <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => handleEditAllocation(allocation)}
+                      >
+                        <Text style={styles.editButtonText}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteAllocationButton}
+                        onPress={() => handleDeleteAllocation(allocation.id)}
+                      >
+                        <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                   <View style={styles.allocationRow}>
                     <Text style={dynamicStyles.allocationLabel}>Required:</Text>
                     <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
@@ -564,6 +686,83 @@ function TallySessionDetailScreen() {
             </View>
           </TouchableOpacity>
         </Modal>
+      )}
+
+      {showEditModal && (
+        <View style={styles.modal}>
+          <View style={dynamicStyles.modalContent}>
+            <Text style={dynamicStyles.modalTitle}>Edit Allocation</Text>
+            <Text style={dynamicStyles.label}>Weight Classification</Text>
+            <ScrollView style={dynamicStyles.pickerContainer}>
+              {weightClassifications.map((wc) => (
+                <TouchableOpacity
+                  key={wc.id}
+                  style={[
+                    dynamicStyles.pickerOption,
+                    formData.weight_classification_id === wc.id && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => setFormData({ ...formData, weight_classification_id: wc.id })}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.pickerOptionText,
+                      formData.weight_classification_id === wc.id && styles.pickerOptionTextSelected,
+                    ]}
+                  >
+                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={dynamicStyles.label}>Required Bags</Text>
+            <TextInput
+              style={dynamicStyles.input}
+              value={formData.required_bags}
+              onChangeText={(text) => setFormData({ ...formData, required_bags: text })}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+            <Text style={dynamicStyles.label}>Allocated Bags (Tally)</Text>
+            <TextInput
+              style={dynamicStyles.input}
+              value={formData.allocated_bags_tally}
+              onChangeText={(text) => setFormData({ ...formData, allocated_bags_tally: text })}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+            <Text style={dynamicStyles.label}>Allocated Bags (Dispatcher)</Text>
+            <TextInput
+              style={dynamicStyles.input}
+              value={formData.allocated_bags_dispatcher}
+              onChangeText={(text) => setFormData({ ...formData, allocated_bags_dispatcher: text })}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+            <View style={dynamicStyles.modalActions}>
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setEditingAllocation(null);
+                  setFormData({ 
+                    weight_classification_id: weightClassifications[0]?.id || 0, 
+                    required_bags: '', 
+                    allocated_bags_tally: '', 
+                    allocated_bags_dispatcher: '' 
+                  });
+                }}
+              >
+                <Text style={dynamicStyles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, styles.saveButton]}
+                onPress={handleUpdateAllocation}
+              >
+                <Text style={dynamicStyles.modalButtonText}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
 
       {showAddModal && (
@@ -813,6 +1012,31 @@ const styles = StyleSheet.create({
   },
   startTallyButton: {
     backgroundColor: '#9b59b6',
+  },
+  deleteButton: {
+    backgroundColor: '#e74c3c',
+  },
+  allocationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  allocationActions: {
+    flexDirection: 'row',
+  },
+  editButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  editButtonText: {
+    fontSize: 18,
+  },
+  deleteAllocationButton: {
+    padding: 4,
+  },
+  deleteAllocationButtonText: {
+    fontSize: 18,
   },
 });
 
