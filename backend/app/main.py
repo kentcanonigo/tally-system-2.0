@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from .config import settings
-from .api.routes import customers, plants, weight_classifications, tally_sessions, allocation_details
+from .api.routes import customers, plants, weight_classifications, tally_sessions, allocation_details, tally_log_entries
 
 # Configure logging
 logging.basicConfig(
@@ -40,6 +40,7 @@ app.include_router(plants.router, prefix=settings.api_v1_prefix, tags=["plants"]
 app.include_router(weight_classifications.router, prefix=settings.api_v1_prefix, tags=["weight-classifications"])
 app.include_router(tally_sessions.router, prefix=settings.api_v1_prefix, tags=["tally-sessions"])
 app.include_router(allocation_details.router, prefix=settings.api_v1_prefix, tags=["allocation-details"])
+app.include_router(tally_log_entries.router, prefix=settings.api_v1_prefix, tags=["tally-log-entries"])
 
 
 @app.get("/")

@@ -50,3 +50,18 @@ export interface AllocationDetails {
   updated_at: string;
 }
 
+export enum TallyLogEntryRole {
+  TALLY = "tally",
+  DISPATCHER = "dispatcher",
+}
+
+export interface TallyLogEntry {
+  id: number;
+  tally_session_id: number;
+  weight_classification_id: number;
+  role: TallyLogEntryRole;
+  weight: number;
+  notes: string | null;
+  created_at: string;
+}
+

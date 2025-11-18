@@ -144,9 +144,12 @@ function TallySessionDetail() {
         </p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button className="btn btn-primary" onClick={handleCreate}>
           Add Allocation
+        </button>
+        <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}/logs`)}>
+          View Logs
         </button>
       </div>
 

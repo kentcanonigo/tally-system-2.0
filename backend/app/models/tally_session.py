@@ -26,6 +26,7 @@ class TallySession(Base):
     customer = relationship("Customer", back_populates="tally_sessions")
     plant = relationship("Plant", back_populates="tally_sessions")
     allocation_details = relationship("AllocationDetails", back_populates="tally_session", cascade="all, delete-orphan")
+    tally_log_entries = relationship("TallyLogEntry", back_populates="tally_session", cascade="all, delete-orphan")
 
     # Indexes for common queries
     __table_args__ = (

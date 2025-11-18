@@ -5,6 +5,8 @@ import type {
   WeightClassification,
   TallySession,
   AllocationDetails,
+  TallyLogEntry,
+  TallyLogEntryRole,
 } from '../types';
 
 // Vite replaces import.meta.env.VITE_API_URL at build time
@@ -73,6 +75,21 @@ export const allocationDetailsApi = {
   update: (id: number, data: Partial<AllocationDetails>) =>
     api.put<AllocationDetails>(`/allocations/${id}`, data),
   delete: (id: number) => api.delete(`/allocations/${id}`),
+};
+
+// Tally Log Entries API
+export const tallyLogEntriesApi = {
+  create: (sessionId: number, data: { weight_classification_id: number; role: TallyLogEntryRole; weight: number; notes?: string | null }) =>
+    api.post<TallyLogEntry>(`/tally-sessions/${sessionId}/log-entries`, {
+      ...data,
+      tally_session_id: sessionId,
+    }),
+  getBySession: (sessionId: number, role?: TallyLogEntryRole) =>
+    api.get<TallyLogEntry[]>(`/tally-sessions/${sessionId}/log-entries`, {
+      params: role ? { role } : undefined,
+    }),
+  getById: (entryId: number) =>
+    api.get<TallyLogEntry>(`/log-entries/${entryId}`),
 };
 
 export default api;

@@ -5,6 +5,7 @@ import Plants from './pages/Plants';
 import WeightClassifications from './pages/WeightClassifications';
 import TallySessions from './pages/TallySessions';
 import TallySessionDetail from './pages/TallySessionDetail';
+import TallySessionLogs from './pages/TallySessionLogs';
 import './App.css';
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
             <Route path="/weight-classifications" element={<WeightClassifications />} />
             <Route path="/tally-sessions" element={<TallySessions />} />
             <Route path="/tally-sessions/:id" element={<TallySessionDetail />} />
+            <Route path="/tally-sessions/:id/logs" element={<TallySessionLogs />} />
           </Routes>
         </main>
       </div>

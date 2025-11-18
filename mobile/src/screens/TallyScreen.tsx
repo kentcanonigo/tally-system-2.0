@@ -7,8 +7,9 @@ import {
   tallySessionsApi,
   customersApi,
   plantsApi,
+  tallyLogEntriesApi,
 } from '../services/api';
-import type { AllocationDetails, WeightClassification, TallySession, Customer, Plant } from '../types';
+import type { AllocationDetails, WeightClassification, TallySession, Customer, Plant, TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 
 function TallyScreen() {
@@ -141,23 +142,28 @@ function TallyScreen() {
       return;
     }
 
-    const currentAllocation = getCurrentAllocation(matchedWC.id);
-    
-    // Log for debugging
-    console.log('=== TALLY ENTER DEBUG ===');
-    console.log('Input Weight:', weight);
-    console.log('Matched Classification:', matchedWC.classification);
-    console.log('Classification ID:', matchedWC.id);
-    console.log('Role:', tallyRole);
-    console.log('Current Allocation:', currentAllocation);
-    console.log('Required Bags:', currentAllocation?.required_bags || 'N/A');
-    console.log('Current Allocated (Tally):', currentAllocation?.allocated_bags_tally || 0);
-    console.log('Current Allocated (Dispatcher):', currentAllocation?.allocated_bags_dispatcher || 0);
-    console.log('========================');
+    try {
+      // Create log entry - this will also increment the allocation
+      await tallyLogEntriesApi.create(sessionId, {
+        weight_classification_id: matchedWC.id,
+        role: tallyRole as TallyLogEntryRole,
+        weight: weight,
+        notes: null,
+      });
 
-    // For now, just log. Later we'll update the allocation
-    // TODO: Update allocation when ready
-    setTallyInput('0');
+      // Reset input
+      setTallyInput('0');
+
+      // Refresh allocations to show updated counts
+      const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+      setAllocations(allocationsRes.data);
+    } catch (error: any) {
+      console.error('Error creating tally log entry:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || 'Failed to log tally entry. Please try again.'
+      );
+    }
   };
 
   const currentWeight = parseFloat(tallyInput) || 0;
