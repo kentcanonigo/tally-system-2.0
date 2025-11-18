@@ -23,9 +23,6 @@ function TallySessionDetailScreen() {
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showTallyModal, setShowTallyModal] = useState(false);
-  const [tallyRole, setTallyRole] = useState<'tally' | 'dispatcher' | null>(null);
-  const [tallyInput, setTallyInput] = useState('0');
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: '',
@@ -123,47 +120,6 @@ function TallySessionDetailScreen() {
     return `${wc.min_weight}-${wc.max_weight}`;
   };
 
-  const findWeightClassification = (weight: number): WeightClassification | null => {
-    // Priority order: regular ranges > "up" ranges > "down" ranges > catch-all
-    
-    // First, check regular ranges (most specific)
-    for (const wc of weightClassifications) {
-      if (wc.min_weight !== null && wc.max_weight !== null) {
-        if (weight >= wc.min_weight && weight <= wc.max_weight) {
-          return wc;
-        }
-      }
-    }
-    
-    // Then check "up" ranges (less specific)
-    for (const wc of weightClassifications) {
-      if (wc.min_weight !== null && wc.max_weight === null) {
-        if (weight >= wc.min_weight) {
-          return wc;
-        }
-      }
-    }
-    
-    // Then check "down" ranges (less specific)
-    for (const wc of weightClassifications) {
-      if (wc.min_weight === null && wc.max_weight !== null) {
-        if (weight <= wc.max_weight) {
-          return wc;
-        }
-      }
-    }
-    
-    // Finally, check catch-all (least specific)
-    const catchAll = weightClassifications.find(
-      (wc) => wc.min_weight === null && wc.max_weight === null
-    );
-    return catchAll || null;
-  };
-
-  const getCurrentAllocation = (wcId: number): AllocationDetails | null => {
-    return allocations.find((a) => a.weight_classification_id === wcId) || null;
-  };
-
   const handleStartTally = () => {
     Alert.alert(
       'Select Role',
@@ -172,17 +128,19 @@ function TallySessionDetailScreen() {
         {
           text: 'Tally-er',
           onPress: () => {
-            setTallyRole('tally');
-            setTallyInput('0');
-            setShowTallyModal(true);
+            (navigation as any).navigate('Tally', {
+              sessionId: sessionId,
+              tallyRole: 'tally',
+            });
           },
         },
         {
           text: 'Dispatcher',
           onPress: () => {
-            setTallyRole('dispatcher');
-            setTallyInput('0');
-            setShowTallyModal(true);
+            (navigation as any).navigate('Tally', {
+              sessionId: sessionId,
+              tallyRole: 'dispatcher',
+            });
           },
         },
         {
@@ -192,70 +150,6 @@ function TallySessionDetailScreen() {
       ]
     );
   };
-
-  const handleTallyNumberPress = (num: string) => {
-    setTallyInput((prev) => {
-      if (prev === '0') {
-        return num;
-      }
-      return prev + num;
-    });
-  };
-
-  const handleTallyDecimal = () => {
-    if (tallyInput.indexOf('.') === -1) {
-      setTallyInput((prev) => prev + '.');
-    }
-  };
-
-  const handleTallyClear = () => {
-    setTallyInput('0');
-  };
-
-  const handleTallyBackspace = () => {
-    setTallyInput((prev) => {
-      if (prev.length > 1) {
-        return prev.slice(0, -1);
-      }
-      return '0';
-    });
-  };
-
-  const handleTallyEnter = async () => {
-    const weight = parseFloat(tallyInput);
-    if (isNaN(weight) || weight <= 0) {
-      Alert.alert('Error', 'Please enter a valid weight');
-      return;
-    }
-
-    const matchedWC = findWeightClassification(weight);
-    if (!matchedWC) {
-      Alert.alert('Error', 'No weight classification found for this weight');
-      return;
-    }
-
-    const currentAllocation = getCurrentAllocation(matchedWC.id);
-    
-    // Log for debugging
-    console.log('=== TALLY ENTER DEBUG ===');
-    console.log('Input Weight:', weight);
-    console.log('Matched Classification:', matchedWC.classification);
-    console.log('Classification ID:', matchedWC.id);
-    console.log('Role:', tallyRole);
-    console.log('Current Allocation:', currentAllocation);
-    console.log('Required Bags:', currentAllocation?.required_bags || 'N/A');
-    console.log('Current Allocated (Tally):', currentAllocation?.allocated_bags_tally || 0);
-    console.log('Current Allocated (Dispatcher):', currentAllocation?.allocated_bags_dispatcher || 0);
-    console.log('========================');
-
-    // For now, just log. Later we'll update the allocation
-    // TODO: Update allocation when ready
-    setTallyInput('0');
-  };
-
-  const currentWeight = parseFloat(tallyInput) || 0;
-  const matchedWC = currentWeight > 0 ? findWeightClassification(currentWeight) : null;
-  const currentAllocation = matchedWC ? getCurrentAllocation(matchedWC.id) : null;
 
   if (loading) {
     return (
@@ -558,160 +452,6 @@ function TallySessionDetailScreen() {
           </View>
         </View>
       )}
-
-      {showTallyModal && (
-        <View style={styles.modal}>
-          <View style={[dynamicStyles.modalContent, styles.tallyModalContent]}>
-            <View style={styles.tallyHeader}>
-              <Text style={dynamicStyles.modalTitle}>
-                Tally - {tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTallyModal(false);
-                  setTallyRole(null);
-                  setTallyInput('0');
-                }}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.tallyScrollContent}>
-              {/* Three display fields in a row */}
-              <View style={styles.tallyDisplayRow}>
-                <View style={[styles.tallyDisplayField, { flex: 2 }]}>
-                  <Text style={styles.tallyDisplayLabel}>Classification</Text>
-                  <Text style={styles.tallyDisplayValue} numberOfLines={1}>
-                    {matchedWC ? matchedWC.classification : '-'}
-                  </Text>
-                </View>
-                <View style={[styles.tallyDisplayField, { flex: 2 }]}>
-                  <Text style={styles.tallyDisplayLabel}>Allocated / Required</Text>
-                  <Text style={styles.tallyDisplayValue}>
-                    {currentAllocation
-                      ? `${tallyRole === 'tally' ? currentAllocation.allocated_bags_tally : currentAllocation.allocated_bags_dispatcher} / ${currentAllocation.required_bags}`
-                      : '- / -'}
-                  </Text>
-                </View>
-                <View style={[styles.tallyDisplayField, { flex: 1.5 }]}>
-                  <Text style={styles.tallyDisplayLabel}>Weight</Text>
-                  <Text style={[styles.tallyDisplayValue, { fontSize: responsive.isTablet ? 28 : 24 }]}>
-                    {tallyInput}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Calculator buttons */}
-              <View style={styles.tallyButtonsContainer}>
-                {/* Number pad */}
-                <View style={styles.tallyNumberPad}>
-                  <View style={styles.tallyButtonRow}>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('7')}>
-                    <Text style={styles.tallyButtonText}>7</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('8')}>
-                    <Text style={styles.tallyButtonText}>8</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('9')}>
-                    <Text style={styles.tallyButtonText}>9</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.tallyButtonRow}>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('4')}>
-                    <Text style={styles.tallyButtonText}>4</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('5')}>
-                    <Text style={styles.tallyButtonText}>5</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('6')}>
-                    <Text style={styles.tallyButtonText}>6</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.tallyButtonRow}>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('1')}>
-                    <Text style={styles.tallyButtonText}>1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('2')}>
-                    <Text style={styles.tallyButtonText}>2</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('3')}>
-                    <Text style={styles.tallyButtonText}>3</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.tallyButtonRow}>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={() => handleTallyNumberPress('0')}>
-                    <Text style={styles.tallyButtonText}>0</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={handleTallyDecimal}>
-                    <Text style={styles.tallyButtonText}>.</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.tallyNumberButton} onPress={handleTallyBackspace}>
-                    <Text style={styles.tallyButtonText}>⌫</Text>
-                  </TouchableOpacity>
-                </View>
-                </View>
-
-                {/* Action buttons */}
-                <View style={styles.tallyActionButtons}>
-                  <TouchableOpacity
-                    style={[styles.tallyActionButton, styles.clearButton]}
-                    onPress={handleTallyClear}
-                  >
-                    <Text style={styles.tallyActionButtonText}>Clear</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tallyActionButton, styles.enterButton]}
-                    onPress={handleTallyEnter}
-                  >
-                    <Text style={styles.tallyActionButtonText}>Enter</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Summary table */}
-              <View style={styles.tallySummaryContainer}>
-                <Text style={styles.tallySummaryTitle}>Allocations Summary</Text>
-                <View style={styles.tallySummaryTable}>
-                  <View style={styles.tallySummaryHeader}>
-                    <Text style={[styles.tallySummaryHeaderText, { flex: 2 }]}>Label</Text>
-                    <Text style={[styles.tallySummaryHeaderText, { flex: 2 }]}>Allocated / Required</Text>
-                    <Text style={[styles.tallySummaryHeaderText, { flex: 1 }]}>Sum</Text>
-                  </View>
-                  {allocations.map((allocation) => {
-                    const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
-                    if (!wc) return null;
-                    
-                    const allocatedBags = tallyRole === 'tally' 
-                      ? allocation.allocated_bags_tally 
-                      : allocation.allocated_bags_dispatcher;
-                    
-                    return (
-                      <View key={allocation.id} style={styles.tallySummaryRow}>
-                        <Text style={[styles.tallySummaryCell, { flex: 2 }]} numberOfLines={1}>
-                          {wc.classification}
-                        </Text>
-                        <Text style={[styles.tallySummaryCell, { flex: 2 }]}>
-                          {allocatedBags} / {allocation.required_bags}
-                        </Text>
-                        <Text style={[styles.tallySummaryCell, { flex: 1 }]}>-</Text>
-                      </View>
-                    );
-                  })}
-                  {allocations.length === 0 && (
-                    <View style={styles.tallySummaryRow}>
-                      <Text style={[styles.tallySummaryCell, { flex: 1, textAlign: 'center' }]}>
-                        No allocations yet
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -832,18 +572,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
   },
-  tallyModalContent: {
-    width: '95%',
-    maxWidth: 600,
-    maxHeight: '90%',
-    padding: 20,
-  },
-  tallyScrollContent: {
-    // No height constraint - let content determine size
-  },
-  tallyScrollContentContainer: {
-    paddingBottom: 10,
-  },
   modalTitle: {
     fontWeight: 'bold',
     color: '#2c3e50',
@@ -898,140 +626,6 @@ const styles = StyleSheet.create({
   },
   startTallyButton: {
     backgroundColor: '#9b59b6',
-  },
-  tallyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  tallyDisplayRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 10,
-  },
-  tallyDisplayField: {
-    backgroundColor: '#ecf0f1',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#bdc3c7',
-  },
-  tallyDisplayLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginBottom: 4,
-  },
-  tallyDisplayValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  tallyButtonsContainer: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  tallyNumberPad: {
-    flex: 2,
-  },
-  tallyButtonRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-    gap: 10,
-  },
-  tallyNumberButton: {
-    flex: 1,
-    backgroundColor: '#34495e',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 60,
-  },
-  tallyButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  tallyActionButtons: {
-    flex: 1,
-    gap: 10,
-  },
-  tallyActionButton: {
-    flex: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    minHeight: 60,
-  },
-  tallyActionButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  clearButton: {
-    backgroundColor: '#e67e22',
-  },
-  enterButton: {
-    backgroundColor: '#27ae60',
-  },
-  tallySummaryContainer: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#bdc3c7',
-  },
-  tallySummaryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
-  },
-  tallySummaryTable: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bdc3c7',
-    overflow: 'hidden',
-  },
-  tallySummaryHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#34495e',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#bdc3c7',
-  },
-  tallySummaryHeaderText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  tallySummaryRow: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  tallySummaryCell: {
-    fontSize: 14,
-    color: '#2c3e50',
-    paddingHorizontal: 4,
   },
 });
 

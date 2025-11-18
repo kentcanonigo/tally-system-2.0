@@ -1,0 +1,595 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import {
+  allocationDetailsApi,
+  weightClassificationsApi,
+  tallySessionsApi,
+  customersApi,
+  plantsApi,
+} from '../services/api';
+import type { AllocationDetails, WeightClassification, TallySession, Customer, Plant } from '../types';
+import { useResponsive } from '../utils/responsive';
+
+function TallyScreen() {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const responsive = useResponsive();
+  const sessionId = (route.params as any)?.sessionId;
+  const tallyRole = (route.params as any)?.tallyRole as 'tally' | 'dispatcher';
+  const [session, setSession] = useState<TallySession | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [plant, setPlant] = useState<Plant | null>(null);
+  const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
+  const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
+  const [tallyInput, setTallyInput] = useState('0');
+
+  // Determine if we should use landscape layout (side by side)
+  // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
+  const isLandscape = responsive.width > responsive.height || responsive.width >= 900;
+
+  useEffect(() => {
+    if (sessionId) {
+      fetchData();
+    }
+  }, [sessionId]);
+
+  const fetchData = async () => {
+    try {
+      // First fetch the session to get plant_id and customer_id
+      const sessionRes = await tallySessionsApi.getById(sessionId);
+      const sessionData = sessionRes.data;
+      setSession(sessionData);
+      
+      // Then fetch customer, plant, allocations and weight classifications
+      const [customerRes, plantRes, allocationsRes, wcRes] = await Promise.all([
+        customersApi.getById(sessionData.customer_id),
+        plantsApi.getById(sessionData.plant_id),
+        allocationDetailsApi.getBySession(sessionId),
+        weightClassificationsApi.getByPlant(sessionData.plant_id),
+      ]);
+      
+      setCustomer(customerRes.data);
+      setPlant(plantRes.data);
+      setAllocations(allocationsRes.data);
+      setWeightClassifications(wcRes.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to load tally data');
+    }
+  };
+
+  const findWeightClassification = (weight: number): WeightClassification | null => {
+    // Priority order: regular ranges > "up" ranges > "down" ranges > catch-all
+    
+    // First, check regular ranges (most specific)
+    for (const wc of weightClassifications) {
+      if (wc.min_weight !== null && wc.max_weight !== null) {
+        if (weight >= wc.min_weight && weight <= wc.max_weight) {
+          return wc;
+        }
+      }
+    }
+    
+    // Then check "up" ranges (less specific)
+    for (const wc of weightClassifications) {
+      if (wc.min_weight !== null && wc.max_weight === null) {
+        if (weight >= wc.min_weight) {
+          return wc;
+        }
+      }
+    }
+    
+    // Then check "down" ranges (less specific)
+    for (const wc of weightClassifications) {
+      if (wc.min_weight === null && wc.max_weight !== null) {
+        if (weight <= wc.max_weight) {
+          return wc;
+        }
+      }
+    }
+    
+    // Finally, check catch-all (least specific)
+    const catchAll = weightClassifications.find(
+      (wc) => wc.min_weight === null && wc.max_weight === null
+    );
+    return catchAll || null;
+  };
+
+  const getCurrentAllocation = (wcId: number): AllocationDetails | null => {
+    return allocations.find((a) => a.weight_classification_id === wcId) || null;
+  };
+
+  const handleTallyNumberPress = (num: string) => {
+    setTallyInput((prev) => {
+      if (prev === '0') {
+        return num;
+      }
+      return prev + num;
+    });
+  };
+
+  const handleTallyDecimal = () => {
+    if (tallyInput.indexOf('.') === -1) {
+      setTallyInput((prev) => prev + '.');
+    }
+  };
+
+  const handleTallyClear = () => {
+    setTallyInput('0');
+  };
+
+  const handleTallyBackspace = () => {
+    setTallyInput((prev) => {
+      if (prev.length > 1) {
+        return prev.slice(0, -1);
+      }
+      return '0';
+    });
+  };
+
+  const handleTallyEnter = async () => {
+    const weight = parseFloat(tallyInput);
+    if (isNaN(weight) || weight <= 0) {
+      Alert.alert('Error', 'Please enter a valid weight');
+      return;
+    }
+
+    const matchedWC = findWeightClassification(weight);
+    if (!matchedWC) {
+      Alert.alert('Error', 'No weight classification found for this weight');
+      return;
+    }
+
+    const currentAllocation = getCurrentAllocation(matchedWC.id);
+    
+    // Log for debugging
+    console.log('=== TALLY ENTER DEBUG ===');
+    console.log('Input Weight:', weight);
+    console.log('Matched Classification:', matchedWC.classification);
+    console.log('Classification ID:', matchedWC.id);
+    console.log('Role:', tallyRole);
+    console.log('Current Allocation:', currentAllocation);
+    console.log('Required Bags:', currentAllocation?.required_bags || 'N/A');
+    console.log('Current Allocated (Tally):', currentAllocation?.allocated_bags_tally || 0);
+    console.log('Current Allocated (Dispatcher):', currentAllocation?.allocated_bags_dispatcher || 0);
+    console.log('========================');
+
+    // For now, just log. Later we'll update the allocation
+    // TODO: Update allocation when ready
+    setTallyInput('0');
+  };
+
+  const currentWeight = parseFloat(tallyInput) || 0;
+  const matchedWC = currentWeight > 0 ? findWeightClassification(currentWeight) : null;
+  const currentAllocation = matchedWC ? getCurrentAllocation(matchedWC.id) : null;
+
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      padding: responsive.padding.medium,
+    },
+    header: {
+      ...styles.header,
+      padding: responsive.padding.medium,
+      marginBottom: responsive.spacing.md,
+      minHeight: responsive.isTablet ? 60 : 50,
+    },
+    headerTitle: {
+      ...styles.headerTitle,
+      fontSize: responsive.fontSize.medium,
+      flex: 1,
+      marginRight: responsive.spacing.sm,
+    },
+    closeButton: {
+      ...styles.closeButton,
+      width: responsive.isTablet ? 36 : 32,
+      height: responsive.isTablet ? 36 : 32,
+    },
+    closeButtonText: {
+      ...styles.closeButtonText,
+      fontSize: responsive.isTablet ? 20 : 18,
+    },
+    contentContainer: {
+      flexDirection: isLandscape ? ('row-reverse' as const) : ('column' as const),
+      flex: isLandscape ? 1 : undefined,
+      gap: responsive.spacing.md,
+      padding: isLandscape ? 0 : responsive.padding.medium,
+    },
+    calculatorSection: {
+      flex: isLandscape ? 1 : undefined,
+      minHeight: isLandscape ? undefined : 400,
+    },
+    summarySection: {
+      flex: isLandscape ? 1 : undefined,
+      minHeight: isLandscape ? undefined : 300,
+    },
+    displayRow: {
+      ...styles.displayRow,
+      marginBottom: responsive.spacing.md,
+      gap: responsive.spacing.sm,
+    },
+    displayField: {
+      ...styles.displayField,
+      padding: responsive.padding.medium,
+    },
+    displayLabel: {
+      ...styles.displayLabel,
+      fontSize: responsive.fontSize.small,
+    },
+    displayValue: {
+      ...styles.displayValue,
+      fontSize: responsive.fontSize.medium,
+    },
+    weightDisplayValue: {
+      ...styles.displayValue,
+      fontSize: responsive.isTablet ? 28 : 24,
+    },
+    buttonsContainer: {
+      ...styles.buttonsContainer,
+      gap: responsive.spacing.md,
+    },
+    numberPad: {
+      flex: 2,
+    },
+    buttonRow: {
+      ...styles.buttonRow,
+      marginBottom: responsive.spacing.sm,
+      gap: responsive.spacing.sm,
+    },
+    numberButton: {
+      ...styles.numberButton,
+      padding: responsive.isTablet ? 24 : 20,
+      minHeight: responsive.isTablet ? 70 : 60,
+    },
+    buttonText: {
+      ...styles.buttonText,
+      fontSize: responsive.isTablet ? 28 : 24,
+    },
+    actionButtons: {
+      flex: 1,
+      gap: responsive.spacing.sm,
+    },
+    actionButton: {
+      ...styles.actionButton,
+      padding: responsive.isTablet ? 24 : 20,
+      minHeight: responsive.isTablet ? 70 : 60,
+    },
+    actionButtonText: {
+      ...styles.actionButtonText,
+      fontSize: responsive.isTablet ? 20 : 18,
+    },
+    summaryContainer: {
+      ...styles.summaryContainer,
+      padding: responsive.padding.medium,
+    },
+    summaryTitle: {
+      ...styles.summaryTitle,
+      fontSize: responsive.fontSize.medium,
+      marginBottom: responsive.spacing.md,
+    },
+    summaryTable: {
+      ...styles.summaryTable,
+    },
+    summaryHeader: {
+      ...styles.summaryHeader,
+      paddingVertical: responsive.padding.small,
+      paddingHorizontal: responsive.padding.small,
+    },
+    summaryHeaderText: {
+      ...styles.summaryHeaderText,
+      fontSize: responsive.fontSize.small,
+    },
+    summaryRow: {
+      ...styles.summaryRow,
+      paddingVertical: responsive.padding.small,
+      paddingHorizontal: responsive.padding.small,
+    },
+    summaryCell: {
+      ...styles.summaryCell,
+      fontSize: responsive.fontSize.small,
+    },
+  };
+
+  // Build title with plant, customer, and session info
+  const titleParts = [];
+  if (plant) titleParts.push(plant.name);
+  if (customer) titleParts.push(customer.name);
+  if (session) titleParts.push(`Session #${session.id}`);
+  const titleText = titleParts.length > 0 
+    ? `${titleParts.join(' - ')} (${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'})`
+    : `Tally - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}`;
+
+  const content = (
+    <View style={dynamicStyles.contentContainer}>
+        {/* Calculator Section */}
+        <View style={dynamicStyles.calculatorSection}>
+          {/* Three display fields in a row */}
+          <View style={dynamicStyles.displayRow}>
+            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
+              <Text style={dynamicStyles.displayLabel}>Classification</Text>
+              <Text style={dynamicStyles.displayValue} numberOfLines={1}>
+                {matchedWC ? matchedWC.classification : '-'}
+              </Text>
+            </View>
+            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
+              <Text style={dynamicStyles.displayLabel}>Allocated / Required</Text>
+              <Text style={dynamicStyles.displayValue}>
+                {currentAllocation
+                  ? `${tallyRole === 'tally' ? currentAllocation.allocated_bags_tally : currentAllocation.allocated_bags_dispatcher} / ${currentAllocation.required_bags}`
+                  : '- / -'}
+              </Text>
+            </View>
+            <View style={[dynamicStyles.displayField, { flex: 1.5 }]}>
+              <Text style={dynamicStyles.displayLabel}>Weight</Text>
+              <Text style={dynamicStyles.weightDisplayValue}>
+                {tallyInput}
+              </Text>
+            </View>
+          </View>
+
+          {/* Calculator buttons */}
+          <View style={dynamicStyles.buttonsContainer}>
+            {/* Number pad */}
+            <View style={dynamicStyles.numberPad}>
+              <View style={dynamicStyles.buttonRow}>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('7')}>
+                  <Text style={dynamicStyles.buttonText}>7</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('8')}>
+                  <Text style={dynamicStyles.buttonText}>8</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('9')}>
+                  <Text style={dynamicStyles.buttonText}>9</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={dynamicStyles.buttonRow}>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('4')}>
+                  <Text style={dynamicStyles.buttonText}>4</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('5')}>
+                  <Text style={dynamicStyles.buttonText}>5</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('6')}>
+                  <Text style={dynamicStyles.buttonText}>6</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={dynamicStyles.buttonRow}>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('1')}>
+                  <Text style={dynamicStyles.buttonText}>1</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('2')}>
+                  <Text style={dynamicStyles.buttonText}>2</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('3')}>
+                  <Text style={dynamicStyles.buttonText}>3</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={dynamicStyles.buttonRow}>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('0')}>
+                  <Text style={dynamicStyles.buttonText}>0</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyDecimal}>
+                  <Text style={dynamicStyles.buttonText}>.</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyBackspace}>
+                  <Text style={dynamicStyles.buttonText}>⌫</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Action buttons */}
+            <View style={dynamicStyles.actionButtons}>
+              <TouchableOpacity
+                style={[dynamicStyles.actionButton, styles.clearButton]}
+                onPress={handleTallyClear}
+              >
+                <Text style={dynamicStyles.actionButtonText}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.actionButton, styles.enterButton]}
+                onPress={handleTallyEnter}
+              >
+                <Text style={dynamicStyles.actionButtonText}>Enter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Summary table */}
+        <View style={dynamicStyles.summarySection}>
+          <View style={dynamicStyles.summaryContainer}>
+            <Text style={dynamicStyles.summaryTitle}>Allocations Summary</Text>
+            <View style={dynamicStyles.summaryTable}>
+              <View style={dynamicStyles.summaryHeader}>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Label</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Allocated / Required</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Sum</Text>
+              </View>
+              {allocations.map((allocation) => {
+                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                if (!wc) return null;
+                
+                const allocatedBags = tallyRole === 'tally' 
+                  ? allocation.allocated_bags_tally 
+                  : allocation.allocated_bags_dispatcher;
+                
+                return (
+                  <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                      {wc.classification}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]}>
+                      {allocatedBags} / {allocation.required_bags}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>-</Text>
+                  </View>
+                );
+              })}
+              {allocations.length === 0 && (
+                <View style={dynamicStyles.summaryRow}>
+                  <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
+                    No allocations yet
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+  );
+
+  return (
+    <View style={dynamicStyles.container}>
+      <View style={dynamicStyles.header}>
+        <Text style={dynamicStyles.headerTitle} numberOfLines={2}>
+          {titleText}
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={dynamicStyles.closeButton}
+        >
+          <Text style={dynamicStyles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isLandscape ? (
+        content
+      ) : (
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={true}
+        >
+          {content}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    flexShrink: 1,
+  },
+  closeButton: {
+    borderRadius: 18,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  displayRow: {
+    flexDirection: 'row',
+  },
+  displayField: {
+    backgroundColor: '#ecf0f1',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+  },
+  displayLabel: {
+    color: '#7f8c8d',
+    marginBottom: 4,
+  },
+  displayValue: {
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+  },
+  numberButton: {
+    flex: 1,
+    backgroundColor: '#34495e',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  clearButton: {
+    backgroundColor: '#e67e22',
+  },
+  enterButton: {
+    backgroundColor: '#27ae60',
+  },
+  summaryContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    flex: 1,
+  },
+  summaryTitle: {
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  summaryTable: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    overflow: 'hidden',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#34495e',
+    borderBottomWidth: 1,
+    borderBottomColor: '#bdc3c7',
+  },
+  summaryHeaderText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  summaryCell: {
+    color: '#2c3e50',
+    paddingHorizontal: 4,
+  },
+});
+
+export default TallyScreen;
+

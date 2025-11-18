@@ -6,6 +6,7 @@ import HomeScreen from '../screens/HomeScreen';
 import TallySessionsScreen from '../screens/TallySessionsScreen';
 import TallySessionDetailScreen from '../screens/TallySessionDetailScreen';
 import CreateTallySessionScreen from '../screens/CreateTallySessionScreen';
+import TallyScreen from '../screens/TallyScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
 
 const Stack = createStackNavigator();
@@ -17,6 +18,7 @@ function SessionsStack() {
       <Stack.Screen name="TallySessionsList" component={TallySessionsScreen} options={{ title: 'Tally Sessions' }} />
       <Stack.Screen name="TallySessionDetail" component={TallySessionDetailScreen} options={{ title: 'Session Details' }} />
       <Stack.Screen name="CreateTallySession" component={CreateTallySessionScreen} options={{ title: 'New Session' }} />
+      <Stack.Screen name="Tally" component={TallyScreen} options={{ title: 'Tally' }} />
     </Stack.Navigator>
   );
 }
