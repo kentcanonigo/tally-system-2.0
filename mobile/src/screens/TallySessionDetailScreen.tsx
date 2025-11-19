@@ -649,17 +649,21 @@ function TallySessionDetailScreen() {
               >
                 <Text style={dynamicStyles.actionButtonText}>Start Tally</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[dynamicStyles.actionButton, styles.addButton]}
-                onPress={() => setShowAddModal(true)}
-              >
-                <Text style={dynamicStyles.actionButtonText}>Add Allocation</Text>
-              </TouchableOpacity>
             </>
           )}
         </View>
 
-        <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
+          {session.status === 'ongoing' && (
+            <TouchableOpacity
+              style={styles.addAllocationButton}
+              onPress={() => setShowAddModal(true)}
+            >
+              <Text style={styles.addAllocationButtonText}>+</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {allocations.length === 0 ? (
           <Text style={styles.emptyText}>No allocations yet</Text>
         ) : (
@@ -1181,6 +1185,26 @@ const styles = StyleSheet.create({
   },
   deleteAllocationButtonText: {
     fontSize: 18,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 16,
+  },
+  addAllocationButton: {
+    backgroundColor: '#3498db',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addAllocationButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: -2,
   },
 });
 
