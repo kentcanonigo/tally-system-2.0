@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -298,6 +298,79 @@ function TallySessionDetailScreen() {
     const wc = weightClassifications.find((wc) => wc.id === wcId);
     if (!wc) return 'Select Weight Classification';
     return `${wc.classification} (${wc.category}) - ${formatWeightRange(wc)}`;
+  };
+
+  // Filter allocations by category
+  const dressedAllocations = useMemo(() => {
+    return allocations.filter((allocation) => {
+      const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+      return wc?.category === 'Dressed';
+    });
+  }, [allocations, weightClassifications]);
+
+  const byproductAllocations = useMemo(() => {
+    return allocations.filter((allocation) => {
+      const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+      return wc?.category === 'Byproduct';
+    });
+  }, [allocations, weightClassifications]);
+
+  const renderAllocationCard = (allocation: AllocationDetails) => {
+    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    return (
+      <View 
+        key={allocation.id} 
+        style={[
+          dynamicStyles.allocationCard,
+          responsive.isLargeTablet && { width: '45%', marginHorizontal: '2.5%' }
+        ]}
+      >
+        <View style={styles.allocationHeader}>
+          <Text style={dynamicStyles.allocationTitle}>
+            {getWeightClassificationName(allocation.weight_classification_id)}
+          </Text>
+          <View style={styles.allocationActions}>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => handleEditAllocation(allocation)}
+            >
+              <Text style={styles.editButtonText}>✏️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteAllocationButton}
+              onPress={() => handleDeleteAllocation(allocation.id)}
+            >
+              <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.allocationRow}>
+          <Text style={dynamicStyles.allocationLabel}>Required:</Text>
+          <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
+        </View>
+        <View style={styles.allocationRow}>
+          <Text style={dynamicStyles.allocationLabel}>Allocated (Tally):</Text>
+          <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_tally}</Text>
+        </View>
+        <View style={styles.allocationRow}>
+          <Text style={dynamicStyles.allocationLabel}>Allocated (Dispatcher):</Text>
+          <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_dispatcher}</Text>
+        </View>
+        <View style={styles.allocationRow}>
+          <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
+          <Text style={[
+            dynamicStyles.allocationValue, 
+            { 
+              color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'),
+              fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
+            }
+          ]}>
+            {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
+          </Text>
+        </View>
+      </View>
+    );
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
@@ -719,69 +792,34 @@ function TallySessionDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
-        {allocations.length === 0 ? (
-          <Text style={styles.emptyText}>No allocations yet</Text>
-        ) : (
-          <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
-              {allocations.map((allocation) => {
-              const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
-              const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
-              return (
-                <View 
-                  key={allocation.id} 
-                  style={[
-                    dynamicStyles.allocationCard,
-                    responsive.isLargeTablet && { width: '45%', marginHorizontal: '2.5%' }
-                  ]}
-                >
-                  <View style={styles.allocationHeader}>
-                    <Text style={dynamicStyles.allocationTitle}>
-                      {getWeightClassificationName(allocation.weight_classification_id)}
-                    </Text>
-                    <View style={styles.allocationActions}>
-                      <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => handleEditAllocation(allocation)}
-                      >
-                        <Text style={styles.editButtonText}>✏️</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteAllocationButton}
-                        onPress={() => handleDeleteAllocation(allocation.id)}
-                      >
-                        <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.allocationRow}>
-                    <Text style={dynamicStyles.allocationLabel}>Required:</Text>
-                    <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
-                  </View>
-                  <View style={styles.allocationRow}>
-                    <Text style={dynamicStyles.allocationLabel}>Allocated (Tally):</Text>
-                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_tally}</Text>
-                  </View>
-                  <View style={styles.allocationRow}>
-                    <Text style={dynamicStyles.allocationLabel}>Allocated (Dispatcher):</Text>
-                    <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_dispatcher}</Text>
-                  </View>
-                  <View style={styles.allocationRow}>
-                    <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
-                    <Text style={[
-                      dynamicStyles.allocationValue, 
-                      { 
-                        color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'),
-                        fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
-                      }
-                    ]}>
-                      {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+
+        {/* Dressed Allocations Section */}
+        <View style={{ marginBottom: responsive.spacing.lg }}>
+          <Text style={[dynamicStyles.sectionTitle, { marginBottom: responsive.spacing.md, fontSize: responsive.fontSize.medium }]}>
+            Dressed
+          </Text>
+          {dressedAllocations.length === 0 ? (
+            <Text style={styles.emptyText}>No Dressed allocations</Text>
+          ) : (
+            <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
+              {dressedAllocations.map((allocation) => renderAllocationCard(allocation))}
+            </View>
+          )}
+        </View>
+
+        {/* Byproduct Allocations Section */}
+        <View style={{ marginBottom: responsive.spacing.lg }}>
+          <Text style={[dynamicStyles.sectionTitle, { marginBottom: responsive.spacing.md, fontSize: responsive.fontSize.medium }]}>
+            Byproduct
+          </Text>
+          {byproductAllocations.length === 0 ? (
+            <Text style={styles.emptyText}>No Byproduct allocations</Text>
+          ) : (
+            <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
+              {byproductAllocations.map((allocation) => renderAllocationCard(allocation))}
+            </View>
+          )}
+        </View>
 
         <View style={{ padding: responsive.padding.medium, marginTop: responsive.spacing.lg, marginBottom: responsive.spacing.xl, flexDirection: 'row' }}>
           <TouchableOpacity
