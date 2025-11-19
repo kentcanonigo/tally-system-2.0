@@ -657,12 +657,6 @@ function TallySessionDetailScreen() {
               </TouchableOpacity>
             </>
           )}
-          <TouchableOpacity
-            style={[dynamicStyles.actionButton, styles.deleteButton]}
-            onPress={handleDeleteSession}
-          >
-            <Text style={dynamicStyles.actionButtonText}>Delete Session</Text>
-          </TouchableOpacity>
         </View>
 
         <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
@@ -728,6 +722,15 @@ function TallySessionDetailScreen() {
             })}
           </View>
         )}
+
+        <View style={{ padding: responsive.padding.medium, marginTop: responsive.spacing.lg, marginBottom: responsive.spacing.xl, flexDirection: 'row' }}>
+          <TouchableOpacity
+            style={[dynamicStyles.actionButton, styles.deleteButton]}
+            onPress={handleDeleteSession}
+          >
+            <Text style={dynamicStyles.actionButtonText}>Delete Session</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showStatusDropdown && (
@@ -1152,7 +1155,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   startTallyButton: {
-    backgroundColor: '#9b59b6',
+    backgroundColor: '#27ae60',
   },
   deleteButton: {
     backgroundColor: '#e74c3c',

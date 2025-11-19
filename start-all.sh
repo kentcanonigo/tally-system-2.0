@@ -55,7 +55,7 @@ start_backend() {
         echo -e "${CYAN}Running migrations...${NC}"
         alembic upgrade head
         echo -e "${GREEN}Starting FastAPI server...${NC}"
-        uvicorn app.main:app --reload
+        uvicorn app.main:app --host 0.0.0.0 --reload
     ) &
     BACKEND_PID=$!
     echo -e "${GREEN}✅ Backend starting (PID: $BACKEND_PID)${NC}"

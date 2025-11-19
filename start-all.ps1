@@ -37,7 +37,7 @@ if (Test-Path venv\Scripts\Activate.ps1) {
 Write-Host "Running migrations..." -ForegroundColor Cyan
 alembic upgrade head
 Write-Host "Starting FastAPI server..." -ForegroundColor Green
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --reload
 pause
 "@
     Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendScript
