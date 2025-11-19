@@ -290,8 +290,12 @@ function WeightClassificationsScreen() {
     modalContent: {
       ...styles.modalContent,
       width: responsive.isTablet ? 500 : '90%',
-      maxHeight: '90%',
+      maxHeight: '85%',
       padding: responsive.padding.large,
+    },
+    modalScrollView: {
+      ...styles.modalScrollView,
+      maxHeight: responsive.isTablet ? 450 : 350,
     },
     input: {
       ...styles.input,
@@ -441,12 +445,15 @@ function WeightClassificationsScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalScrollContent}>
-            <View style={dynamicStyles.modalContent}>
-              <Text style={styles.modalTitle}>
-                {editingWC ? 'Edit Weight Classification' : 'Add Weight Classification'}
-              </Text>
-
+          <View style={dynamicStyles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {editingWC ? 'Edit Weight Classification' : 'Add Weight Classification'}
+            </Text>
+            <ScrollView 
+              style={dynamicStyles.modalScrollView}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+            >
               <Text style={styles.label}>Plant *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -522,23 +529,23 @@ function WeightClassificationsScreen() {
                   </Text>
                 </>
               )}
+            </ScrollView>
 
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[dynamicStyles.modalButton, styles.cancelButton]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={dynamicStyles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[dynamicStyles.modalButton, styles.saveButton]}
-                  onPress={handleSave}
-                >
-                  <Text style={dynamicStyles.modalButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={dynamicStyles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.modalButton, styles.saveButton]}
+                onPress={handleSave}
+              >
+                <Text style={dynamicStyles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -674,10 +681,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  modalScrollView: {
+    maxHeight: 400,
+  },
   modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingBottom: 16,
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -687,6 +695,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    maxHeight: '85%',
+    width: '90%',
+    maxWidth: 500,
   },
   modalTitle: {
     fontSize: 20,
@@ -730,7 +741,10 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   modalButton: {
     borderRadius: 4,
