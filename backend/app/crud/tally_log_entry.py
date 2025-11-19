@@ -92,3 +92,29 @@ def get_tally_log_entries_by_session(
     
     return query.order_by(TallyLogEntry.created_at.desc()).all()
 
+
+def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry]:
+    """
+    Delete a tally log entry and decrement the corresponding allocation detail.
+    """
+    # Get the log entry
+    log_entry = get_tally_log_entry(db, entry_id)
+    if not log_entry:
+        return None
+
+    # Get the allocation detail
+    allocation = db.query(AllocationDetails).filter(
+        AllocationDetails.tally_session_id == log_entry.tally_session_id,
+        AllocationDetails.weight_classification_id == log_entry.weight_classification_id
+    ).first()
+
+    if allocation:
+        # Decrement the appropriate allocated_bags field based on role
+        if log_entry.role == TallyLogEntryRole.TALLY:
+            allocation.allocated_bags_tally = max(0.0, allocation.allocated_bags_tally - 1)
+        elif log_entry.role == TallyLogEntryRole.DISPATCHER:
+            allocation.allocated_bags_dispatcher = max(0.0, allocation.allocated_bags_dispatcher - 1)
+
+    db.delete(log_entry)
+    db.commit()
+    return log_entry

@@ -46,6 +46,8 @@ function TallySessionLogsScreen() {
     description: true,
     range: true,
   });
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (sessionId) {
@@ -244,6 +246,63 @@ function TallySessionLogsScreen() {
       difference: totals.tally - totals.dispatcher,
     };
   }, [filteredEntries]);
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelection = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === filteredEntries.length) {
+      setSelectedIds(new Set());
+    } else {
+      const newSelected = new Set(filteredEntries.map(e => e.id));
+      setSelectedIds(newSelected);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    
+    Alert.alert(
+      'Delete Logs',
+      `Are you sure you want to delete ${selectedIds.size} log entries?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const deletePromises = Array.from(selectedIds).map(id => tallyLogEntriesApi.delete(id));
+              await Promise.all(deletePromises);
+              
+              setSelectionMode(false);
+              setSelectedIds(new Set());
+              fetchData();
+            } catch (error) {
+              console.error('Error deleting logs:', error);
+              Alert.alert('Error', 'Failed to delete some logs');
+              fetchData();
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   if (loading) {
     return (
@@ -605,15 +664,53 @@ function TallySessionLogsScreen() {
       {/* Log Entries Table */}
       <View style={dynamicStyles.sectionTitleContainer}>
         <Text style={dynamicStyles.sectionTitle}>Log Entries ({filteredEntries.length})</Text>
-        <TouchableOpacity
-          style={dynamicStyles.settingsButton}
-          onPress={() => setShowColumnSettings(true)}
-        >
-          <Text style={dynamicStyles.settingsButtonText}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {selectionMode ? (
+            <>
+              <TouchableOpacity
+                style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                onPress={handleDeleteSelected}
+              >
+                <Text style={{ fontSize: 16 }}>🗑️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                onPress={selectAll}
+              >
+                <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>
+                  {selectedIds.size === filteredEntries.length && filteredEntries.length > 0 ? 'None' : 'All'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={dynamicStyles.settingsButton}
+                onPress={toggleSelectionMode}
+              >
+                <Text style={{ fontSize: 14, color: '#e74c3c', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                onPress={toggleSelectionMode}
+              >
+                <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>Select</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={dynamicStyles.settingsButton}
+                onPress={() => setShowColumnSettings(true)}
+              >
+                <Text style={dynamicStyles.settingsButtonText}>⚙️</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
       <View style={dynamicStyles.tableContainer}>
         <View style={dynamicStyles.tableHeader}>
+          {selectionMode && (
+            <View style={{ width: 40 }} />
+          )}
           {visibleColumns.id && (
             <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>ID</Text>
           )}
@@ -632,7 +729,28 @@ function TallySessionLogsScreen() {
           filteredEntries.map((entry) => {
             const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
             return (
-              <View key={entry.id} style={dynamicStyles.tableRow}>
+              <TouchableOpacity
+                key={entry.id}
+                style={dynamicStyles.tableRow}
+                onPress={() => selectionMode ? toggleSelection(entry.id) : null}
+                activeOpacity={selectionMode ? 0.7 : 1}
+              >
+                {selectionMode && (
+                  <View style={{ width: 40, justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      borderWidth: 2,
+                      borderColor: selectedIds.has(entry.id) ? '#3498db' : '#bdc3c7',
+                      backgroundColor: selectedIds.has(entry.id) ? '#3498db' : 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      {selectedIds.has(entry.id) && <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>✓</Text>}
+                    </View>
+                  </View>
+                )}
                 {visibleColumns.id && (
                   <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>{entry.id}</Text>
                 )}
@@ -670,7 +788,7 @@ function TallySessionLogsScreen() {
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}
                 </Text>
-              </View>
+              </TouchableOpacity>
             );
           })
         ) : (

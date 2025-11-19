@@ -174,6 +174,8 @@ export const tallyLogEntriesApi = {
     }),
   getById: (entryId: number) =>
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
+  delete: (entryId: number) =>
+    api.delete(`/log-entries/${entryId}`),
 };
 
 // Cache helpers

@@ -74,3 +74,14 @@ def get_tally_log_entry(entry_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Tally log entry not found")
     return entry
 
+
+@router.delete(
+    "/log-entries/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_tally_log_entry(entry_id: int, db: Session = Depends(get_db)):
+    """Delete a tally log entry."""
+    entry = crud.delete_tally_log_entry(db, entry_id=entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Tally log entry not found")
+    return None
