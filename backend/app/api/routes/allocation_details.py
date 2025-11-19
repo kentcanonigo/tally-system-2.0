@@ -88,7 +88,7 @@ def delete_allocation_detail(allocation_id: int, db: Session = Depends(get_db)):
 
 @router.post("/tally-sessions/{session_id}/allocations/reset-tally", status_code=status.HTTP_200_OK)
 def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
-    """Reset allocated_bags_tally to 0 for all allocations in a session and delete associated tally log entries."""
+    """Delete all TALLY role log entries for a session and recalculate allocated_bags_tally from remaining log entries."""
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -96,7 +96,7 @@ def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
     
     result = crud.reset_allocated_bags_for_session(db, session_id, reset_tally=True, reset_dispatcher=False)
     return {
-        "message": f"Reset tally allocations for {result['allocations_updated']} allocation(s) and deleted {result['log_entries_deleted']} log entry/entries",
+        "message": f"Deleted {result['log_entries_deleted']} tally log entry/entries and recalculated allocations for {result['allocations_updated']} allocation(s)",
         "allocations_updated": result["allocations_updated"],
         "log_entries_deleted": result["log_entries_deleted"]
     }
@@ -104,7 +104,7 @@ def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
 
 @router.post("/tally-sessions/{session_id}/allocations/reset-dispatcher", status_code=status.HTTP_200_OK)
 def reset_dispatcher_allocations(session_id: int, db: Session = Depends(get_db)):
-    """Reset allocated_bags_dispatcher to 0 for all allocations in a session and delete associated tally log entries."""
+    """Delete all DISPATCHER role log entries for a session and recalculate allocated_bags_dispatcher from remaining log entries."""
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -112,7 +112,7 @@ def reset_dispatcher_allocations(session_id: int, db: Session = Depends(get_db))
     
     result = crud.reset_allocated_bags_for_session(db, session_id, reset_tally=False, reset_dispatcher=True)
     return {
-        "message": f"Reset dispatcher allocations for {result['allocations_updated']} allocation(s) and deleted {result['log_entries_deleted']} log entry/entries",
+        "message": f"Deleted {result['log_entries_deleted']} dispatcher log entry/entries and recalculated allocations for {result['allocations_updated']} allocation(s)",
         "allocations_updated": result["allocations_updated"],
         "log_entries_deleted": result["log_entries_deleted"]
     }

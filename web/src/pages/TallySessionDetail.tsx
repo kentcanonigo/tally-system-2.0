@@ -117,13 +117,13 @@ function TallySessionDetail() {
 
   const handleResetTally = async () => {
     if (!id) return;
-    if (!confirm('Are you sure you want to reset all Tally-er allocations for this session? This will set all allocated_bags_tally values to 0 and delete all associated tally log entries.')) {
+    if (!confirm('Are you sure you want to reset all Tally-er allocations for this session? This will delete all Tally-er log entries and recalculate allocated bags from the remaining log entries.')) {
       return;
     }
     try {
       const response = await allocationDetailsApi.resetTally(Number(id));
       const result = response.data;
-      alert(`Tally-er allocations reset successfully.\n${result.allocations_updated} allocation(s) updated.\n${result.log_entries_deleted} log entry/entries deleted.`);
+      alert(`Tally-er allocations reset successfully.\n${result.log_entries_deleted} log entry/entries deleted.\n${result.allocations_updated} allocation(s) recalculated.`);
       fetchData();
     } catch (error: any) {
       console.error('Error resetting tally allocations:', error);
@@ -133,13 +133,13 @@ function TallySessionDetail() {
 
   const handleResetDispatcher = async () => {
     if (!id) return;
-    if (!confirm('Are you sure you want to reset all Dispatcher allocations for this session? This will set all allocated_bags_dispatcher values to 0 and delete all associated tally log entries.')) {
+    if (!confirm('Are you sure you want to reset all Dispatcher allocations for this session? This will delete all Dispatcher log entries and recalculate allocated bags from the remaining log entries.')) {
       return;
     }
     try {
       const response = await allocationDetailsApi.resetDispatcher(Number(id));
       const result = response.data;
-      alert(`Dispatcher allocations reset successfully.\n${result.allocations_updated} allocation(s) updated.\n${result.log_entries_deleted} log entry/entries deleted.`);
+      alert(`Dispatcher allocations reset successfully.\n${result.log_entries_deleted} log entry/entries deleted.\n${result.allocations_updated} allocation(s) recalculated.`);
       fetchData();
     } catch (error: any) {
       console.error('Error resetting dispatcher allocations:', error);

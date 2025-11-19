@@ -102,7 +102,8 @@ def reset_allocated_bags_for_session(
     reset_dispatcher: bool = False
 ) -> dict:
     """
-    Reset allocated bags for all allocations in a session and delete associated tally log entries.
+    Delete tally log entries for a specific role in a session and recalculate allocated bags
+    from the remaining log entries. Allocated bags are computed from log entries, not set directly.
     Returns a dictionary with the number of allocations updated and log entries deleted.
     """
     allocations = get_allocation_details_by_session(db, session_id)
@@ -128,14 +129,28 @@ def reset_allocated_bags_for_session(
         ).delete(synchronize_session=False)
         log_entries_deleted += deleted_count
     
-    # Reset allocated bags
+    # Recalculate allocated bags from remaining log entries (not set directly)
     for allocation in allocations:
         updated = False
+        
         if reset_tally:
-            allocation.allocated_bags_tally = 0.0
+            # Count remaining TALLY log entries for this allocation
+            tally_count = db.query(TallyLogEntry).filter(
+                TallyLogEntry.tally_session_id == allocation.tally_session_id,
+                TallyLogEntry.weight_classification_id == allocation.weight_classification_id,
+                TallyLogEntry.role == TallyLogEntryRole.TALLY
+            ).count()
+            allocation.allocated_bags_tally = float(tally_count)
             updated = True
+        
         if reset_dispatcher:
-            allocation.allocated_bags_dispatcher = 0.0
+            # Count remaining DISPATCHER log entries for this allocation
+            dispatcher_count = db.query(TallyLogEntry).filter(
+                TallyLogEntry.tally_session_id == allocation.tally_session_id,
+                TallyLogEntry.weight_classification_id == allocation.weight_classification_id,
+                TallyLogEntry.role == TallyLogEntryRole.DISPATCHER
+            ).count()
+            allocation.allocated_bags_dispatcher = float(dispatcher_count)
             updated = True
         
         if updated:
