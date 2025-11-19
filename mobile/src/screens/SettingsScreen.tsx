@@ -258,7 +258,7 @@ function SettingsScreen() {
             value={threshold}
             onChangeText={setThreshold}
             placeholder="0"
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
             placeholderTextColor="#999"
           />
         </View>
