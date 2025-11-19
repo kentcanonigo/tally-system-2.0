@@ -11,6 +11,8 @@ import TallyScreen from '../screens/TallyScreen';
 import TallySessionLogsScreen from '../screens/TallySessionLogsScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import CustomersScreen from '../screens/CustomersScreen';
+import PlantsScreen from '../screens/PlantsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,6 +41,10 @@ function AppNavigator() {
               iconName = 'home';
             } else if (route.name === 'Sessions') {
               iconName = 'list';
+            } else if (route.name === 'Customers') {
+              iconName = 'people';
+            } else if (route.name === 'Plants') {
+              iconName = 'business';
             } else if (route.name === 'Calculator') {
               iconName = 'calculate';
             } else if (route.name === 'Settings') {
@@ -55,6 +61,8 @@ function AppNavigator() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
+        <Tab.Screen name="Customers" component={CustomersScreen} />
+        <Tab.Screen name="Plants" component={PlantsScreen} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>

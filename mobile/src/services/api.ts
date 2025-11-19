@@ -120,12 +120,22 @@ export const setApiHostIp = async (ip: string) => {
 export const customersApi = {
   getAll: () => api.get<Customer[]>('/customers'),
   getById: (id: number) => api.get<Customer>(`/customers/${id}`),
+  create: (data: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) =>
+    api.post<Customer>('/customers', data),
+  update: (id: number, data: Partial<Customer>) =>
+    api.put<Customer>(`/customers/${id}`, data),
+  delete: (id: number) => api.delete(`/customers/${id}`),
 };
 
 // Plants API
 export const plantsApi = {
   getAll: () => api.get<Plant[]>('/plants'),
   getById: (id: number) => api.get<Plant>(`/plants/${id}`),
+  create: (data: Omit<Plant, 'id' | 'created_at' | 'updated_at'>) =>
+    api.post<Plant>('/plants', data),
+  update: (id: number, data: Partial<Plant>) =>
+    api.put<Plant>(`/plants/${id}`, data),
+  delete: (id: number) => api.delete(`/plants/${id}`),
 };
 
 // Weight Classifications API
