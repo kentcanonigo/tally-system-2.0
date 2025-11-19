@@ -142,6 +142,15 @@ export const plantsApi = {
 export const weightClassificationsApi = {
   getByPlant: (plantId: number) =>
     api.get<WeightClassification[]>(`/plants/${plantId}/weight-classifications`),
+  getById: (id: number) => api.get<WeightClassification>(`/weight-classifications/${id}`),
+  create: (plantId: number, data: Omit<WeightClassification, 'id' | 'plant_id' | 'created_at' | 'updated_at'>) =>
+    api.post<WeightClassification>(`/plants/${plantId}/weight-classifications`, {
+      ...data,
+      plant_id: plantId,
+    }),
+  update: (id: number, data: Partial<Omit<WeightClassification, 'id' | 'plant_id' | 'created_at' | 'updated_at'>>) =>
+    api.put<WeightClassification>(`/weight-classifications/${id}`, data),
+  delete: (id: number) => api.delete(`/weight-classifications/${id}`),
 };
 
 // Tally Sessions API
