@@ -103,7 +103,7 @@ function TallySessionsScreen() {
     header: {
       ...styles.header,
       padding: responsive.padding.medium,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     title: {
@@ -122,7 +122,7 @@ function TallySessionsScreen() {
     list: {
       ...styles.list,
       padding: responsive.padding.medium,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     sessionCard: {

@@ -79,12 +79,11 @@ function CreateTallySessionScreen() {
     },
     contentContainer: {
       ...styles.scrollContent,
-      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
     },
     form: {
       ...styles.form,
       padding: responsive.padding.large,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     formGroup: {

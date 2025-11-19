@@ -517,16 +517,15 @@ function TallySessionDetailScreen() {
     },
     contentContainer: {
       ...styles.scrollContent,
-      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
     },
     contentWrapper: {
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     header: {
       ...styles.header,
       padding: responsive.padding.medium,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     sessionId: {
@@ -605,7 +604,7 @@ function TallySessionDetailScreen() {
       ...styles.actions,
       padding: responsive.spacing.md,
       flexDirection: responsive.isTablet ? 'row' as const : 'column' as const,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     actionButton: {

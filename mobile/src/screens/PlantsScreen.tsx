@@ -104,12 +104,11 @@ function PlantsScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
-      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
     },
     header: {
       ...styles.header,
       padding: responsive.padding.medium,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     title: {
@@ -119,7 +118,7 @@ function PlantsScreen() {
     list: {
       ...styles.list,
       padding: responsive.padding.medium,
-      width: responsive.isTablet ? responsive.maxContentWidth : '100%',
+      width: '100%',
       maxWidth: '100%',
     },
     card: {
