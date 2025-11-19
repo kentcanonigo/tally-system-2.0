@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, A
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatTime } from '../utils/dateFormat';
+import { useAcceptableDifference } from '../utils/settings';
 import {
   tallySessionsApi,
   customersApi,
@@ -19,6 +20,7 @@ function TallySessionLogsScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
+  const threshold = useAcceptableDifference();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -259,6 +261,21 @@ function TallySessionLogsScreen() {
       difference: totals.tally - totals.dispatcher,
     };
   }, [filteredEntries]);
+
+  // Helper function to get color based on difference and threshold
+  const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
+    if (isNotStarted) {
+      return '#666';
+    }
+    if (difference === 0) {
+      return '#27ae60'; // Green for exact match
+    }
+    const absDifference = Math.abs(difference);
+    if (absDifference <= threshold) {
+      return '#f39c12'; // Orange for acceptable difference
+    }
+    return '#e74c3c'; // Red for unacceptable difference
+  };
 
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
@@ -633,6 +650,7 @@ function TallySessionLogsScreen() {
           <>
             {aggregations.map((agg) => {
               const isNotStarted = agg.tally === 0 && agg.dispatcher === 0;
+              const diffColor = getDifferenceColor(agg.difference, isNotStarted);
               return (
                 <View key={agg.weight_classification_id} style={dynamicStyles.tableRow}>
                   <Text style={[dynamicStyles.tableCell, { flex: 2 }]} numberOfLines={1}>
@@ -649,7 +667,7 @@ function TallySessionLogsScreen() {
                       dynamicStyles.tableCell,
                       {
                         flex: 1,
-                        color: isNotStarted ? '#666' : (agg.difference === 0 ? '#27ae60' : '#e74c3c'),
+                        color: diffColor,
                         fontWeight: agg.difference === 0 && !isNotStarted ? 'normal' : 'bold',
                       },
                     ]}
@@ -672,7 +690,7 @@ function TallySessionLogsScreen() {
                   dynamicStyles.tableCell,
                   {
                     flex: 1,
-                    color: (overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? '#666' : (overallTotals.difference === 0 ? '#27ae60' : '#e74c3c'),
+                    color: getDifferenceColor(overallTotals.difference, overallTotals.tally === 0 && overallTotals.dispatcher === 0),
                     fontWeight: 'bold',
                   },
                 ]}

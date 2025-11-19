@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi } from '../services/api';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
+import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,11 +21,14 @@ function TallySessionDetail() {
     allocated_bags_tally: 0,
     allocated_bags_dispatcher: 0,
   });
+  const [threshold, setThreshold] = useState<number>(0);
 
   useEffect(() => {
     if (id) {
       fetchData();
     }
+    // Load threshold from localStorage
+    setThreshold(getAcceptableDifferenceThreshold());
   }, [id]);
 
   const fetchData = async () => {
@@ -161,6 +165,21 @@ function TallySessionDetail() {
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
   };
+
+  // Helper function to get color based on difference and threshold
+  const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
+    if (isNotStarted) {
+      return '#666';
+    }
+    if (difference === 0) {
+      return '#27ae60'; // Green for exact match
+    }
+    const absDifference = Math.abs(difference);
+    if (absDifference <= threshold) {
+      return '#f39c12'; // Orange for acceptable difference
+    }
+    return '#e74c3c'; // Red for unacceptable difference
+  };
   
   const formatWeightRange = (wc: WeightClassification): string => {
     // For Byproduct with both weights null, show N/A
@@ -259,6 +278,7 @@ function TallySessionDetail() {
             {allocations.map((allocation) => {
               const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
               const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+              const diffColor = getDifferenceColor(difference, isNotStarted);
               const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
               return (
                 <tr key={allocation.id}>
@@ -270,7 +290,7 @@ function TallySessionDetail() {
                   <td>{allocation.required_bags}</td>
                   <td>{allocation.allocated_bags_tally}</td>
                   <td>{allocation.allocated_bags_dispatcher}</td>
-                  <td style={{ color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'), fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
+                  <td style={{ color: diffColor, fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
                     {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
                   </td>
                   <td>

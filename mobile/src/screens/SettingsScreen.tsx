@@ -1,27 +1,70 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = '@tally_system_acceptable_difference_threshold';
+const DEFAULT_THRESHOLD = 0;
 
 function SettingsScreen() {
   const { timezone, setTimezone, availableTimezones } = useTimezone();
   const responsive = useResponsive();
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
+  const [threshold, setThreshold] = useState<string>('0');
+  const [currentThreshold, setCurrentThreshold] = useState<number>(0);
 
   // Update selectedTimezone when timezone changes from context
   React.useEffect(() => {
     setSelectedTimezone(timezone);
   }, [timezone]);
 
-  const handleSave = async () => {
+  // Load threshold on mount
+  useEffect(() => {
+    loadThreshold();
+  }, []);
+
+  const loadThreshold = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY);
+      if (stored !== null) {
+        const value = parseFloat(stored);
+        setCurrentThreshold(value);
+        setThreshold(value.toString());
+      } else {
+        setCurrentThreshold(DEFAULT_THRESHOLD);
+        setThreshold(DEFAULT_THRESHOLD.toString());
+      }
+    } catch (error) {
+      console.error('Error loading threshold:', error);
+    }
+  };
+
+  const handleSaveTimezone = async () => {
     try {
       await setTimezone(selectedTimezone);
       Alert.alert('Success', `Timezone preference saved successfully. All dates and times will now display in ${selectedTimezone}.`);
     } catch (error) {
       console.error('Error saving timezone:', error);
       Alert.alert('Error', 'Failed to save timezone preference');
+    }
+  };
+
+  const handleSaveThreshold = async () => {
+    try {
+      const thresholdValue = parseFloat(threshold);
+      if (isNaN(thresholdValue) || thresholdValue < 0) {
+        Alert.alert('Error', 'Please enter a valid number greater than or equal to 0');
+        return;
+      }
+      await AsyncStorage.setItem(ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY, thresholdValue.toString());
+      setCurrentThreshold(thresholdValue);
+      Alert.alert('Success', `Acceptable difference threshold saved successfully. Differences within ${thresholdValue} will now be displayed in orange.`);
+    } catch (error) {
+      console.error('Error saving threshold:', error);
+      Alert.alert('Error', 'Failed to save threshold preference');
     }
   };
 
@@ -150,6 +193,19 @@ function SettingsScreen() {
       fontSize: responsive.fontSize.small,
       marginTop: responsive.spacing.md,
     },
+    inputWrapper: {
+      marginBottom: responsive.spacing.md,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: '#ddd',
+      borderRadius: 8,
+      paddingHorizontal: responsive.padding.medium,
+      paddingVertical: responsive.padding.small,
+      fontSize: responsive.fontSize.medium,
+      color: '#2c3e50',
+      backgroundColor: '#fff',
+    },
   };
 
   return (
@@ -179,7 +235,7 @@ function SettingsScreen() {
         </Text>
 
         {selectedTimezone !== timezone && (
-          <TouchableOpacity style={dynamicStyles.saveButton} onPress={handleSave}>
+          <TouchableOpacity style={dynamicStyles.saveButton} onPress={handleSaveTimezone}>
             <Text style={dynamicStyles.saveButtonText}>Save Timezone</Text>
           </TouchableOpacity>
         )}
@@ -187,6 +243,39 @@ function SettingsScreen() {
         <Text style={dynamicStyles.infoText}>
           All dates and times throughout the app will be displayed in your selected timezone.
           Log entries are stored in UTC and converted to your timezone for display.
+        </Text>
+      </View>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Difference Threshold</Text>
+        <Text style={dynamicStyles.label}>
+          Set the acceptable difference between tally-er and dispatcher weights:
+        </Text>
+
+        <View style={dynamicStyles.inputWrapper}>
+          <TextInput
+            style={dynamicStyles.input}
+            value={threshold}
+            onChangeText={setThreshold}
+            placeholder="0"
+            keyboardType="numeric"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <Text style={dynamicStyles.currentTimezone}>
+          Current: {currentThreshold}
+        </Text>
+
+        {parseFloat(threshold) !== currentThreshold && !isNaN(parseFloat(threshold)) && parseFloat(threshold) >= 0 && (
+          <TouchableOpacity style={dynamicStyles.saveButton} onPress={handleSaveThreshold}>
+            <Text style={dynamicStyles.saveButtonText}>Save Threshold</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={dynamicStyles.infoText}>
+          When viewing session logs, differences within this threshold will be displayed in orange (acceptable).
+          Exact matches (0) will be green, and differences beyond the threshold will be red (unacceptable).
         </Text>
       </View>
 

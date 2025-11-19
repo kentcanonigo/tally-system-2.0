@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInp
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate } from '../utils/dateFormat';
+import { useAcceptableDifference } from '../utils/settings';
 import {
   tallySessionsApi,
   allocationDetailsApi,
@@ -19,6 +20,7 @@ function TallySessionDetailScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
+  const threshold = useAcceptableDifference();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -315,9 +317,25 @@ function TallySessionDetailScreen() {
     });
   }, [allocations, weightClassifications]);
 
+  // Helper function to get color based on difference and threshold
+  const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
+    if (isNotStarted) {
+      return '#666';
+    }
+    if (difference === 0) {
+      return '#27ae60'; // Green for exact match
+    }
+    const absDifference = Math.abs(difference);
+    if (absDifference <= threshold) {
+      return '#f39c12'; // Orange for acceptable difference
+    }
+    return '#e74c3c'; // Red for unacceptable difference
+  };
+
   const renderAllocationCard = (allocation: AllocationDetails) => {
     const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
     const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    const diffColor = getDifferenceColor(difference, isNotStarted);
     return (
       <View 
         key={allocation.id} 
@@ -362,7 +380,7 @@ function TallySessionDetailScreen() {
           <Text style={[
             dynamicStyles.allocationValue, 
             { 
-              color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'),
+              color: diffColor,
               fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
             }
           ]}>

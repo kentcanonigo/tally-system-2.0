@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { tallySessionsApi, customersApi, plantsApi, weightClassificationsApi, tallyLogEntriesApi } from '../services/api';
 import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { TallyLogEntryRole } from '../types';
+import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionLogs() {
   const { id } = useParams<{ id: string }>();
@@ -22,11 +23,14 @@ function TallySessionLogs() {
   });
   const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [threshold, setThreshold] = useState<number>(0);
 
   useEffect(() => {
     if (id) {
       fetchData();
     }
+    // Load threshold from localStorage
+    setThreshold(getAcceptableDifferenceThreshold());
   }, [id]);
 
   const fetchData = async () => {
@@ -58,6 +62,21 @@ function TallySessionLogs() {
 
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
+  };
+
+  // Helper function to get color based on difference and threshold
+  const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
+    if (isNotStarted) {
+      return '#666';
+    }
+    if (difference === 0) {
+      return '#27ae60'; // Green for exact match
+    }
+    const absDifference = Math.abs(difference);
+    if (absDifference <= threshold) {
+      return '#f39c12'; // Orange for acceptable difference
+    }
+    return '#e74c3c'; // Red for unacceptable difference
   };
 
   const formatWeightRange = (wc: WeightClassification): string => {
@@ -276,6 +295,7 @@ function TallySessionLogs() {
               {aggregations.length > 0 ? (
                 aggregations.map((agg) => {
                   const isNotStarted = agg.tally === 0 && agg.dispatcher === 0;
+                  const diffColor = getDifferenceColor(agg.difference, isNotStarted);
                   return (
                     <tr key={agg.weight_classification_id}>
                       <td>{agg.classification}</td>
@@ -283,7 +303,7 @@ function TallySessionLogs() {
                       <td>{agg.dispatcher.toFixed(2)}</td>
                       <td
                         style={{
-                          color: isNotStarted ? '#666' : (agg.difference === 0 ? '#27ae60' : '#e74c3c'),
+                          color: diffColor,
                           fontWeight: agg.difference === 0 && !isNotStarted ? 'normal' : 'bold',
                         }}
                       >
@@ -307,7 +327,7 @@ function TallySessionLogs() {
                 <td>{overallTotals.dispatcher.toFixed(2)}</td>
                 <td
                   style={{
-                    color: (overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? '#666' : (overallTotals.difference === 0 ? '#27ae60' : '#e74c3c'),
+                    color: getDifferenceColor(overallTotals.difference, overallTotals.tally === 0 && overallTotals.dispatcher === 0),
                   }}
                 >
                   {(overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? 'Not started' : (overallTotals.difference === 0 ? 'Match' : overallTotals.difference.toFixed(2))}

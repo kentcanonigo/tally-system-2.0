@@ -6,6 +6,7 @@ import WeightClassifications from './pages/WeightClassifications';
 import TallySessions from './pages/TallySessions';
 import TallySessionDetail from './pages/TallySessionDetail';
 import TallySessionLogs from './pages/TallySessionLogs';
+import Settings from './pages/Settings';
 import './App.css';
 
 function App() {
@@ -33,6 +34,9 @@ function App() {
             <li>
               <Link to="/tally-sessions">Tally Sessions</Link>
             </li>
+            <li>
+              <Link to="/settings">Settings</Link>
+            </li>
           </ul>
         </nav>
         <main className="main-content">
@@ -44,6 +48,7 @@ function App() {
             <Route path="/tally-sessions" element={<TallySessions />} />
             <Route path="/tally-sessions/:id" element={<TallySessionDetail />} />
             <Route path="/tally-sessions/:id/logs" element={<TallySessionLogs />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>
