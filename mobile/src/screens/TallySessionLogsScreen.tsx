@@ -30,21 +30,23 @@ function TallySessionLogsScreen() {
   const [filters, setFilters] = useState<{
     role: TallyLogEntryRole | 'all';
     weight_classification_id: number | 'all';
+    category: 'Dressed' | 'Byproduct' | 'all';
   }>({
     role: 'all',
     weight_classification_id: 'all',
+    category: 'all',
   });
   const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSortByDropdown, setShowSortByDropdown] = useState(false);
   const [showSortOrderDropdown, setShowSortOrderDropdown] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
     description: true,
-    range: true,
   });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -138,6 +140,11 @@ function TallySessionLogsScreen() {
     return `${wc.classification} - ${formatWeightRange(wc)}`;
   };
 
+  const getCategoryLabel = (category: 'Dressed' | 'Byproduct' | 'all') => {
+    if (category === 'all') return 'All Categories';
+    return category;
+  };
+
   const getSortByLabel = (sortBy: 'class' | 'weight' | 'time' | 'id') => {
     const labels: { [key: string]: string } = {
       time: 'Time',
@@ -160,6 +167,12 @@ function TallySessionLogsScreen() {
       }
       if (filters.weight_classification_id !== 'all' && entry.weight_classification_id !== filters.weight_classification_id) {
         return false;
+      }
+      if (filters.category !== 'all') {
+        const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
+        if (!wc || wc.category !== filters.category) {
+          return false;
+        }
       }
       return true;
     });
@@ -198,7 +211,7 @@ function TallySessionLogsScreen() {
     });
 
     return filtered;
-  }, [logEntries, filters, sortBy, sortOrder, weightClassifications, timezone]);
+  }, [logEntries, filters, sortBy, sortOrder, weightClassifications]);
 
   // Calculate aggregations by weight classification
   const aggregations = useMemo(() => {
@@ -567,6 +580,19 @@ function TallySessionLogsScreen() {
           </TouchableOpacity>
         </View>
 
+        <Text style={[dynamicStyles.filterLabel, { marginTop: 16 }]}>Filter by Category:</Text>
+        <View style={dynamicStyles.pickerWrapper}>
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowCategoryDropdown(true)}
+          >
+            <Text style={dynamicStyles.dropdownText}>
+              {getCategoryLabel(filters.category)}
+            </Text>
+            <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={[dynamicStyles.filterLabel, { marginTop: 16 }]}>Sort By:</Text>
         <View style={dynamicStyles.pickerWrapper}>
           <TouchableOpacity
@@ -719,9 +745,7 @@ function TallySessionLogsScreen() {
           {visibleColumns.description && (
             <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Desc</Text>
           )}
-          {visibleColumns.range && (
-            <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Range</Text>
-          )}
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Category</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
         </View>
@@ -777,11 +801,9 @@ function TallySessionLogsScreen() {
                     {wc?.description || '-'}
                   </Text>
                 )}
-                {visibleColumns.range && (
-                  <Text style={[dynamicStyles.tableCell, { flex: 1, fontSize: 10 }]} numberOfLines={1}>
-                    {wc ? formatWeightRange(wc) : '-'}
-                  </Text>
-                )}
+                <Text style={[dynamicStyles.tableCell, { flex: 1, fontSize: 10 }]} numberOfLines={1}>
+                  {wc?.category || '-'}
+                </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
                   {entry.weight.toFixed(2)}
                 </Text>
@@ -942,6 +964,86 @@ function TallySessionLogsScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Category Dropdown Modal */}
+      {showCategoryDropdown && (
+        <Modal
+          transparent
+          visible={showCategoryDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowCategoryDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowCategoryDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.category === 'all' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, category: 'all' });
+                  setShowCategoryDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.category === 'all' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  All Categories
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.category === 'Dressed' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, category: 'Dressed' });
+                  setShowCategoryDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.category === 'Dressed' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Dressed
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  dynamicStyles.dropdownOptionLast,
+                  filters.category === 'Byproduct' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, category: 'Byproduct' });
+                  setShowCategoryDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.category === 'Byproduct' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Byproduct
+                </Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </Modal>
       )}
@@ -1144,7 +1246,7 @@ function TallySessionLogsScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={dynamicStyles.columnSettingsOption}
+                style={[dynamicStyles.columnSettingsOption, dynamicStyles.columnSettingsOptionLast]}
                 onPress={() => setVisibleColumns({ ...visibleColumns, description: !visibleColumns.description })}
               >
                 <View style={dynamicStyles.checkboxContainer}>
@@ -1155,21 +1257,6 @@ function TallySessionLogsScreen() {
                     {visibleColumns.description && <Text style={dynamicStyles.checkboxCheckmark}>✓</Text>}
                   </View>
                   <Text style={dynamicStyles.columnSettingsOptionText}>Description</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[dynamicStyles.columnSettingsOption, dynamicStyles.columnSettingsOptionLast]}
-                onPress={() => setVisibleColumns({ ...visibleColumns, range: !visibleColumns.range })}
-              >
-                <View style={dynamicStyles.checkboxContainer}>
-                  <View style={[
-                    dynamicStyles.checkbox,
-                    visibleColumns.range && dynamicStyles.checkboxChecked
-                  ]}>
-                    {visibleColumns.range && <Text style={dynamicStyles.checkboxCheckmark}>✓</Text>}
-                  </View>
-                  <Text style={dynamicStyles.columnSettingsOptionText}>Range</Text>
                 </View>
               </TouchableOpacity>
 
