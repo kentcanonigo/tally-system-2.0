@@ -62,9 +62,10 @@ function CustomersScreen() {
             try {
               await customersApi.delete(customer.id);
               fetchData(false);
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting customer:', error);
-              Alert.alert('Error', 'Failed to delete customer');
+              const errorMessage = error.response?.data?.detail || 'Failed to delete customer';
+              Alert.alert('Error', errorMessage);
             }
           },
         },

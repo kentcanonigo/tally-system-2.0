@@ -37,8 +37,11 @@ def update_customer(customer_id: int, customer: CustomerUpdate, db: Session = De
 
 @router.delete("/customers/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_customer(customer_id: int, db: Session = Depends(get_db)):
-    success = crud.delete_customer(db, customer_id=customer_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    return None
+    try:
+        success = crud.delete_customer(db, customer_id=customer_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        return None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 

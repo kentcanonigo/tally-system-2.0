@@ -62,9 +62,10 @@ function PlantsScreen() {
             try {
               await plantsApi.delete(plant.id);
               fetchData(false);
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting plant:', error);
-              Alert.alert('Error', 'Failed to delete plant');
+              const errorMessage = error.response?.data?.detail || 'Failed to delete plant';
+              Alert.alert('Error', errorMessage);
             }
           },
         },

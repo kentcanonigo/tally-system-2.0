@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models.customer import Customer
+from ..models.tally_session import TallySession
 from ..schemas.customer import CustomerCreate, CustomerUpdate
 
 
@@ -39,6 +40,11 @@ def delete_customer(db: Session, customer_id: int) -> bool:
     db_customer = get_customer(db, customer_id)
     if not db_customer:
         return False
+    
+    # Check if there are any tally sessions associated with this customer
+    associated_sessions = db.query(TallySession).filter(TallySession.customer_id == customer_id).count()
+    if associated_sessions > 0:
+        raise ValueError(f"Cannot delete customer: {associated_sessions} tally session(s) are associated with this customer. Please delete or reassign the sessions first.")
     
     db.delete(db_customer)
     db.commit()

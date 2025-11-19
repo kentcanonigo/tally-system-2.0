@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models.plant import Plant
+from ..models.tally_session import TallySession
+from ..models.weight_classification import WeightClassification
 from ..schemas.plant import PlantCreate, PlantUpdate
 
 
@@ -39,6 +41,16 @@ def delete_plant(db: Session, plant_id: int) -> bool:
     db_plant = get_plant(db, plant_id)
     if not db_plant:
         return False
+    
+    # Check if there are any tally sessions associated with this plant
+    associated_sessions = db.query(TallySession).filter(TallySession.plant_id == plant_id).count()
+    if associated_sessions > 0:
+        raise ValueError(f"Cannot delete plant: {associated_sessions} tally session(s) are associated with this plant. Please delete or reassign the sessions first.")
+    
+    # Check if there are any weight classifications associated with this plant
+    associated_weight_classes = db.query(WeightClassification).filter(WeightClassification.plant_id == plant_id).count()
+    if associated_weight_classes > 0:
+        raise ValueError(f"Cannot delete plant: {associated_weight_classes} weight classification(s) are associated with this plant. Please delete the weight classifications first.")
     
     db.delete(db_plant)
     db.commit()
