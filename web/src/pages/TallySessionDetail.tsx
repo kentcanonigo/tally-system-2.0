@@ -115,6 +115,17 @@ function TallySessionDetail() {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!session || !id) return;
+    try {
+      await tallySessionsApi.update(Number(id), { status: newStatus as any });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      alert(error.response?.data?.detail || 'Error updating status');
+    }
+  };
+
   const handleResetTally = async () => {
     if (!id) return;
     if (!confirm('Are you sure you want to reset all Tally-er allocations for this session? This will delete all Tally-er log entries and recalculate allocated bags from the remaining log entries.')) {
@@ -188,7 +199,23 @@ function TallySessionDetail() {
           Customer: {customer?.name} | Plant: {plant?.name} | Date: {new Date(session.date).toLocaleDateString()}
         </p>
         <p>
-          Status: <span className={`status-badge status-${session.status}`}>{session.status}</span>
+          Status:{' '}
+          <select
+            value={session.status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            style={{
+              padding: '4px 8px',
+              borderRadius: '4px',
+              border: '1px solid #ddd',
+              fontSize: '14px',
+              marginLeft: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </p>
       </div>
 
