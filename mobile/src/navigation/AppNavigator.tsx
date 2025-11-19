@@ -67,7 +67,7 @@ function AppNavigator() {
         <Tab.Screen name="Customers" component={CustomersScreen} />
         <Tab.Screen name="Plants" component={PlantsScreen} />
         <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ title: 'Weight Classes' }} />
-        <Tab.Screen name="Calculator" component={CalculatorScreen} />
+        <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>
