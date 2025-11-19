@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import {
   allocationDetailsApi,
@@ -19,6 +19,7 @@ function TallyScreen() {
   const responsive = useResponsive();
   const sessionId = (route.params as any)?.sessionId;
   const tallyRole = (route.params as any)?.tallyRole as 'tally' | 'dispatcher';
+  const tallyMode = (route.params as any)?.tallyMode as 'dressed' | 'byproduct' || 'dressed';
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -27,6 +28,9 @@ function TallyScreen() {
   const [logEntries, setLogEntries] = useState<TallyLogEntry[]>([]);
   const [tallyInput, setTallyInput] = useState('0');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [selectedByproductId, setSelectedByproductId] = useState<number | null>(null);
+  const [quantityInput, setQuantityInput] = useState('1');
 
   // Determine if we should use landscape layout (side by side)
   // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
@@ -42,12 +46,15 @@ function TallyScreen() {
   useLayoutEffect(() => {
     if (plant && customer && session) {
       const titleParts = [plant.name, customer.name, `Session #${session.id}`];
-      const titleText = `${titleParts.join(' - ')} (${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'})`;
+      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
+      const roleText = tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher';
+      const titleText = `${titleParts.join(' - ')} (${modeText} - ${roleText})`;
       navigation.setOptions({ title: titleText });
     } else {
-      navigation.setOptions({ title: `Tally - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}` });
+      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
+      navigation.setOptions({ title: `Tally - ${modeText} - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}` });
     }
-  }, [plant, customer, session, tallyRole, navigation]);
+  }, [plant, customer, session, tallyRole, tallyMode, navigation]);
 
   const fetchData = async () => {
     try {
@@ -283,9 +290,144 @@ function TallyScreen() {
     }
   };
 
+  // Filter allocations to only byproducts when in byproduct mode
+  const filteredAllocations = tallyMode === 'byproduct'
+    ? allocations.filter((allocation) => {
+        const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+        return wc && wc.category === 'Byproduct';
+      })
+    : allocations;
+
   const currentWeight = parseFloat(tallyInput) || 0;
   const matchedWC = currentWeight > 0 ? findWeightClassification(currentWeight) : null;
   const currentAllocation = matchedWC ? getCurrentAllocation(matchedWC.id) : null;
+
+  // Byproduct increment function
+  const handleByproductIncrement = async (wcId: number) => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!sessionId) {
+      Alert.alert('Error', 'Session ID is missing');
+      return;
+    }
+
+    const allocation = getCurrentAllocation(wcId);
+    if (allocation && allocation.required_bags > 0) {
+      const currentAllocated = tallyRole === 'tally'
+        ? allocation.allocated_bags_tally
+        : allocation.allocated_bags_dispatcher;
+      const newAllocated = currentAllocated + 1;
+
+      if (newAllocated > allocation.required_bags) {
+        Alert.alert(
+          'Over-Allocation Warning',
+          `This entry would cause over-allocation.\n\n` +
+          `Required: ${allocation.required_bags}\n` +
+          `Current: ${currentAllocated}\n` +
+          `After this entry: ${newAllocated}\n\n` +
+          `Do you want to proceed?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Proceed',
+              onPress: () => createByproductLogEntry(wcId),
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    createByproductLogEntry(wcId);
+
+    async function createByproductLogEntry(wcId: number) {
+      setIsSubmitting(true);
+      try {
+        await tallyLogEntriesApi.create(sessionId, {
+          weight_classification_id: wcId,
+          role: tallyRole as TallyLogEntryRole,
+          weight: 1,
+          notes: null,
+        });
+
+        // Refresh allocations and log entries
+        const [allocationsRes, logEntriesRes] = await Promise.all([
+          allocationDetailsApi.getBySession(sessionId),
+          tallyLogEntriesApi.getBySession(sessionId),
+        ]);
+        setAllocations(allocationsRes.data);
+        setLogEntries(logEntriesRes.data);
+      } catch (error: any) {
+        console.error('Error creating byproduct log entry:', error);
+        const errorMessage = error.response?.data?.detail
+          || error.message
+          || 'Failed to log tally entry. Please try again.';
+        Alert.alert('Error', errorMessage);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  // Handle quantity modal submission
+  const handleQuantitySubmit = async () => {
+    if (!selectedByproductId) {
+      Alert.alert('Error', 'Please select a byproduct');
+      return;
+    }
+
+    const quantity = parseInt(quantityInput);
+    if (isNaN(quantity) || quantity <= 0) {
+      Alert.alert('Error', 'Please enter a valid quantity');
+      return;
+    }
+
+    if (!sessionId) {
+      Alert.alert('Error', 'Session ID is missing');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Create multiple log entries, each with weight = 1
+      const promises = Array.from({ length: quantity }, () =>
+        tallyLogEntriesApi.create(sessionId, {
+          weight_classification_id: selectedByproductId,
+          role: tallyRole as TallyLogEntryRole,
+          weight: 1,
+          notes: null,
+        })
+      );
+
+      await Promise.all(promises);
+
+      // Refresh allocations and log entries
+      const [allocationsRes, logEntriesRes] = await Promise.all([
+        allocationDetailsApi.getBySession(sessionId),
+        tallyLogEntriesApi.getBySession(sessionId),
+      ]);
+      setAllocations(allocationsRes.data);
+      setLogEntries(logEntriesRes.data);
+
+      // Close modal and reset
+      setShowQuantityModal(false);
+      setSelectedByproductId(null);
+      setQuantityInput('1');
+    } catch (error: any) {
+      console.error('Error creating byproduct log entries:', error);
+      const errorMessage = error.response?.data?.detail
+        || error.message
+        || 'Failed to log tally entries. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const dynamicStyles = {
     container: {
@@ -393,7 +535,80 @@ function TallyScreen() {
     },
   };
 
-  const content = (
+  // Render byproduct mode UI
+  const renderByproductMode = () => (
+    <View style={dynamicStyles.contentContainer}>
+      <View style={dynamicStyles.summarySection}>
+        <View style={dynamicStyles.summaryContainer}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: responsive.spacing.md }}>
+            <Text style={dynamicStyles.summaryTitle}>Byproducts</Text>
+            <TouchableOpacity
+              style={[styles.addQuantityButton, { padding: responsive.padding.small }]}
+              onPress={() => setShowQuantityModal(true)}
+            >
+              <Text style={[styles.addQuantityButtonText, { fontSize: responsive.fontSize.small }]}>+ Add Quantity</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={dynamicStyles.summaryTable}>
+            <View style={dynamicStyles.summaryHeader}>
+              <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Classification</Text>
+              <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Description</Text>
+              <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Count / Required</Text>
+              <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Action</Text>
+            </View>
+            {filteredAllocations.length > 0 ? (
+              filteredAllocations.map((allocation) => {
+                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                if (!wc) return null;
+
+                const allocatedBags = tallyRole === 'tally'
+                  ? allocation.allocated_bags_tally
+                  : allocation.allocated_bags_dispatcher;
+
+                const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+
+                return (
+                  <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                      {wc.classification}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={2}>
+                      {wc.description || '-'}
+                    </Text>
+                    <Text style={[
+                      dynamicStyles.summaryCell,
+                      { flex: 1.5 },
+                      isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
+                    ]}>
+                      {allocatedBags} / {allocation.required_bags}
+                    </Text>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <TouchableOpacity
+                        style={[styles.incrementButton, isSubmitting && { opacity: 0.6 }]}
+                        onPress={() => handleByproductIncrement(wc.id)}
+                        disabled={isSubmitting}
+                      >
+                        <Text style={styles.incrementButtonText}>+1</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={dynamicStyles.summaryRow}>
+                <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
+                  No byproduct allocations found
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Render dressed mode UI (existing)
+  const renderDressedMode = () => (
     <View style={dynamicStyles.contentContainer}>
         {/* Calculator Section */}
         <View style={dynamicStyles.calculatorSection}>
@@ -516,7 +731,7 @@ function TallyScreen() {
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Allocated / Required</Text>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Sum</Text>
               </View>
-              {allocations.map((allocation) => {
+              {filteredAllocations.map((allocation) => {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                 if (!wc) return null;
                 
@@ -548,7 +763,7 @@ function TallyScreen() {
                   </View>
                 );
               })}
-              {allocations.length === 0 && (
+              {filteredAllocations.length === 0 && (
                 <View style={dynamicStyles.summaryRow}>
                   <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
                     No allocations yet
@@ -560,6 +775,8 @@ function TallyScreen() {
         </View>
       </View>
   );
+
+  const content = tallyMode === 'byproduct' ? renderByproductMode() : renderDressedMode();
 
   return (
     <View style={dynamicStyles.container}>
@@ -574,6 +791,93 @@ function TallyScreen() {
           {content}
         </ScrollView>
       )}
+
+      {/* Quantity Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showQuantityModal}
+        onRequestClose={() => {
+          setShowQuantityModal(false);
+          setSelectedByproductId(null);
+          setQuantityInput('1');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: responsive.isTablet ? 400 : '90%', padding: responsive.padding.large }]}>
+            <Text style={[styles.modalTitle, { fontSize: responsive.fontSize.large, marginBottom: responsive.spacing.md }]}>
+              Add Quantity
+            </Text>
+
+            <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
+              Select Byproduct:
+            </Text>
+            <ScrollView style={{ maxHeight: 200, marginBottom: responsive.spacing.md }}>
+              {filteredAllocations.map((allocation) => {
+                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                if (!wc) return null;
+                return (
+                  <TouchableOpacity
+                    key={allocation.id}
+                    style={[
+                      styles.modalOption,
+                      selectedByproductId === wc.id && styles.modalOptionSelected,
+                      { padding: responsive.padding.medium }
+                    ]}
+                    onPress={() => setSelectedByproductId(wc.id)}
+                  >
+                    <Text style={[
+                      styles.modalOptionText,
+                      selectedByproductId === wc.id && styles.modalOptionTextSelected,
+                      { fontSize: responsive.fontSize.small }
+                    ]}>
+                      {wc.classification} {wc.description ? `- ${wc.description}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
+              Quantity:
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+              placeholder="Enter quantity"
+              value={quantityInput}
+              onChangeText={setQuantityInput}
+              keyboardType="numeric"
+            />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: responsive.spacing.sm }}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton, { padding: responsive.padding.medium }]}
+                onPress={() => {
+                  setShowQuantityModal(false);
+                  setSelectedByproductId(null);
+                  setQuantityInput('1');
+                }}
+              >
+                <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.small }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalSubmitButton,
+                  { padding: responsive.padding.medium },
+                  isSubmitting && { opacity: 0.6 }
+                ]}
+                onPress={handleQuantitySubmit}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.small }]}>
+                  {isSubmitting ? 'Adding...' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -671,6 +975,86 @@ const styles = StyleSheet.create({
   summaryCell: {
     color: '#2c3e50',
     paddingHorizontal: 4,
+  },
+  incrementButton: {
+    backgroundColor: '#3498db',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  incrementButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  addQuantityButton: {
+    backgroundColor: '#27ae60',
+    borderRadius: 6,
+  },
+  addQuantityButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalLabel: {
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  modalOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  modalOptionSelected: {
+    backgroundColor: '#3498db',
+  },
+  modalOptionText: {
+    color: '#2c3e50',
+  },
+  modalOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    backgroundColor: '#f9f9f9',
+  },
+  modalButton: {
+    borderRadius: 4,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalCancelButton: {
+    backgroundColor: '#95a5a6',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#3498db',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

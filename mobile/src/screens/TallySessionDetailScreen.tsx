@@ -319,26 +319,81 @@ function TallySessionDetailScreen() {
   };
 
   const handleStartTally = () => {
+    // First, select the mode (Dressed or Byproduct)
     Alert.alert(
-      'Select Role',
-      'Are you a tally-er or dispatcher?',
+      'Select Mode',
+      'What would you like to tally?',
       [
         {
-          text: 'Tally-er',
+          text: 'Dressed',
           onPress: () => {
-            (navigation as any).navigate('Tally', {
-              sessionId: sessionId,
-              tallyRole: 'tally',
-            });
+            // After mode selection, select role
+            Alert.alert(
+              'Select Role',
+              'Are you a tally-er or dispatcher?',
+              [
+                {
+                  text: 'Tally-er',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'tally',
+                      tallyMode: 'dressed',
+                    });
+                  },
+                },
+                {
+                  text: 'Dispatcher',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'dispatcher',
+                      tallyMode: 'dressed',
+                    });
+                  },
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+              ]
+            );
           },
         },
         {
-          text: 'Dispatcher',
+          text: 'Byproduct',
           onPress: () => {
-            (navigation as any).navigate('Tally', {
-              sessionId: sessionId,
-              tallyRole: 'dispatcher',
-            });
+            // After mode selection, select role
+            Alert.alert(
+              'Select Role',
+              'Are you a tally-er or dispatcher?',
+              [
+                {
+                  text: 'Tally-er',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'tally',
+                      tallyMode: 'byproduct',
+                    });
+                  },
+                },
+                {
+                  text: 'Dispatcher',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'dispatcher',
+                      tallyMode: 'byproduct',
+                    });
+                  },
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+              ]
+            );
           },
         },
         {
