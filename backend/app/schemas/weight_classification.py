@@ -28,8 +28,10 @@ class WeightClassificationBase(BaseModel):
         if self.category == 'Byproduct':
             if not self.description or not self.description.strip():
                 raise ValueError('description is required for Byproduct category')
+            # Skip weight validation for byproducts - they don't have weight ranges
+            return self
         
-        # Validate weights
+        # Validate weights for Dressed category only
         # Catch-all: both min and max must be null
         if self.min_weight is None and self.max_weight is None:
             return self  # Valid catch-all
@@ -78,7 +80,11 @@ class WeightClassificationUpdate(BaseModel):
         # The validation will be handled at the API/CRUD level if needed
         # If category is being updated to Byproduct, description should be provided
         
-        # Only validate weights if at least one weight is being set
+        # Skip weight validation for byproducts - they don't have weight ranges
+        if self.category == 'Byproduct':
+            return self
+        
+        # Only validate weights if at least one weight is being set and category is not Byproduct
         if self.min_weight is None and self.max_weight is None:
             return self  # No weights being updated, skip validation
         

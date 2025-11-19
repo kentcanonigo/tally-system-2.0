@@ -29,6 +29,42 @@ def _ranges_overlap(
     return min1_val <= max2_val and min2_val <= max1_val
 
 
+def _check_byproduct_duplicates(
+    db: Session,
+    plant_id: int,
+    classification: str,
+    description: Optional[str],
+    exclude_id: Optional[int] = None
+) -> None:
+    """
+    Check if a byproduct with the same classification name or description already exists
+    for the same plant. Byproducts cannot have duplicates.
+    """
+    existing = db.query(WeightClassification).filter(
+        WeightClassification.plant_id == plant_id,
+        WeightClassification.category == 'Byproduct'
+    ).all()
+    
+    for existing_wc in existing:
+        if exclude_id and existing_wc.id == exclude_id:
+            continue
+        
+        # Check for duplicate classification name
+        if existing_wc.classification.lower() == classification.lower():
+            raise ValueError(
+                f'A byproduct with classification "{existing_wc.classification}" already exists for this plant. '
+                f'Byproducts cannot have duplicate classification names.'
+            )
+        
+        # Check for duplicate description (if description is provided)
+        if description and existing_wc.description:
+            if existing_wc.description.lower().strip() == description.lower().strip():
+                raise ValueError(
+                    f'A byproduct with description "{existing_wc.description}" already exists for this plant. '
+                    f'Byproducts cannot have duplicate descriptions.'
+                )
+
+
 def _check_overlaps(
     db: Session,
     plant_id: int,
@@ -39,8 +75,12 @@ def _check_overlaps(
 ) -> None:
     """
     Check if the given weight range overlaps with any existing classification
-    for the same plant and category.
+    for the same plant and category. Only applies to Dressed category.
     """
+    # Skip weight range checking for byproducts
+    if category == 'Byproduct':
+        return
+    
     existing = db.query(WeightClassification).filter(
         WeightClassification.plant_id == plant_id,
         WeightClassification.category == category
@@ -67,14 +107,23 @@ def _check_overlaps(
 
 
 def create_weight_classification(db: Session, weight_classification: WeightClassificationCreate) -> WeightClassification:
-    # Check for overlaps with existing classifications
-    _check_overlaps(
-        db,
-        weight_classification.plant_id,
-        weight_classification.category,
-        weight_classification.min_weight,
-        weight_classification.max_weight
-    )
+    # For byproducts, check for duplicate classification names or descriptions
+    if weight_classification.category == 'Byproduct':
+        _check_byproduct_duplicates(
+            db,
+            weight_classification.plant_id,
+            weight_classification.classification,
+            weight_classification.description
+        )
+    else:
+        # For Dressed category, check for weight range overlaps
+        _check_overlaps(
+            db,
+            weight_classification.plant_id,
+            weight_classification.category,
+            weight_classification.min_weight,
+            weight_classification.max_weight
+        )
     
     db_wc = WeightClassification(**weight_classification.model_dump())
     db.add(db_wc)
@@ -105,17 +154,31 @@ def update_weight_classification(db: Session, wc_id: int, wc_update: WeightClass
     final_min_weight = update_data.get('min_weight', db_wc.min_weight)
     final_max_weight = update_data.get('max_weight', db_wc.max_weight)
     final_category = update_data.get('category', db_wc.category)
+    final_classification = update_data.get('classification', db_wc.classification)
+    final_description = update_data.get('description', db_wc.description)
     
-    # Check for overlaps if weight or category is being changed
-    if 'min_weight' in update_data or 'max_weight' in update_data or 'category' in update_data:
-        _check_overlaps(
-            db,
-            db_wc.plant_id,
-            final_category,
-            final_min_weight,
-            final_max_weight,
-            exclude_id=wc_id
-        )
+    # For byproducts, check for duplicate classification names or descriptions
+    if final_category == 'Byproduct':
+        # Check if classification or description is being changed
+        if 'classification' in update_data or 'description' in update_data or 'category' in update_data:
+            _check_byproduct_duplicates(
+                db,
+                db_wc.plant_id,
+                final_classification,
+                final_description,
+                exclude_id=wc_id
+            )
+    else:
+        # For Dressed category, check for weight range overlaps if weight or category is being changed
+        if 'min_weight' in update_data or 'max_weight' in update_data or 'category' in update_data:
+            _check_overlaps(
+                db,
+                db_wc.plant_id,
+                final_category,
+                final_min_weight,
+                final_max_weight,
+                exclude_id=wc_id
+            )
     
     for field, value in update_data.items():
         setattr(db_wc, field, value)
