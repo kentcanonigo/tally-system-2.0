@@ -81,9 +81,20 @@ function TallySessionDetail() {
     if (!id) return;
     try {
       if (editingAllocation) {
-        await allocationDetailsApi.update(editingAllocation.id, formData);
+        // When editing, only send fields that can be updated (not allocated_bags fields)
+        const updateData = {
+          weight_classification_id: formData.weight_classification_id,
+          required_bags: formData.required_bags,
+        };
+        await allocationDetailsApi.update(editingAllocation.id, updateData);
       } else {
-        await allocationDetailsApi.create(Number(id), formData);
+        // When creating, allocated bags default to 0 (computed from logs)
+        await allocationDetailsApi.create(Number(id), {
+          weight_classification_id: formData.weight_classification_id,
+          required_bags: formData.required_bags,
+          allocated_bags_tally: 0,
+          allocated_bags_dispatcher: 0,
+        });
       }
       setShowModal(false);
       fetchData();
@@ -287,26 +298,36 @@ function TallySessionDetail() {
                   required
                 />
               </div>
-              <div className="form-group">
-                <label>Allocated Bags (Tally)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.allocated_bags_tally}
-                  onChange={(e) => setFormData({ ...formData, allocated_bags_tally: parseFloat(e.target.value) })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Allocated Bags (Dispatcher)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.allocated_bags_dispatcher}
-                  onChange={(e) => setFormData({ ...formData, allocated_bags_dispatcher: parseFloat(e.target.value) })}
-                  required
-                />
-              </div>
+              {editingAllocation && (
+                <>
+                  <div className="form-group">
+                    <label>Allocated Bags (Tally)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingAllocation.allocated_bags_tally}
+                      disabled
+                      style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                    />
+                    <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                      Computed from log entries (read-only)
+                    </small>
+                  </div>
+                  <div className="form-group">
+                    <label>Allocated Bags (Dispatcher)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingAllocation.allocated_bags_dispatcher}
+                      disabled
+                      style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                    />
+                    <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                      Computed from log entries (read-only)
+                    </small>
+                  </div>
+                </>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   Cancel
