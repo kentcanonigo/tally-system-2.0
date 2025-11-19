@@ -725,6 +725,7 @@ function TallySessionDetailScreen() {
           <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
               {allocations.map((allocation) => {
               const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+              const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
               return (
                 <View 
                   key={allocation.id} 
@@ -769,11 +770,11 @@ function TallySessionDetailScreen() {
                     <Text style={[
                       dynamicStyles.allocationValue, 
                       { 
-                        color: difference === 0 ? '#27ae60' : '#e74c3c',
-                        fontWeight: difference === 0 ? 'normal' : 'bold'
+                        color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'),
+                        fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
                       }
                     ]}>
-                      {difference === 0 ? 'Match' : difference.toFixed(2)}
+                      {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
                     </Text>
                   </View>
                 </View>

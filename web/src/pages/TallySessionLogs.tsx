@@ -274,21 +274,24 @@ function TallySessionLogs() {
             </thead>
             <tbody>
               {aggregations.length > 0 ? (
-                aggregations.map((agg) => (
-                  <tr key={agg.weight_classification_id}>
-                    <td>{agg.classification}</td>
-                    <td>{agg.tally.toFixed(2)}</td>
-                    <td>{agg.dispatcher.toFixed(2)}</td>
-                    <td
-                      style={{
-                        color: agg.difference === 0 ? '#27ae60' : '#e74c3c',
-                        fontWeight: agg.difference === 0 ? 'normal' : 'bold',
-                      }}
-                    >
-                      {agg.difference === 0 ? 'Match' : agg.difference.toFixed(2)}
-                    </td>
-                  </tr>
-                ))
+                aggregations.map((agg) => {
+                  const isNotStarted = agg.tally === 0 && agg.dispatcher === 0;
+                  return (
+                    <tr key={agg.weight_classification_id}>
+                      <td>{agg.classification}</td>
+                      <td>{agg.tally.toFixed(2)}</td>
+                      <td>{agg.dispatcher.toFixed(2)}</td>
+                      <td
+                        style={{
+                          color: isNotStarted ? '#666' : (agg.difference === 0 ? '#27ae60' : '#e74c3c'),
+                          fontWeight: agg.difference === 0 && !isNotStarted ? 'normal' : 'bold',
+                        }}
+                      >
+                        {isNotStarted ? 'Not started' : (agg.difference === 0 ? 'Match' : agg.difference.toFixed(2))}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={4} style={{ textAlign: 'center' }}>
@@ -304,10 +307,10 @@ function TallySessionLogs() {
                 <td>{overallTotals.dispatcher.toFixed(2)}</td>
                 <td
                   style={{
-                    color: overallTotals.difference === 0 ? '#27ae60' : '#e74c3c',
+                    color: (overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? '#666' : (overallTotals.difference === 0 ? '#27ae60' : '#e74c3c'),
                   }}
                 >
-                  {overallTotals.difference === 0 ? 'Match' : overallTotals.difference.toFixed(2)}
+                  {(overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? 'Not started' : (overallTotals.difference === 0 ? 'Match' : overallTotals.difference.toFixed(2))}
                 </td>
               </tr>
             </tfoot>

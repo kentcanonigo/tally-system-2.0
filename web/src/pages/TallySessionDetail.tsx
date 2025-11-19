@@ -231,6 +231,7 @@ function TallySessionDetail() {
           <tbody>
             {allocations.map((allocation) => {
               const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+              const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
               const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
               return (
                 <tr key={allocation.id}>
@@ -242,8 +243,8 @@ function TallySessionDetail() {
                   <td>{allocation.required_bags}</td>
                   <td>{allocation.allocated_bags_tally}</td>
                   <td>{allocation.allocated_bags_dispatcher}</td>
-                  <td style={{ color: difference === 0 ? '#27ae60' : '#e74c3c', fontWeight: difference === 0 ? 'normal' : 'bold' }}>
-                    {difference === 0 ? 'Match' : difference.toFixed(2)}
+                  <td style={{ color: isNotStarted ? '#666' : (difference === 0 ? '#27ae60' : '#e74c3c'), fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
+                    {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
                   </td>
                   <td>
                     <button

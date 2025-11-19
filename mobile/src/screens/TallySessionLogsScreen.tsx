@@ -631,31 +631,34 @@ function TallySessionLogsScreen() {
         </View>
         {aggregations.length > 0 ? (
           <>
-            {aggregations.map((agg) => (
-              <View key={agg.weight_classification_id} style={dynamicStyles.tableRow}>
-                <Text style={[dynamicStyles.tableCell, { flex: 2 }]} numberOfLines={1}>
-                  {agg.classification}
-                </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.5 }]}>
-                  {agg.tally.toFixed(2)}
-                </Text>
-                <Text style={[dynamicStyles.tableCell, { flex: 1.5 }]}>
-                  {agg.dispatcher.toFixed(2)}
-                </Text>
-                <Text
-                  style={[
-                    dynamicStyles.tableCell,
-                    {
-                      flex: 1,
-                      color: agg.difference === 0 ? '#27ae60' : '#e74c3c',
-                      fontWeight: agg.difference === 0 ? 'normal' : 'bold',
-                    },
-                  ]}
-                >
-                  {agg.difference === 0 ? '✓' : agg.difference.toFixed(1)}
-                </Text>
-              </View>
-            ))}
+            {aggregations.map((agg) => {
+              const isNotStarted = agg.tally === 0 && agg.dispatcher === 0;
+              return (
+                <View key={agg.weight_classification_id} style={dynamicStyles.tableRow}>
+                  <Text style={[dynamicStyles.tableCell, { flex: 2 }]} numberOfLines={1}>
+                    {agg.classification}
+                  </Text>
+                  <Text style={[dynamicStyles.tableCell, { flex: 1.5 }]}>
+                    {agg.tally.toFixed(2)}
+                  </Text>
+                  <Text style={[dynamicStyles.tableCell, { flex: 1.5 }]}>
+                    {agg.dispatcher.toFixed(2)}
+                  </Text>
+                  <Text
+                    style={[
+                      dynamicStyles.tableCell,
+                      {
+                        flex: 1,
+                        color: isNotStarted ? '#666' : (agg.difference === 0 ? '#27ae60' : '#e74c3c'),
+                        fontWeight: agg.difference === 0 && !isNotStarted ? 'normal' : 'bold',
+                      },
+                    ]}
+                  >
+                    {isNotStarted ? 'Not started' : (agg.difference === 0 ? '✓' : agg.difference.toFixed(1))}
+                  </Text>
+                </View>
+              );
+            })}
             <View style={[dynamicStyles.tableRow, styles.totalRow]}>
               <Text style={[dynamicStyles.tableCell, { flex: 2, fontWeight: 'bold' }]}>Total</Text>
               <Text style={[dynamicStyles.tableCell, { flex: 1.5, fontWeight: 'bold' }]}>
@@ -669,12 +672,12 @@ function TallySessionLogsScreen() {
                   dynamicStyles.tableCell,
                   {
                     flex: 1,
-                    color: overallTotals.difference === 0 ? '#27ae60' : '#e74c3c',
+                    color: (overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? '#666' : (overallTotals.difference === 0 ? '#27ae60' : '#e74c3c'),
                     fontWeight: 'bold',
                   },
                 ]}
               >
-                {overallTotals.difference === 0 ? '✓' : overallTotals.difference.toFixed(1)}
+                {(overallTotals.tally === 0 && overallTotals.dispatcher === 0) ? 'Not started' : (overallTotals.difference === 0 ? '✓' : overallTotals.difference.toFixed(1))}
               </Text>
             </View>
           </>
