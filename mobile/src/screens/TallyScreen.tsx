@@ -205,7 +205,28 @@ function TallyScreen() {
 
     // Check for over-allocation before proceeding
     const currentAllocation = getCurrentAllocation(matchedWC.id);
-    if (currentAllocation && currentAllocation.required_bags > 0) {
+    
+    // Check if there's no allocation or required_bags is 0
+    if (!currentAllocation || currentAllocation.required_bags === 0) {
+      Alert.alert(
+        'No Required Allocation',
+        `There is no required allocation for ${matchedWC.classification}.\n\n` +
+        `Are you sure you want to add this tally entry?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes, Add It',
+            onPress: () => createLogEntry(),
+          },
+        ]
+      );
+      return;
+    }
+    
+    if (currentAllocation.required_bags > 0) {
       const currentAllocated = tallyRole === 'tally' 
         ? currentAllocation.allocated_bags_tally 
         : currentAllocation.allocated_bags_dispatcher;
@@ -314,7 +335,30 @@ function TallyScreen() {
     }
 
     const allocation = getCurrentAllocation(wcId);
-    if (allocation && allocation.required_bags > 0) {
+    
+    // Check if there's no allocation or required_bags is 0
+    if (!allocation || allocation.required_bags === 0) {
+      const wc = weightClassifications.find((wc) => wc.id === wcId);
+      const wcName = wc?.classification || 'this byproduct';
+      Alert.alert(
+        'No Required Allocation',
+        `There is no required allocation for ${wcName}.\n\n` +
+        `Are you sure you want to add this tally entry?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes, Add It',
+            onPress: () => createByproductLogEntry(wcId),
+          },
+        ]
+      );
+      return;
+    }
+    
+    if (allocation.required_bags > 0) {
       const currentAllocated = tallyRole === 'tally'
         ? allocation.allocated_bags_tally
         : allocation.allocated_bags_dispatcher;
@@ -392,17 +436,43 @@ function TallyScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      // Create multiple log entries, each with weight = 1
-      const promises = Array.from({ length: quantity }, () =>
-        tallyLogEntriesApi.create(sessionId, {
-          weight_classification_id: selectedByproductId,
-          role: tallyRole as TallyLogEntryRole,
-          weight: 1,
-          notes: null,
-        })
+    // Check if there's no allocation or required_bags is 0
+    const allocation = getCurrentAllocation(selectedByproductId);
+    if (!allocation || allocation.required_bags === 0) {
+      const wc = weightClassifications.find((wc) => wc.id === selectedByproductId);
+      const wcName = wc?.classification || 'this byproduct';
+      Alert.alert(
+        'No Required Allocation',
+        `There is no required allocation for ${wcName}.\n\n` +
+        `Are you sure you want to add ${quantity} tally ${quantity === 1 ? 'entry' : 'entries'}?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes, Add It',
+            onPress: () => createQuantityLogEntries(quantity),
+          },
+        ]
       );
+      return;
+    }
+
+    createQuantityLogEntries(quantity);
+
+    async function createQuantityLogEntries(quantity: number) {
+      setIsSubmitting(true);
+      try {
+        // Create multiple log entries, each with weight = 1
+        const promises = Array.from({ length: quantity }, () =>
+          tallyLogEntriesApi.create(sessionId, {
+            weight_classification_id: selectedByproductId,
+            role: tallyRole as TallyLogEntryRole,
+            weight: 1,
+            notes: null,
+          })
+        );
 
       await Promise.all(promises);
 
@@ -426,6 +496,7 @@ function TallyScreen() {
       Alert.alert('Error', errorMessage);
     } finally {
       setIsSubmitting(false);
+    }
     }
   };
 
