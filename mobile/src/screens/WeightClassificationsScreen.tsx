@@ -1,65 +1,45 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { weightClassificationsApi, plantsApi } from '../services/api';
-import type { WeightClassification, Plant } from '../types';
+import { weightClassificationsApi } from '../services/api';
+import type { WeightClassification } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { usePlant } from '../contexts/PlantContext';
 
 function WeightClassificationsScreen() {
   const responsive = useResponsive();
+  const { activePlantId } = usePlant();
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
-  const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingWC, setEditingWC] = useState<WeightClassification | null>(null);
   
-  // Filter state
-  const [filterPlantId, setFilterPlantId] = useState<number | null>(null); // null means "All Plants"
-  
   // Form state
-  const [selectedPlantId, setSelectedPlantId] = useState<number | null>(null);
   const [classification, setClassification] = useState('');
   const [description, setDescription] = useState('');
   const [minWeight, setMinWeight] = useState('');
   const [maxWeight, setMaxWeight] = useState('');
   const [category, setCategory] = useState<'Dressed' | 'Byproduct'>('Dressed');
 
-  const fetchPlants = async () => {
-    try {
-      const response = await plantsApi.getAll();
-      setPlants(response.data);
-      if (response.data.length > 0 && !selectedPlantId) {
-        setSelectedPlantId(response.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching plants:', error);
-    }
-  };
-
-  const fetchData = async (showLoading = true, plantsList?: Plant[]) => {
-    const plantsToUse = plantsList || plants;
-    if (plantsToUse.length === 0) {
+  useEffect(() => {
+    if (activePlantId) {
+      fetchData();
+    } else {
+      setWeightClassifications([]);
       setLoading(false);
-      setRefreshing(false);
-      return;
     }
+  }, [activePlantId]);
+
+  const fetchData = async (showLoading = true) => {
+    if (!activePlantId) return;
     
     if (showLoading) {
       setLoading(true);
     }
     try {
-      // Fetch all weight classifications by fetching from all plants
-      const allWCs: WeightClassification[] = [];
-      for (const plant of plantsToUse) {
-        try {
-          const response = await weightClassificationsApi.getByPlant(plant.id);
-          allWCs.push(...response.data);
-        } catch (error) {
-          console.error(`Error fetching weight classifications for plant ${plant.id}:`, error);
-        }
-      }
-      setWeightClassifications(allWCs);
+      const response = await weightClassificationsApi.getByPlant(activePlantId);
+      setWeightClassifications(response.data);
     } catch (error) {
       console.error('Error fetching weight classifications:', error);
     } finally {
@@ -68,50 +48,27 @@ function WeightClassificationsScreen() {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      await fetchPlants();
-    };
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (plants.length > 0) {
-      fetchData();
-    }
-  }, [plants]);
-
   const onRefresh = async () => {
     setRefreshing(true);
-    try {
-      const response = await plantsApi.getAll();
-      const fetchedPlants = response.data;
-      setPlants(fetchedPlants);
-      if (fetchedPlants.length > 0) {
-        await fetchData(false, fetchedPlants);
-      }
-    } catch (error) {
-      console.error('Error refreshing:', error);
-      setRefreshing(false);
-    }
+    await fetchData(false);
   };
 
   const handleAdd = () => {
+    if (!activePlantId) {
+      Alert.alert('Error', 'Please select an active plant in Settings first.');
+      return;
+    }
     setEditingWC(null);
     setClassification('');
     setDescription('');
     setMinWeight('');
     setMaxWeight('');
     setCategory('Dressed');
-    if (plants.length > 0 && !selectedPlantId) {
-      setSelectedPlantId(plants[0].id);
-    }
     setModalVisible(true);
   };
 
   const handleEdit = (wc: WeightClassification) => {
     setEditingWC(wc);
-    setSelectedPlantId(wc.plant_id);
     setClassification(wc.classification);
     setDescription(wc.description || '');
     setMinWeight(wc.min_weight?.toString() || '');
@@ -165,25 +122,19 @@ function WeightClassificationsScreen() {
 
   // Filter and group classifications by category
   const groupedClassifications = useMemo(() => {
-    // First filter by plant if a filter is selected
-    const filtered = filterPlantId 
-      ? weightClassifications.filter(wc => wc.plant_id === filterPlantId)
-      : weightClassifications;
-    
-    // Then group by category
-    const dressed = filtered.filter(wc => wc.category === 'Dressed');
-    const byproducts = filtered.filter(wc => wc.category === 'Byproduct');
+    const dressed = weightClassifications.filter(wc => wc.category === 'Dressed');
+    const byproducts = weightClassifications.filter(wc => wc.category === 'Byproduct');
     return { dressed, byproducts };
-  }, [weightClassifications, filterPlantId]);
+  }, [weightClassifications]);
 
   const handleSave = async () => {
-    if (!classification.trim()) {
-      Alert.alert('Error', 'Classification cannot be empty');
+    if (!activePlantId) {
+      Alert.alert('Error', 'No active plant selected.');
       return;
     }
 
-    if (!selectedPlantId) {
-      Alert.alert('Error', 'Please select a plant');
+    if (!classification.trim()) {
+      Alert.alert('Error', 'Classification cannot be empty');
       return;
     }
 
@@ -233,7 +184,7 @@ function WeightClassificationsScreen() {
       if (editingWC) {
         await weightClassificationsApi.update(editingWC.id, data);
       } else {
-        await weightClassificationsApi.create(selectedPlantId, data);
+        await weightClassificationsApi.create(activePlantId, data);
       }
       setModalVisible(false);
       fetchData(false);
@@ -244,10 +195,18 @@ function WeightClassificationsScreen() {
     }
   };
 
-  if (loading && weightClassifications.length === 0) {
+  if (loading) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    );
+  }
+
+  if (!activePlantId) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.emptyText}>Please select an active plant in Settings to view weight classifications.</Text>
       </View>
     );
   }
@@ -321,23 +280,6 @@ function WeightClassificationsScreen() {
       ...styles.emptySectionText,
       fontSize: responsive.fontSize.small,
     },
-    filterContainer: {
-      ...styles.filterContainer,
-      padding: responsive.padding.medium,
-      width: '100%',
-      maxWidth: '100%',
-    },
-    filterLabel: {
-      ...styles.filterLabel,
-      fontSize: responsive.fontSize.small,
-      marginBottom: responsive.spacing.xs,
-    },
-    filterPickerContainer: {
-      ...styles.filterPickerContainer,
-    },
-    filterPicker: {
-      ...styles.filterPicker,
-    },
   };
 
   return (
@@ -347,23 +289,6 @@ function WeightClassificationsScreen() {
         <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
           <Text style={dynamicStyles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Plant Filter */}
-      <View style={dynamicStyles.filterContainer}>
-        <Text style={dynamicStyles.filterLabel}>Filter by Plant:</Text>
-        <View style={dynamicStyles.filterPickerContainer}>
-          <Picker
-            selectedValue={filterPlantId}
-            onValueChange={(value) => setFilterPlantId(value)}
-            style={dynamicStyles.filterPicker}
-          >
-            <Picker.Item label="All Plants" value={null} />
-            {plants.map((plant) => (
-              <Picker.Item key={plant.id} label={plant.name} value={plant.id} />
-            ))}
-          </Picker>
-        </View>
       </View>
 
       <ScrollView
@@ -453,20 +378,8 @@ function WeightClassificationsScreen() {
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
             >
-              <Text style={styles.label}>Plant *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedPlantId}
-                  onValueChange={(value) => setSelectedPlantId(value)}
-                  enabled={!editingWC}
-                  style={styles.picker}
-                >
-                  {plants.map((plant) => (
-                    <Picker.Item key={plant.id} label={plant.name} value={plant.id} />
-                  ))}
-                </Picker>
-              </View>
-
+              {/* Plant selection removed as it is handled globally */}
+              
               <Text style={styles.label}>Classification *</Text>
               <TextInput
                 style={dynamicStyles.input}
@@ -556,6 +469,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   header: {
     backgroundColor: '#2c3e50',
     flexDirection: 'row',
@@ -579,25 +497,6 @@ const styles = StyleSheet.create({
   },
   list: {
     flexGrow: 1,
-  },
-  filterContainer: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  filterLabel: {
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  filterPickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    backgroundColor: '#f9f9f9',
-    marginTop: 8,
-  },
-  filterPicker: {
-    height: 50,
   },
   section: {
     marginBottom: 24,
@@ -646,11 +545,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 18,
     color: '#2c3e50',
-    marginBottom: 4,
-  },
-  plantName: {
-    fontSize: 14,
-    color: '#7f8c8d',
     marginBottom: 4,
   },
   weightRange: {
@@ -761,7 +655,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  emptyText: {
+    color: '#7f8c8d',
+    textAlign: 'center',
+    fontSize: 16,
+  },
 });
 
 export default WeightClassificationsScreen;
-

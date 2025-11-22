@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
-import type { Customer, Plant } from '../types';
+import { customersApi, tallySessionsApi } from '../services/api';
+import type { Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { usePlant } from '../contexts/PlantContext';
 
 function CreateTallySessionScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { activePlantId } = usePlant();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     customer_id: 0,
-    plant_id: 0,
     date: new Date().toISOString().split('T')[0],
     status: 'ongoing' as const,
   });
@@ -25,35 +25,35 @@ function CreateTallySessionScreen() {
 
   const fetchData = async () => {
     try {
-      const [customersRes, plantsRes] = await Promise.all([
-        customersApi.getAll(),
-        plantsApi.getAll(),
-      ]);
+      const customersRes = await customersApi.getAll();
       setCustomers(customersRes.data);
-      setPlants(plantsRes.data);
       if (customersRes.data.length > 0) {
         setFormData((prev) => ({ ...prev, customer_id: customersRes.data[0].id }));
       }
-      if (plantsRes.data.length > 0) {
-        setFormData((prev) => ({ ...prev, plant_id: plantsRes.data[0].id }));
-      }
     } catch (error) {
       console.error('Error fetching data:', error);
-      Alert.alert('Error', 'Failed to load customers and plants');
+      Alert.alert('Error', 'Failed to load customers');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!formData.customer_id || !formData.plant_id) {
-      Alert.alert('Error', 'Please select a customer and plant');
+    if (!activePlantId) {
+      Alert.alert('Error', 'No active plant selected. Please select a plant in Settings.');
+      return;
+    }
+    if (!formData.customer_id) {
+      Alert.alert('Error', 'Please select a customer');
       return;
     }
 
     setSubmitting(true);
     try {
-      await tallySessionsApi.create(formData);
+      await tallySessionsApi.create({
+        ...formData,
+        plant_id: activePlantId,
+      });
       Alert.alert('Success', 'Tally session created successfully', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -68,7 +68,15 @@ function CreateTallySessionScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    );
+  }
+
+  if (!activePlantId) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.emptyText}>Please select an active plant in Settings to create a session.</Text>
       </View>
     );
   }
@@ -130,7 +138,7 @@ function CreateTallySessionScreen() {
       <View style={dynamicStyles.form}>
         <View style={dynamicStyles.formGroup}>
           <Text style={dynamicStyles.label}>Customer</Text>
-          <View style={dynamicStyles.pickerContainer}>
+          <ScrollView style={dynamicStyles.pickerContainer} nestedScrollEnabled={true}>
             {customers.map((customer) => (
               <TouchableOpacity
                 key={customer.id}
@@ -150,32 +158,7 @@ function CreateTallySessionScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-        </View>
-
-        <View style={dynamicStyles.formGroup}>
-          <Text style={dynamicStyles.label}>Plant</Text>
-          <View style={dynamicStyles.pickerContainer}>
-            {plants.map((plant) => (
-              <TouchableOpacity
-                key={plant.id}
-                style={[
-                  dynamicStyles.pickerOption,
-                  formData.plant_id === plant.id && styles.pickerOptionSelected,
-                ]}
-                onPress={() => setFormData({ ...formData, plant_id: plant.id })}
-              >
-                <Text
-                  style={[
-                    dynamicStyles.pickerOptionText,
-                    formData.plant_id === plant.id && styles.pickerOptionTextSelected,
-                  ]}
-                >
-                  {plant.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          </ScrollView>
         </View>
 
         <View style={dynamicStyles.formGroup}>
@@ -206,6 +189,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   scrollContent: {
     flexGrow: 1,
@@ -258,7 +246,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  emptyText: {
+    color: '#7f8c8d',
+    textAlign: 'center',
+    fontSize: 16,
+  },
 });
 
 export default CreateTallySessionScreen;
-

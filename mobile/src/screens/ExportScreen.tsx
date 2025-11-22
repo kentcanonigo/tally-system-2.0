@@ -16,15 +16,16 @@ import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { tallySessionsApi, exportApi, customersApi, plantsApi } from '../services/api';
+import { tallySessionsApi, exportApi, customersApi } from '../services/api';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
-import { TallySession, Customer, Plant } from '../types';
+import { TallySession, Customer } from '../types';
+import { usePlant } from '../contexts/PlantContext';
 
 const ExportScreen = () => {
+  const { activePlantId } = usePlant();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,7 +34,6 @@ const ExportScreen = () => {
 
   // Filters state
   const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
-  const [filterPlantId, setFilterPlantId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('completed'); // Default to completed
   
   // Sort state
@@ -41,17 +41,17 @@ const ExportScreen = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const fetchData = useCallback(async () => {
+    if (!activePlantId) return;
+    
     try {
       setLoading(true);
-      const [sessionsRes, customersRes, plantsRes] = await Promise.all([
-        tallySessionsApi.getAll(),
+      const [sessionsRes, customersRes] = await Promise.all([
+        tallySessionsApi.getAll({ plant_id: activePlantId }),
         customersApi.getAll(),
-        plantsApi.getAll(),
       ]);
       
       setSessions(sessionsRes.data);
       setCustomers(customersRes.data);
-      setPlants(plantsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       Alert.alert('Error', 'Failed to fetch sessions');
@@ -59,11 +59,17 @@ const ExportScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [activePlantId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (activePlantId) {
+      fetchData();
+    } else {
+      setSessions([]);
+      setCustomers([]);
+      setLoading(false);
+    }
+  }, [activePlantId, fetchData]);
 
   // Apply filters and sorting
   useEffect(() => {
@@ -77,11 +83,6 @@ const ExportScreen = () => {
     // Filter by Customer
     if (filterCustomerId) {
       result = result.filter(s => s.customer_id === filterCustomerId);
-    }
-
-    // Filter by Plant
-    if (filterPlantId) {
-      result = result.filter(s => s.plant_id === filterPlantId);
     }
 
     // Sorting
@@ -98,7 +99,7 @@ const ExportScreen = () => {
     setFilteredSessions(result);
     // Reset selection when filters change
     setSelectedSessionIds([]);
-  }, [sessions, filterCustomerId, filterPlantId, filterStatus, sortBy, sortOrder]);
+  }, [sessions, filterCustomerId, filterStatus, sortBy, sortOrder]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -157,10 +158,6 @@ const ExportScreen = () => {
     return customers.find(c => c.id === customerId)?.name || 'Unknown';
   };
 
-  const getPlantName = (plantId: number) => {
-    return plants.find(p => p.id === plantId)?.name || 'Unknown';
-  };
-
   const renderFilterModal = () => (
     <Modal
       visible={showFilters}
@@ -204,19 +201,6 @@ const ExportScreen = () => {
               </Picker>
             </View>
 
-            <Text style={styles.filterLabel}>Plant</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={filterPlantId}
-                onValueChange={(itemValue) => setFilterPlantId(itemValue)}
-              >
-                <Picker.Item label="All Plants" value={null} />
-                {plants.map(p => (
-                  <Picker.Item key={p.id} label={p.name} value={p.id} />
-                ))}
-              </Picker>
-            </View>
-
             <Text style={styles.filterLabel}>Sort By</Text>
             <View style={styles.row}>
               <TouchableOpacity 
@@ -253,7 +237,6 @@ const ExportScreen = () => {
               style={styles.resetButton}
               onPress={() => {
                 setFilterCustomerId(null);
-                setFilterPlantId(null);
                 setFilterStatus('completed');
                 setSortBy('date');
                 setSortOrder('desc');
@@ -294,7 +277,6 @@ const ExportScreen = () => {
               <Text style={styles.itemCustomer}>{getCustomerName(item.customer_id)}</Text>
               <Text style={styles.itemDate}>{new Date(item.date).toLocaleDateString()}</Text>
             </View>
-            <Text style={styles.itemSubtext}>{getPlantName(item.plant_id)}</Text>
             <View style={styles.statusContainer}>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                 <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
@@ -315,6 +297,22 @@ const ExportScreen = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#3498db" style={styles.loader} />
+      </View>
+    );
+  }
+
+  if (!activePlantId) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.emptyText}>Please select an active plant in Settings to export sessions.</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.header}>
@@ -331,33 +329,27 @@ const ExportScreen = () => {
         </View>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#3498db" style={styles.loader} />
+      {filteredSessions.length === 0 ? (
+        <View style={styles.emptyState}>
+          <MaterialIcons name="search-off" size={64} color="#ccc" />
+          <Text style={styles.emptyStateText}>No sessions found</Text>
+          <Text style={styles.emptyStateSubtext}>Try adjusting your filters to see more results.</Text>
+          <TouchableOpacity 
+            style={styles.adjustFiltersButton}
+            onPress={() => setShowFilters(true)}
+          >
+            <Text style={styles.adjustFiltersButtonText}>Adjust Filters</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <>
-          {filteredSessions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialIcons name="search-off" size={64} color="#ccc" />
-              <Text style={styles.emptyStateText}>No sessions found</Text>
-              <Text style={styles.emptyStateSubtext}>Try adjusting your filters to see more results.</Text>
-              <TouchableOpacity 
-                style={styles.adjustFiltersButton}
-                onPress={() => setShowFilters(true)}
-              >
-                <Text style={styles.adjustFiltersButtonText}>Adjust Filters</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredSessions}
-              renderItem={renderItem}
-              keyExtractor={item => item.id.toString()}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              contentContainerStyle={styles.listContent}
-            />
-          )}
-        </>
+        <FlatList
+          data={filteredSessions}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          contentContainerStyle={styles.listContent}
+        />
       )}
 
       <View style={styles.footer}>
@@ -384,6 +376,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
@@ -632,6 +629,11 @@ const styles = StyleSheet.create({
   adjustFiltersButtonText: {
     color: '#3498db',
     fontWeight: '600',
+  },
+  emptyText: {
+    color: '#7f8c8d',
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
 

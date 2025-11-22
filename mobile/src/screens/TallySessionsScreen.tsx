@@ -1,16 +1,18 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { usePlant } from '../contexts/PlantContext';
 import { formatDate } from '../utils/dateFormat';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
+  const { activePlantId } = usePlant();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -22,7 +24,7 @@ function TallySessionsScreen() {
     fetchData().then(() => {
       hasInitiallyLoaded.current = true;
     });
-  }, []);
+  }, [activePlantId]); // Refetch when activePlantId changes
 
   // Refresh sessions when screen comes into focus (e.g., when returning from session details)
   useFocusEffect(
@@ -35,7 +37,7 @@ function TallySessionsScreen() {
         }, 100);
         return () => clearTimeout(timeoutId);
       }
-    }, [loading, refreshing])
+    }, [loading, refreshing, activePlantId])
   );
 
   const fetchData = async (showLoading = true) => {
@@ -43,8 +45,13 @@ function TallySessionsScreen() {
       setLoading(true);
     }
     try {
+      const params: any = {};
+      if (activePlantId) {
+        params.plant_id = activePlantId;
+      }
+
       const [sessionsRes, customersRes, plantsRes] = await Promise.all([
-        tallySessionsApi.getAll(),
+        tallySessionsApi.getAll(params),
         customersApi.getAll(),
         plantsApi.getAll(),
       ]);
@@ -90,7 +97,15 @@ function TallySessionsScreen() {
   if (loading && sessions.length === 0) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    );
+  }
+
+  if (!activePlantId) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.emptyText}>Please select an active plant in Settings to view sessions.</Text>
       </View>
     );
   }
@@ -172,6 +187,11 @@ function TallySessionsScreen() {
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={dynamicStyles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No sessions found for this plant.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -181,6 +201,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
@@ -241,7 +266,15 @@ const styles = StyleSheet.create({
     color: '#95a5a6',
     marginTop: 5,
   },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#7f8c8d',
+    textAlign: 'center',
+    fontSize: 16,
+  },
 });
 
 export default TallySessionsScreen;
-

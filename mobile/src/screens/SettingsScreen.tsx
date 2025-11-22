@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { usePlant } from '../contexts/PlantContext';
 import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
+import { plantsApi } from '../services/api';
+import { Plant } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = '@tally_system_acceptable_difference_threshold';
@@ -10,11 +13,18 @@ const DEFAULT_THRESHOLD = 0;
 
 function SettingsScreen() {
   const { timezone, setTimezone, availableTimezones } = useTimezone();
+  const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
+  
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [threshold, setThreshold] = useState<string>('0');
   const [currentThreshold, setCurrentThreshold] = useState<number>(0);
+  
+  // Plants state
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [showPlantDropdown, setShowPlantDropdown] = useState(false);
+  const [isLoadingPlants, setIsLoadingPlants] = useState(false);
 
   // Update selectedTimezone when timezone changes from context
   React.useEffect(() => {
@@ -24,7 +34,21 @@ function SettingsScreen() {
   // Load threshold on mount
   useEffect(() => {
     loadThreshold();
+    fetchPlants();
   }, []);
+
+  const fetchPlants = async () => {
+    try {
+      setIsLoadingPlants(true);
+      const response = await plantsApi.getAll();
+      setPlants(response.data);
+    } catch (error) {
+      console.error('Error fetching plants:', error);
+      Alert.alert('Error', 'Failed to load plants');
+    } finally {
+      setIsLoadingPlants(false);
+    }
+  };
 
   const loadThreshold = async () => {
     try {
@@ -66,6 +90,23 @@ function SettingsScreen() {
       console.error('Error saving threshold:', error);
       Alert.alert('Error', 'Failed to save threshold preference');
     }
+  };
+
+  const handleSelectPlant = async (plantId: number) => {
+    try {
+      await setActivePlantId(plantId);
+      setShowPlantDropdown(false);
+      Alert.alert('Success', 'Active plant updated successfully.');
+    } catch (error) {
+      console.error('Error saving active plant:', error);
+      Alert.alert('Error', 'Failed to save active plant');
+    }
+  };
+
+  const getActivePlantName = () => {
+    if (!activePlantId) return 'None Selected';
+    const plant = plants.find(p => p.id === activePlantId);
+    return plant ? plant.name : 'Unknown Plant';
   };
 
   const dynamicStyles = {
@@ -115,7 +156,7 @@ function SettingsScreen() {
       fontSize: 10,
       marginLeft: responsive.spacing.xs,
     },
-    timezoneDropdownMenu: {
+    dropdownMenu: {
       backgroundColor: '#fff',
       borderRadius: 12,
       width: responsive.isTablet ? Math.min(responsive.width * 0.6, 500) : '90%',
@@ -128,7 +169,7 @@ function SettingsScreen() {
       elevation: 8,
       overflow: 'hidden',
     },
-    timezoneDropdownHeader: {
+    dropdownHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -136,42 +177,42 @@ function SettingsScreen() {
       borderBottomWidth: 1,
       borderBottomColor: '#f0f0f0',
     },
-    timezoneDropdownTitle: {
+    dropdownTitle: {
       fontSize: responsive.fontSize.large,
       fontWeight: 'bold',
       color: '#2c3e50',
     },
-    timezoneDropdownCloseButton: {
+    dropdownCloseButton: {
       padding: responsive.spacing.xs,
     },
-    timezoneDropdownCloseText: {
+    dropdownCloseText: {
       fontSize: responsive.fontSize.large,
       color: '#7f8c8d',
       fontWeight: 'bold',
     },
-    timezoneDropdownScroll: {
+    dropdownScroll: {
       maxHeight: responsive.isTablet ? 400 : 300,
     },
-    timezoneDropdownContent: {
+    dropdownContent: {
       paddingBottom: responsive.spacing.md,
     },
-    timezoneDropdownOption: {
+    dropdownOption: {
       paddingHorizontal: responsive.padding.medium,
       paddingVertical: responsive.padding.medium,
       borderBottomWidth: 1,
       borderBottomColor: '#f0f0f0',
     },
-    timezoneDropdownOptionLast: {
+    dropdownOptionLast: {
       borderBottomWidth: 0,
     },
-    timezoneDropdownOptionSelected: {
+    dropdownOptionSelected: {
       backgroundColor: '#3498db',
     },
-    timezoneDropdownOptionText: {
+    dropdownOptionText: {
       color: '#2c3e50',
       fontSize: responsive.fontSize.small,
     },
-    timezoneDropdownOptionTextSelected: {
+    dropdownOptionTextSelected: {
       color: '#fff',
       fontWeight: '600',
     },
@@ -208,9 +249,47 @@ function SettingsScreen() {
     },
   };
 
+  if (isPlantLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={dynamicStyles.container} contentContainerStyle={{ paddingBottom: 100 }}>
       <Text style={dynamicStyles.title}>Settings</Text>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Active Plant</Text>
+        <Text style={dynamicStyles.label}>
+          Select the plant you are currently working on:
+        </Text>
+
+        <View style={dynamicStyles.pickerWrapper}>
+          <TouchableOpacity
+            style={dynamicStyles.dropdownButton}
+            onPress={() => setShowPlantDropdown(true)}
+            disabled={isLoadingPlants}
+          >
+            {isLoadingPlants ? (
+              <ActivityIndicator size="small" color="#3498db" />
+            ) : (
+              <>
+                <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
+                  {getActivePlantName()}
+                </Text>
+                <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={dynamicStyles.infoText}>
+          This setting filters sessions, weight classifications, and exports to show only data relevant to the selected plant.
+        </Text>
+      </View>
 
       <View style={dynamicStyles.section}>
         <Text style={dynamicStyles.sectionTitle}>Timezone</Text>
@@ -279,6 +358,62 @@ function SettingsScreen() {
         </Text>
       </View>
 
+      {/* Plant Dropdown Modal */}
+      {showPlantDropdown && (
+        <Modal
+          transparent
+          visible={showPlantDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowPlantDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowPlantDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={dynamicStyles.dropdownHeader}>
+                <Text style={dynamicStyles.dropdownTitle}>Select Active Plant</Text>
+                <TouchableOpacity
+                  onPress={() => setShowPlantDropdown(false)}
+                  style={dynamicStyles.dropdownCloseButton}
+                >
+                  <Text style={dynamicStyles.dropdownCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                style={dynamicStyles.dropdownScroll}
+                contentContainerStyle={dynamicStyles.dropdownContent}
+              >
+                {plants.map((plant, index) => (
+                  <TouchableOpacity
+                    key={plant.id}
+                    style={[
+                      dynamicStyles.dropdownOption,
+                      index === plants.length - 1 && dynamicStyles.dropdownOptionLast,
+                      activePlantId === plant.id && dynamicStyles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => handleSelectPlant(plant.id)}
+                  >
+                    <Text
+                      style={[
+                        dynamicStyles.dropdownOptionText,
+                        activePlantId === plant.id && dynamicStyles.dropdownOptionTextSelected,
+                      ]}
+                    >
+                      {plant.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
       {/* Timezone Dropdown Modal */}
       {showTimezoneDropdown && (
         <Modal
@@ -293,29 +428,29 @@ function SettingsScreen() {
             onPress={() => setShowTimezoneDropdown(false)}
           >
             <View 
-              style={dynamicStyles.timezoneDropdownMenu}
+              style={dynamicStyles.dropdownMenu}
               onStartShouldSetResponder={() => true}
             >
-              <View style={dynamicStyles.timezoneDropdownHeader}>
-                <Text style={dynamicStyles.timezoneDropdownTitle}>Select Timezone</Text>
+              <View style={dynamicStyles.dropdownHeader}>
+                <Text style={dynamicStyles.dropdownTitle}>Select Timezone</Text>
                 <TouchableOpacity
                   onPress={() => setShowTimezoneDropdown(false)}
-                  style={dynamicStyles.timezoneDropdownCloseButton}
+                  style={dynamicStyles.dropdownCloseButton}
                 >
-                  <Text style={dynamicStyles.timezoneDropdownCloseText}>✕</Text>
+                  <Text style={dynamicStyles.dropdownCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView 
-                style={dynamicStyles.timezoneDropdownScroll}
-                contentContainerStyle={dynamicStyles.timezoneDropdownContent}
+                style={dynamicStyles.dropdownScroll}
+                contentContainerStyle={dynamicStyles.dropdownContent}
               >
                 {availableTimezones.map((tz, index) => (
                   <TouchableOpacity
                     key={tz}
                     style={[
-                      dynamicStyles.timezoneDropdownOption,
-                      index === availableTimezones.length - 1 && dynamicStyles.timezoneDropdownOptionLast,
-                      selectedTimezone === tz && dynamicStyles.timezoneDropdownOptionSelected,
+                      dynamicStyles.dropdownOption,
+                      index === availableTimezones.length - 1 && dynamicStyles.dropdownOptionLast,
+                      selectedTimezone === tz && dynamicStyles.dropdownOptionSelected,
                     ]}
                     onPress={() => {
                       setSelectedTimezone(tz);
@@ -324,8 +459,8 @@ function SettingsScreen() {
                   >
                     <Text
                       style={[
-                        dynamicStyles.timezoneDropdownOptionText,
-                        selectedTimezone === tz && dynamicStyles.timezoneDropdownOptionTextSelected,
+                        dynamicStyles.dropdownOptionText,
+                        selectedTimezone === tz && dynamicStyles.dropdownOptionTextSelected,
                       ]}
                     >
                       {tz} ({getTimezoneAbbreviation(tz)})
@@ -346,6 +481,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   title: {
     fontWeight: 'bold',
     color: '#2c3e50',
@@ -359,7 +498,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
+    },
   sectionTitle: {
     fontWeight: 'bold',
     color: '#2c3e50',
@@ -405,4 +544,3 @@ const styles = StyleSheet.create({
 });
 
 export default SettingsScreen;
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, RefreshControl, Modal, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
@@ -63,15 +63,12 @@ function TallySessionDetailScreen() {
     }
   }, [sessionId]);
 
-  // Refresh data when screen comes into focus (e.g., when returning from tally screen)
+  // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (sessionId && hasInitialFetchedRef.current) {
-        // Refresh when returning to the screen if we've already done initial fetch
-        // This ensures allocations are updated after tally entries are created
         fetchData(false);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId])
   );
 
@@ -120,7 +117,6 @@ function TallySessionDetailScreen() {
       return;
     }
 
-    // Check if weight classification already exists for this session
     const existingAllocation = allocations.find(
       (alloc) => alloc.weight_classification_id === formData.weight_classification_id
     );
@@ -134,15 +130,14 @@ function TallySessionDetailScreen() {
       await allocationDetailsApi.create(sessionId, {
         weight_classification_id: formData.weight_classification_id,
         required_bags: parseFloat(formData.required_bags),
-        allocated_bags_tally: 0.0, // Will be incremented as log entries are created
-        allocated_bags_dispatcher: 0.0, // Will be incremented as log entries are created
+        allocated_bags_tally: 0.0,
+        allocated_bags_dispatcher: 0.0,
       });
       setShowAddModal(false);
       setFormData({ 
         weight_classification_id: weightClassifications[0]?.id || 0, 
         required_bags: '', 
       });
-      // Force refresh to ensure UI updates
       await fetchData();
     } catch (error: any) {
       console.error('Error creating allocation:', error);
@@ -166,9 +161,7 @@ function TallySessionDetailScreen() {
       return;
     }
 
-    // Check if weight classification is being changed
     if (formData.weight_classification_id !== editingAllocation.weight_classification_id) {
-      // Check if there are existing log entries for this allocation
       const hasLogEntries = logEntries.some(
         (entry) => 
           entry.tally_session_id === sessionId &&
@@ -183,7 +176,6 @@ function TallySessionDetailScreen() {
         return;
       }
 
-      // Check if the new weight classification would create a duplicate
       const existingAllocation = allocations.find(
         (alloc) => 
           alloc.weight_classification_id === formData.weight_classification_id &&
@@ -207,7 +199,6 @@ function TallySessionDetailScreen() {
         weight_classification_id: weightClassifications[0]?.id || 0, 
         required_bags: '', 
       });
-      // Force refresh to ensure UI updates
       await fetchData();
     } catch (error: any) {
       console.error('Error updating allocation:', error);
@@ -221,10 +212,7 @@ function TallySessionDetailScreen() {
       'Delete Allocation',
       'Are you sure you want to delete this allocation? This action cannot be undone.',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -249,10 +237,7 @@ function TallySessionDetailScreen() {
       'Delete Session',
       `Are you sure you want to delete Session #${session.id}? This will delete all associated allocations and log entries. This action cannot be undone.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -260,10 +245,7 @@ function TallySessionDetailScreen() {
             try {
               await tallySessionsApi.delete(session.id);
               Alert.alert('Success', 'Session deleted successfully', [
-                {
-                  text: 'OK',
-                  onPress: () => navigation.goBack(),
-                },
+                { text: 'OK', onPress: () => navigation.goBack() },
               ]);
             } catch (error: any) {
               console.error('Error deleting session:', error);
@@ -306,7 +288,6 @@ function TallySessionDetailScreen() {
     return `${wc.classification} (${wc.category}) - ${formatWeightRange(wc)}`;
   };
 
-  // Filter allocations by category
   const dressedAllocations = useMemo(() => {
     return allocations.filter((allocation) => {
       const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -321,19 +302,18 @@ function TallySessionDetailScreen() {
     });
   }, [allocations, weightClassifications]);
 
-  // Helper function to get color based on difference and threshold
   const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
     if (isNotStarted) {
       return '#666';
     }
     if (difference === 0) {
-      return '#27ae60'; // Green for exact match
+      return '#27ae60';
     }
     const absDifference = Math.abs(difference);
     if (absDifference <= threshold) {
-      return '#f39c12'; // Orange for acceptable difference
+      return '#f39c12';
     }
-    return '#e74c3c'; // Red for unacceptable difference
+    return '#e74c3c';
   };
 
   const renderAllocationCard = (allocation: AllocationDetails) => {
@@ -396,21 +376,22 @@ function TallySessionDetailScreen() {
   };
   
   const formatWeightRange = (wc: WeightClassification): string => {
-    // For Byproduct with both weights null, show N/A
-    if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
-      return 'N/A';
+    if (wc.category === 'Byproduct') {
+      return wc.description || 'N/A';
     }
-    // For Dressed with both weights null, show All Sizes (catch-all)
     if (wc.min_weight === null && wc.max_weight === null) {
-      return 'All Sizes';
+      return 'Catch-all';
     }
     if (wc.min_weight === null && wc.max_weight !== null) {
-      return `Up to ${wc.max_weight}`;
+      return `≤ ${wc.max_weight} kg`;
     }
-    if (wc.max_weight === null) {
-      return `${wc.min_weight} and up`;
+    if (wc.min_weight !== null && wc.max_weight === null) {
+      return `≥ ${wc.min_weight} kg`;
     }
-    return `${wc.min_weight}-${wc.max_weight}`;
+    if (wc.min_weight !== null && wc.max_weight !== null) {
+      return `${wc.min_weight} - ${wc.max_weight} kg`;
+    }
+    return 'N/A';
   };
 
   const handleExportPDF = async () => {
@@ -430,7 +411,6 @@ function TallySessionDetailScreen() {
   };
 
   const handleStartTally = () => {
-    // First, select the mode (Dressed or Byproduct)
     Alert.alert(
       'Select Mode',
       'What would you like to tally?',
@@ -438,7 +418,6 @@ function TallySessionDetailScreen() {
         {
           text: 'Dressed',
           onPress: () => {
-            // After mode selection, select role
             Alert.alert(
               'Select Role',
               'Are you a tally-er or dispatcher?',
@@ -463,10 +442,7 @@ function TallySessionDetailScreen() {
                     });
                   },
                 },
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
+                { text: 'Cancel', style: 'cancel' },
               ]
             );
           },
@@ -474,7 +450,6 @@ function TallySessionDetailScreen() {
         {
           text: 'Byproduct',
           onPress: () => {
-            // After mode selection, select role
             Alert.alert(
               'Select Role',
               'Are you a tally-er or dispatcher?',
@@ -499,18 +474,12 @@ function TallySessionDetailScreen() {
                     });
                   },
                 },
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
+                { text: 'Cancel', style: 'cancel' },
               ]
             );
           },
         },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
@@ -518,7 +487,7 @@ function TallySessionDetailScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color="#3498db" />
       </View>
     );
   }
@@ -793,6 +762,9 @@ function TallySessionDetailScreen() {
         <View style={dynamicStyles.infoCard}>
           <Text style={dynamicStyles.infoLabel}>Customer</Text>
           <Text style={dynamicStyles.infoValue}>{customer?.name}</Text>
+          {/* Plant info is now implied by context, but we can still show it or remove it. 
+              Since the user can change plants in settings, showing it confirms context. 
+              But it's read-only. */}
           <Text style={dynamicStyles.infoLabel}>Plant</Text>
           <Text style={dynamicStyles.infoValue}>{plant?.name}</Text>
           <Text style={dynamicStyles.infoLabel}>Date</Text>
@@ -1349,4 +1321,3 @@ const styles = StyleSheet.create({
 });
 
 export default TallySessionDetailScreen;
-
