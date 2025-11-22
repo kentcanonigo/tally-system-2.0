@@ -9,36 +9,83 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
   const tableBody: any[] = [];
 
   customers.forEach((customer) => {
-    const { customer_name, items, subtotal } = customer;
+    const { customer_name, items } = customer;
 
-    items.forEach((item, index) => {
+    // Split items by category
+    const dcItems = items.filter(item => item.category === 'DC');
+    const bpItems = items.filter(item => item.category === 'BP');
+    
+    // Calculate subtotals
+    const dcSubtotal = dcItems.reduce((sum, item) => sum + item.bags, 0);
+    const bpSubtotal = bpItems.reduce((sum, item) => sum + item.bags, 0);
+
+    let isFirstRow = true;
+
+    // Process DC Items
+    if (dcItems.length > 0) {
+      dcItems.forEach((item) => {
+        tableBody.push([
+          isFirstRow ? { content: customer_name, styles: { fontStyle: 'bold' } } : '',
+          item.category,
+          item.classification,
+          item.bags
+        ]);
+        isFirstRow = false;
+      });
+
+      // DC Subtotal row
       tableBody.push([
-        index === 0 ? { content: customer_name, styles: { fontStyle: 'bold' } } : '',
-        item.category,
-        item.classification,
-        item.bags
+        { 
+          content: 'Subtotal:', 
+          colSpan: 3, 
+          styles: { 
+            halign: 'right', 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        },
+        { 
+          content: dcSubtotal.toString(), 
+          styles: { 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        }
       ]);
-    });
+    }
 
-    // Subtotal row
-    tableBody.push([
-      { 
-        content: 'Subtotal:', 
-        colSpan: 3, 
-        styles: { 
-          halign: 'right', 
-          fontStyle: 'bold',
-          lineWidth: { top: 0.1, bottom: 0.1 }
-        } 
-      },
-      { 
-        content: subtotal.toString(), 
-        styles: { 
-          fontStyle: 'bold',
-          lineWidth: { top: 0.1, bottom: 0.1 }
-        } 
-      }
-    ]);
+    // Process BP Items
+    if (bpItems.length > 0) {
+      bpItems.forEach((item) => {
+        tableBody.push([
+          isFirstRow ? { content: customer_name, styles: { fontStyle: 'bold' } } : '',
+          item.category,
+          item.classification,
+          item.bags
+        ]);
+        isFirstRow = false;
+      });
+
+      // BP Subtotal row
+      tableBody.push([
+        { 
+          content: 'Subtotal:', 
+          colSpan: 3, 
+          styles: { 
+            halign: 'right', 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        },
+        { 
+          content: bpSubtotal.toString(), 
+          styles: { 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        }
+      ]);
+    }
 
     // Spacer row
     tableBody.push([{ content: '', colSpan: 4, styles: { minCellHeight: 5, cellPadding: 0, lineWidth: 0 } }]);
@@ -110,4 +157,3 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
 
   doc.save('tally-report.pdf');
 };
-

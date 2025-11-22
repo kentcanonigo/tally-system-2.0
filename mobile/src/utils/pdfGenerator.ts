@@ -4,35 +4,72 @@ export const generateSessionReportHTML = (data: ExportResponse): string => {
   const { customers, grand_total_dc, grand_total_bp } = data;
 
   const generateCustomerRows = (customer: CustomerExportData) => {
-    const { customer_name, items, subtotal } = customer;
+    const { customer_name, items } = customer;
+    
+    // Split items by category
+    const dcItems = items.filter(item => item.category === 'DC');
+    const bpItems = items.filter(item => item.category === 'BP');
+    
+    // Calculate subtotals
+    const dcSubtotal = dcItems.reduce((sum, item) => sum + item.bags, 0);
+    const bpSubtotal = bpItems.reduce((sum, item) => sum + item.bags, 0);
     
     let rows = '';
-    items.forEach((item, index) => {
+    let isFirstRow = true;
+
+    // Render DC items if any
+    if (dcItems.length > 0) {
+      dcItems.forEach((item) => {
+        rows += `
+          <tr>
+            <td class="customer-col">${isFirstRow ? `<b>${customer_name}</b>` : ''}</td>
+            <td class="center-text">${item.category}</td>
+            <td class="center-text">${item.classification}</td>
+            <td class="center-text">${item.bags}</td>
+          </tr>
+        `;
+        isFirstRow = false;
+      });
+      
+      // DC Subtotal
       rows += `
-        <tr>
-          <td class="customer-col">${index === 0 ? `<b>${customer_name}</b>` : ''}</td>
-          <td class="center-text">${item.category}</td>
-          <td class="center-text">${item.classification}</td>
-          <td class="center-text">${item.bags}</td>
+        <tr class="subtotal-row">
+          <td colspan="3" class="right-text"><b>Subtotal:</b></td>
+          <td class="center-text"><b>${dcSubtotal}</b></td>
         </tr>
       `;
-    });
+    }
 
-    // Subtotal row
-    rows += `
-      <tr class="subtotal-row">
-        <td colspan="3" class="right-text"><b>Subtotal:</b></td>
-        <td class="center-text"><b>${subtotal}</b></td>
-      </tr>
-      <tr><td colspan="4" style="height: 20px;"></td></tr>
-    `;
+    // Render BP items if any
+    if (bpItems.length > 0) {
+      bpItems.forEach((item) => {
+        rows += `
+          <tr>
+            <td class="customer-col">${isFirstRow ? `<b>${customer_name}</b>` : ''}</td>
+            <td class="center-text">${item.category}</td>
+            <td class="center-text">${item.classification}</td>
+            <td class="center-text">${item.bags}</td>
+          </tr>
+        `;
+        isFirstRow = false;
+      });
+      
+      // BP Subtotal
+      rows += `
+        <tr class="subtotal-row">
+          <td colspan="3" class="right-text"><b>Subtotal:</b></td>
+          <td class="center-text"><b>${bpSubtotal}</b></td>
+        </tr>
+      `;
+    }
+    
+    // Spacer after customer block
+    rows += `<tr><td colspan="4" style="height: 20px;"></td></tr>`;
 
     return rows;
   };
 
   const customerRows = customers.map(generateCustomerRows).join('');
-
-  const grandTotal = grand_total_dc + grand_total_bp;
 
   return `
     <!DOCTYPE html>
@@ -109,4 +146,3 @@ export const generateSessionReportHTML = (data: ExportResponse): string => {
     </html>
   `;
 };
-
