@@ -98,7 +98,6 @@ function TallySessionsScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
-      alignItems: responsive.isTablet ? 'center' as const : 'stretch' as const,
     },
     header: {
       ...styles.header,
@@ -113,7 +112,7 @@ function TallySessionsScreen() {
     addButton: {
       ...styles.addButton,
       paddingHorizontal: responsive.padding.medium,
-      paddingVertical: responsive.spacing.md,
+      paddingVertical: responsive.spacing.sm,
     },
     addButtonText: {
       ...styles.addButtonText,
@@ -153,7 +152,6 @@ function TallySessionsScreen() {
       </View>
 
       <FlatList
-        key={`flatlist-${responsive.isLargeTablet ? 2 : 1}-columns`}
         data={sessions}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -174,8 +172,6 @@ function TallySessionsScreen() {
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={dynamicStyles.list}
-        numColumns={responsive.isLargeTablet ? 2 : 1}
-        columnWrapperStyle={responsive.isLargeTablet ? styles.row : undefined}
       />
     </View>
   );
@@ -207,9 +203,6 @@ const styles = StyleSheet.create({
   list: {
     flexGrow: 1,
   },
-  row: {
-    justifyContent: 'space-between',
-  },
   sessionCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -218,8 +211,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    flex: 1,
-    marginHorizontal: 5,
   },
   sessionHeader: {
     flexDirection: 'row',

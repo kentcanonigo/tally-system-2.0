@@ -7,16 +7,21 @@ import { useWindowDimensions } from 'react-native';
 export function useResponsive() {
   const { width, height } = useWindowDimensions();
   
+  // Ensure we have valid dimensions (width > 0)
+  // This prevents layout issues on initial render
+  const validWidth = width > 0 ? width : 0;
+  const validHeight = height > 0 ? height : 0;
+  
   // Consider tablet if width >= 600 (medium tablet size)
-  const isTablet = width >= 600;
-  const isSmallTablet = width >= 600 && width < 900;
-  const isLargeTablet = width >= 900;
+  const isTablet = validWidth >= 600;
+  const isSmallTablet = validWidth >= 600 && validWidth < 900;
+  const isLargeTablet = validWidth >= 900;
   
   // For split-screen, we might have narrower widths
-  const isSplitScreen = width < 600 && width >= 400;
+  const isSplitScreen = validWidth < 600 && validWidth >= 400;
   
   // Calculate max content width for tablets to prevent content from being too wide
-  const maxContentWidth = isTablet ? Math.min(width * 0.8, 1200) : width;
+  const maxContentWidth = isTablet ? Math.min(validWidth * 0.8, 1200) : validWidth;
   
   // Responsive padding
   const padding = {
@@ -43,8 +48,8 @@ export function useResponsive() {
   };
   
   return {
-    width,
-    height,
+    width: validWidth,
+    height: validHeight,
     isTablet,
     isSmallTablet,
     isLargeTablet,
@@ -53,6 +58,7 @@ export function useResponsive() {
     padding,
     fontSize,
     spacing,
+    hasValidDimensions: validWidth > 0 && validHeight > 0,
   };
 }
 
