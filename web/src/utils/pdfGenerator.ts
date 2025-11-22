@@ -6,7 +6,7 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
   const doc = new jsPDF();
   const { customers, grand_total_dc, grand_total_bp } = data;
 
-  const tableBody = [];
+  const tableBody: any[] = [];
 
   customers.forEach((customer) => {
     const { customer_name, items, subtotal } = customer;
