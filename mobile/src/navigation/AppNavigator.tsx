@@ -14,6 +14,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import CustomersScreen from '../screens/CustomersScreen';
 import PlantsScreen from '../screens/PlantsScreen';
 import WeightClassificationsScreen from '../screens/WeightClassificationsScreen';
+import ExportScreen from '../screens/ExportScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -52,6 +53,8 @@ function AppNavigator() {
               iconName = 'calculate';
             } else if (route.name === 'Settings') {
               iconName = 'settings';
+            } else if (route.name === 'Export') {
+              iconName = 'file-download';
             } else {
               iconName = 'help';
             }
@@ -68,6 +71,7 @@ function AppNavigator() {
         <Tab.Screen name="Plants" component={PlantsScreen} />
         <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ title: 'Weight Classes' }} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
+        <Tab.Screen name="Export" component={ExportScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>

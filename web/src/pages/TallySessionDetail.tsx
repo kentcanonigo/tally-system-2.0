@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi } from '../services/api';
+import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi, exportApi } from '../services/api';
+import { generateSessionReportPDF } from '../utils/pdfGenerator';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
@@ -162,6 +163,20 @@ function TallySessionDetail() {
     }
   };
 
+  const handleExport = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const response = await exportApi.exportSessions({ session_ids: [Number(id)] });
+      generateSessionReportPDF(response.data);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Failed to export PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
   };
@@ -244,6 +259,13 @@ function TallySessionDetail() {
         </button>
         <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}/logs`)}>
           View Logs
+        </button>
+        <button 
+          className="btn btn-info" 
+          onClick={handleExport}
+          style={{ backgroundColor: '#17a2b8', color: 'white' }}
+        >
+          Export PDF
         </button>
         <button 
           className="btn btn-warning" 

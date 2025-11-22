@@ -64,5 +64,31 @@ export interface TallyLogEntry {
   weight: number;
   notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
+export interface ExportItem {
+  category: string;
+  classification: string;
+  bags: number;
+}
+
+export interface CustomerExportData {
+  customer_name: string;
+  items: ExportItem[];
+  subtotal: number;
+}
+
+export interface ExportResponse {
+  customers: CustomerExportData[];
+  grand_total_dc: number;
+  grand_total_bp: number;
+}
+
+export interface ExportRequest {
+  session_ids?: number[];
+  date_from?: string;
+  date_to?: string;
+  customer_id?: number;
+  plant_id?: number;
+}

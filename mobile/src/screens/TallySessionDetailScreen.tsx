@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, RefreshControl, Platform, Modal, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { printToFileAsync } from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate } from '../utils/dateFormat';
 import { useAcceptableDifference } from '../utils/settings';
@@ -11,7 +13,9 @@ import {
   plantsApi,
   weightClassificationsApi,
   tallyLogEntriesApi,
+  exportApi,
 } from '../services/api';
+import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { useResponsive } from '../utils/responsive';
 
@@ -409,6 +413,22 @@ function TallySessionDetailScreen() {
     return `${wc.min_weight}-${wc.max_weight}`;
   };
 
+  const handleExportPDF = async () => {
+    if (!session) return;
+    try {
+      setLoading(true);
+      const response = await exportApi.exportSessions({ session_ids: [session.id] });
+      const html = generateSessionReportHTML(response.data);
+      const { uri } = await printToFileAsync({ html, base64: false });
+      await shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStartTally = () => {
     // First, select the mode (Dressed or Byproduct)
     Alert.alert(
@@ -786,6 +806,12 @@ function TallySessionDetailScreen() {
           >
             <Text style={dynamicStyles.actionButtonText}>View Logs</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[dynamicStyles.actionButton, styles.exportButton]}
+            onPress={handleExportPDF}
+          >
+            <Text style={dynamicStyles.actionButtonText}>Export PDF</Text>
+          </TouchableOpacity>
           {session.status === 'ongoing' && (
             <>
               <TouchableOpacity
@@ -1150,6 +1176,9 @@ const styles = StyleSheet.create({
   },
   viewLogsButton: {
     backgroundColor: '#9b59b6',
+  },
+  exportButton: {
+    backgroundColor: '#e67e22',
   },
   actionButtonText: {
     color: '#fff',

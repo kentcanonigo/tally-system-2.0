@@ -7,6 +7,8 @@ import type {
   AllocationDetails,
   TallyLogEntry,
   TallyLogEntryRole,
+  ExportRequest,
+  ExportResponse,
 } from '../types';
 
 // Vite replaces import.meta.env.VITE_API_URL at build time
@@ -94,6 +96,12 @@ export const tallyLogEntriesApi = {
     }),
   getById: (entryId: number) =>
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
+};
+
+// Export API
+export const exportApi = {
+  exportSessions: (data: ExportRequest) =>
+    api.post<ExportResponse>('/export/sessions', data),
 };
 
 export default api;

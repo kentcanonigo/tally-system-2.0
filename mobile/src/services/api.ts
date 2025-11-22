@@ -10,6 +10,8 @@ import type {
   AllocationDetails,
   TallyLogEntry,
   TallyLogEntryRole,
+  ExportRequest,
+  ExportResponse,
 } from '../types';
 
 // Get the debugger host IP from Expo Constants (works for physical devices)
@@ -195,6 +197,12 @@ export const tallyLogEntriesApi = {
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
   delete: (entryId: number) =>
     api.delete(`/log-entries/${entryId}`),
+};
+
+// Export API
+export const exportApi = {
+  exportSessions: (data: ExportRequest) =>
+    api.post<ExportResponse>('/export/sessions', data),
 };
 
 // Cache helpers
