@@ -302,13 +302,55 @@ function TallySessionDetailScreen() {
     });
   }, [allocations, weightClassifications]);
 
-  const getDifferenceColor = (difference: number, isNotStarted: boolean): string => {
+  const getMatchStatus = (allocation: AllocationDetails): string => {
+    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    
+    if (isNotStarted) {
+      return 'Not started';
+    }
+    
+    if (difference === 0) {
+      // Tally and dispatcher match
+      const matchedCount = allocation.allocated_bags_tally;
+      if (allocation.required_bags > 0) {
+        if (matchedCount < allocation.required_bags) {
+          return 'Match (Short)';
+        } else if (matchedCount > allocation.required_bags) {
+          return 'Match (Over)';
+        } else {
+          return 'Match';
+        }
+      }
+      return 'Match';
+    }
+    
+    return difference.toFixed(2);
+  };
+
+  const getDifferenceColor = (allocation: AllocationDetails): string => {
+    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
+    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    
     if (isNotStarted) {
       return '#666';
     }
+    
     if (difference === 0) {
-      return '#27ae60';
+      // Tally and dispatcher match - check if short, over, or exact
+      const matchedCount = allocation.allocated_bags_tally;
+      if (allocation.required_bags > 0) {
+        if (matchedCount < allocation.required_bags) {
+          return '#f39c12'; // Orange for short
+        } else if (matchedCount > allocation.required_bags) {
+          return '#e74c3c'; // Red for over
+        } else {
+          return '#27ae60'; // Green for exact match
+        }
+      }
+      return '#27ae60'; // Green for match (no required amount)
     }
+    
     const absDifference = Math.abs(difference);
     if (absDifference <= threshold) {
       return '#f39c12';
@@ -319,7 +361,8 @@ function TallySessionDetailScreen() {
   const renderAllocationCard = (allocation: AllocationDetails) => {
     const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
     const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
-    const diffColor = getDifferenceColor(difference, isNotStarted);
+    const diffColor = getDifferenceColor(allocation);
+    const matchStatus = getMatchStatus(allocation);
     return (
       <View 
         key={allocation.id} 
@@ -368,7 +411,7 @@ function TallySessionDetailScreen() {
               fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
             }
           ]}>
-            {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
+            {matchStatus}
           </Text>
         </View>
       </View>
