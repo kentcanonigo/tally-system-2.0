@@ -34,7 +34,7 @@ const ExportScreen = () => {
 
   // Filters state
   const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>('completed'); // Default to completed
+  const [filterStatus, setFilterStatus] = useState<string>(''); // Default to all statuses
   
   // Sort state
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
@@ -237,7 +237,7 @@ const ExportScreen = () => {
               style={styles.resetButton}
               onPress={() => {
                 setFilterCustomerId(null);
-                setFilterStatus('completed');
+                setFilterStatus('');
                 setSortBy('date');
                 setSortOrder('desc');
               }}
