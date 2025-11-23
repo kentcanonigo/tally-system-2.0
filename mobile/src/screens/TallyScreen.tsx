@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import {
@@ -312,12 +312,15 @@ function TallyScreen() {
   };
 
   // Filter allocations to only byproducts when in byproduct mode
-  const filteredAllocations = tallyMode === 'byproduct'
-    ? allocations.filter((allocation) => {
+  const filteredAllocations = useMemo(() => {
+    if (tallyMode === 'byproduct') {
+      return allocations.filter((allocation) => {
         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
         return wc && wc.category === 'Byproduct';
-      })
-    : allocations;
+      });
+    }
+    return allocations;
+  }, [tallyMode, allocations, weightClassifications]);
 
   const currentWeight = parseFloat(tallyInput) || 0;
   const matchedWC = currentWeight > 0 ? findWeightClassification(currentWeight) : null;
@@ -459,44 +462,81 @@ function TallyScreen() {
       return;
     }
 
+    // Check for over-allocation before proceeding
+    if (allocation.required_bags > 0) {
+      const currentAllocated = tallyRole === 'tally'
+        ? allocation.allocated_bags_tally
+        : allocation.allocated_bags_dispatcher;
+      const newAllocated = currentAllocated + quantity;
+
+      if (newAllocated > allocation.required_bags) {
+        const wc = weightClassifications.find((wc) => wc.id === selectedByproductId);
+        const wcName = wc?.classification || 'this byproduct';
+        Alert.alert(
+          'Over-Allocation Warning',
+          `Adding ${quantity} ${quantity === 1 ? 'entry' : 'entries'} would cause over-allocation for ${wcName}.\n\n` +
+          `Required: ${allocation.required_bags}\n` +
+          `Current: ${currentAllocated}\n` +
+          `After adding ${quantity}: ${newAllocated}\n\n` +
+          `Do you want to proceed?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Proceed',
+              onPress: () => createQuantityLogEntries(quantity),
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    // No over-allocation, proceed directly
     createQuantityLogEntries(quantity);
 
     async function createQuantityLogEntries(quantity: number) {
       setIsSubmitting(true);
       try {
-        // Create multiple log entries, each with weight = 1
-        const promises = Array.from({ length: quantity }, () =>
-          tallyLogEntriesApi.create(sessionId, {
+        // Create log entries sequentially to avoid race conditions
+        // Each entry has weight = 1, and the backend counts each entry as 1 bag
+        for (let i = 0; i < quantity; i++) {
+          await tallyLogEntriesApi.create(sessionId, {
             weight_classification_id: selectedByproductId,
             role: tallyRole as TallyLogEntryRole,
             weight: 1,
             notes: null,
-          })
-        );
+          });
+        }
 
-      await Promise.all(promises);
+        // Refresh allocations and log entries
+        const [allocationsRes, logEntriesRes] = await Promise.all([
+          allocationDetailsApi.getBySession(sessionId),
+          tallyLogEntriesApi.getBySession(sessionId),
+        ]);
+        
+        // Update state first
+        setAllocations(allocationsRes.data);
+        setLogEntries(logEntriesRes.data);
 
-      // Refresh allocations and log entries
-      const [allocationsRes, logEntriesRes] = await Promise.all([
-        allocationDetailsApi.getBySession(sessionId),
-        tallyLogEntriesApi.getBySession(sessionId),
-      ]);
-      setAllocations(allocationsRes.data);
-      setLogEntries(logEntriesRes.data);
-
-      // Close modal and reset
-      setShowQuantityModal(false);
-      setSelectedByproductId(null);
-      setQuantityInput('1');
-    } catch (error: any) {
-      console.error('Error creating byproduct log entries:', error);
-      const errorMessage = error.response?.data?.detail
-        || error.message
-        || 'Failed to log tally entries. Please try again.';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Close modal and reset after state updates
+        // Use setTimeout to ensure state updates are processed before closing modal
+        setTimeout(() => {
+          setShowQuantityModal(false);
+          setSelectedByproductId(null);
+          setQuantityInput('1');
+        }, 0);
+      } catch (error: any) {
+        console.error('Error creating byproduct log entries:', error);
+        const errorMessage = error.response?.data?.detail
+          || error.message
+          || 'Failed to log tally entries. Please try again.';
+        Alert.alert('Error', errorMessage);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
