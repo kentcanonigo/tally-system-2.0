@@ -3,6 +3,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import TallySessionsScreen from '../screens/TallySessionsScreen';
 import TallySessionDetailScreen from '../screens/TallySessionDetailScreen';
@@ -31,52 +34,83 @@ function SessionsStack() {
   );
 }
 
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: any;
+
+          if (route.name === 'Home') {
+            iconName = 'home';
+          } else if (route.name === 'Sessions') {
+            iconName = 'list';
+          } else if (route.name === 'Tally') {
+            iconName = 'edit';
+          } else if (route.name === 'Customers') {
+            iconName = 'people';
+          } else if (route.name === 'WeightClassifications') {
+            iconName = 'scale';
+          } else if (route.name === 'Calculator') {
+            iconName = 'calculate';
+          } else if (route.name === 'Settings') {
+            iconName = 'settings';
+          } else if (route.name === 'Export') {
+            iconName = 'file-download';
+          } else {
+            iconName = 'help';
+          }
+
+          return <MaterialIcons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#3498db',
+        tabBarInactiveTintColor: '#7f8c8d',
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
+      <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Customers" component={CustomersScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+    </Tab.Navigator>
+  );
+}
+
 function AppNavigator() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: any;
-
-            if (route.name === 'Home') {
-              iconName = 'home';
-            } else if (route.name === 'Sessions') {
-              iconName = 'list';
-            } else if (route.name === 'Tally') {
-              iconName = 'edit';
-            } else if (route.name === 'Customers') {
-              iconName = 'people';
-            } else if (route.name === 'WeightClassifications') {
-              iconName = 'scale';
-            } else if (route.name === 'Calculator') {
-              iconName = 'calculate';
-            } else if (route.name === 'Settings') {
-              iconName = 'settings';
-            } else if (route.name === 'Export') {
-              iconName = 'file-download';
-            } else {
-              iconName = 'help';
-            }
-
-            return <MaterialIcons name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: '#3498db',
-          tabBarInactiveTintColor: '#7f8c8d',
-        })}
-      >
-        <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
-        <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Customers" component={CustomersScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
-      </Tab.Navigator>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+});
 
 export default AppNavigator;
 

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,11 @@ import type {
   TallyLogEntryRole,
   ExportRequest,
   ExportResponse,
+  Role,
+  RoleWithPermissions,
+  RoleCreateRequest,
+  RoleUpdateRequest,
+  Permission,
 } from '../types';
 
 // Get the debugger host IP from Expo Constants (works for physical devices)
@@ -89,12 +94,48 @@ let API_BASE_URL = Platform.OS === 'android'
   ? 'http://10.0.2.2:8000/api/v1' 
   : 'http://localhost:8000/api/v1';
 
+const TOKEN_KEY = 'tally_system_token';
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor to add JWT token
+api.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('[API] Error getting token:', error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token on 401
+      try {
+        await AsyncStorage.removeItem(TOKEN_KEY);
+      } catch (err) {
+        console.error('[API] Error removing token:', err);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Set the API base URL asynchronously after api is created
 getApiBaseUrl().then(url => {
@@ -203,6 +244,24 @@ export const tallyLogEntriesApi = {
 export const exportApi = {
   exportSessions: (data: ExportRequest) =>
     api.post<ExportResponse>('/export/sessions', data),
+};
+
+// Roles API
+export const rolesApi = {
+  getAll: () => api.get<Role[]>('/roles'),
+  getById: (id: number) => api.get<RoleWithPermissions>(`/roles/${id}`),
+  create: (data: RoleCreateRequest) => api.post<Role>('/roles', data),
+  update: (id: number, data: RoleUpdateRequest) => api.put<Role>(`/roles/${id}`, data),
+  delete: (id: number) => api.delete(`/roles/${id}`),
+  assignPermissions: (roleId: number, permissionIds: number[]) =>
+    api.post(`/roles/${roleId}/permissions`, { permission_ids: permissionIds }),
+  removePermission: (roleId: number, permissionId: number) =>
+    api.delete(`/roles/${roleId}/permissions/${permissionId}`),
+};
+
+// Permissions API
+export const permissionsApi = {
+  getAll: () => api.get<Permission[]>('/permissions'),
 };
 
 // Cache helpers

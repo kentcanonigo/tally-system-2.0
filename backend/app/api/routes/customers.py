@@ -4,7 +4,7 @@ from typing import List
 from ...database import get_db
 from ...schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse
 from ...crud import customer as crud
-from ...auth.dependencies import get_current_user
+from ...auth.dependencies import get_current_user, require_permission
 from ...models import User
 
 router = APIRouter()
@@ -39,9 +39,9 @@ def read_customer(
 def create_customer(
     customer: CustomerCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("can_manage_customers"))
 ):
-    """Create a new customer. All authenticated users can create customers."""
+    """Create a new customer. Requires 'can_manage_customers' permission."""
     return crud.create_customer(db=db, customer=customer)
 
 
@@ -50,9 +50,9 @@ def update_customer(
     customer_id: int, 
     customer: CustomerUpdate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("can_manage_customers"))
 ):
-    """Update a customer. All authenticated users can update customers."""
+    """Update a customer. Requires 'can_manage_customers' permission."""
     db_customer = crud.update_customer(db, customer_id=customer_id, customer_update=customer)
     if db_customer is None:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -63,9 +63,9 @@ def update_customer(
 def delete_customer(
     customer_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("can_manage_customers"))
 ):
-    """Delete a customer. All authenticated users can delete customers."""
+    """Delete a customer. Requires 'can_manage_customers' permission."""
     try:
         success = crud.delete_customer(db, customer_id=customer_id)
         if not success:

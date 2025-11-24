@@ -27,6 +27,7 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=6)
     role: UserRole = UserRole.ADMIN
     plant_ids: List[int] = Field(default_factory=list, description="List of plant IDs this user can access")
+    role_ids: List[int] = Field(default_factory=list, description="List of role IDs to assign to this user")
 
 
 # User update schema (for superadmin)
@@ -37,6 +38,7 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     plant_ids: Optional[List[int]] = Field(None, description="List of plant IDs this user can access")
+    role_ids: Optional[List[int]] = Field(None, description="List of role IDs to assign to this user")
 
 
 # User response schema (without password)
@@ -49,6 +51,8 @@ class UserResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     plant_ids: List[int] = Field(default_factory=list, description="List of plant IDs this user can access")
+    role_ids: List[int] = Field(default_factory=list, description="List of role IDs assigned to this user")
+    permissions: List[str] = Field(default_factory=list, description="Aggregated permission codes from all roles")
     
     model_config = ConfigDict(from_attributes=True)
 

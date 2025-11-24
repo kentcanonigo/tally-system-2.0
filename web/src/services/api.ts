@@ -12,6 +12,11 @@ import type {
   User,
   UserCreateRequest,
   UserUpdateRequest,
+  Role,
+  RoleWithPermissions,
+  RoleCreateRequest,
+  RoleUpdateRequest,
+  Permission,
 } from '../types';
 import { getToken, removeToken } from './auth';
 
@@ -142,6 +147,25 @@ export const usersApi = {
   create: (data: UserCreateRequest) => api.post<User>('/users', data),
   update: (id: number, data: UserUpdateRequest) => api.put<User>(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
+  getPermissions: (id: number) => api.get<string[]>(`/users/${id}/permissions`),
+};
+
+// Roles API
+export const rolesApi = {
+  getAll: () => api.get<Role[]>('/roles'),
+  getById: (id: number) => api.get<RoleWithPermissions>(`/roles/${id}`),
+  create: (data: RoleCreateRequest) => api.post<Role>('/roles', data),
+  update: (id: number, data: RoleUpdateRequest) => api.put<Role>(`/roles/${id}`, data),
+  delete: (id: number) => api.delete(`/roles/${id}`),
+  assignPermissions: (roleId: number, permissionIds: number[]) =>
+    api.post(`/roles/${roleId}/permissions`, { permission_ids: permissionIds }),
+  removePermission: (roleId: number, permissionId: number) =>
+    api.delete(`/roles/${roleId}/permissions/${permissionId}`),
+};
+
+// Permissions API
+export const permissionsApi = {
+  getAll: () => api.get<Permission[]>('/permissions'),
 };
 
 export default api;

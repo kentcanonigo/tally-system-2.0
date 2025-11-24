@@ -1,15 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole, LoginRequest } from '../types';
-import * as authService from '../services/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { User, LoginRequest, AuthResponse, UserRole } from '../types';
+
+const TOKEN_KEY = 'tally_system_token';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
   login: (credentials: LoginRequest) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isSuperadmin: boolean;
+  token: string | null;
   refetchUser: () => Promise<void>;
   hasPermission: (permissionCode: string) => boolean;
   hasAnyPermission: (permissionCodes: string[]) => boolean;
@@ -28,44 +32,68 @@ export const useAuth = () => {
 
 interface AuthProviderProps {
   children: ReactNode;
+  apiBaseUrl: string;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user on mount if token exists
+  // Load token and user on mount
   useEffect(() => {
-    const loadUser = async () => {
-      if (authService.isAuthenticated()) {
-        try {
-          const userData = await authService.getCurrentUser();
-          setUser(userData);
-        } catch (err) {
-          console.error('Failed to load user:', err);
-          // Token might be invalid, clear it
-          authService.removeToken();
+    const loadAuth = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        if (storedToken) {
+          setToken(storedToken);
+          await fetchUserData(storedToken);
         }
+      } catch (err) {
+        console.error('Failed to load auth:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    loadUser();
+    loadAuth();
   }, []);
+
+  const fetchUserData = async (authToken: string) => {
+    try {
+      const response = await axios.get<User>(`${apiBaseUrl}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      setUser(response.data);
+    } catch (err) {
+      console.error('Failed to fetch user data:', err);
+      // Token might be invalid, clear it
+      await logout();
+    }
+  };
 
   const login = async (credentials: LoginRequest) => {
     try {
       setError(null);
       setLoading(true);
-      
+
       // Login and get token
-      await authService.login(credentials);
+      const loginResponse = await axios.post<AuthResponse>(
+        `${apiBaseUrl}/auth/login`,
+        credentials
+      );
+
+      const newToken = loginResponse.data.access_token;
       
+      // Store token
+      await AsyncStorage.setItem(TOKEN_KEY, newToken);
+      setToken(newToken);
+
       // Fetch user data
-      const userData = await authService.getCurrentUser();
-      setUser(userData);
-      
+      await fetchUserData(newToken);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || 'Login failed';
       setError(errorMessage);
@@ -75,29 +103,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    authService.logout();
+  const logout = async () => {
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+      setToken(null);
+    } catch (err) {
+      console.error('Failed to logout:', err);
+    }
   };
 
   const refetchUser = async () => {
-    try {
-      const userData = await authService.getCurrentUser();
-      setUser(userData);
-    } catch (err) {
-      console.error('Failed to refetch user:', err);
-      setUser(null);
-      authService.removeToken();
+    if (token) {
+      try {
+        await fetchUserData(token);
+      } catch (err) {
+        console.error('Failed to refetch user:', err);
+        await logout();
+      }
     }
   };
 
   // Helper to check if user has a specific RBAC role
   const hasRole = (roleName: string): boolean => {
     if (!user || !user.role_ids || user.role_ids.length === 0) return false;
-    // We need to fetch roles to check names, but for now we can check via permissions
-    // SUPERADMIN users have all permissions, so we can infer from that
-    // For a more robust check, we'd need to store role names in the user object
-    // For now, we'll use the legacy check as fallback and permission-based detection
+    // For SUPERADMIN, check via legacy field or permissions count (they have all permissions)
     return user.role === UserRole.SUPERADMIN || 
            (roleName === 'SUPERADMIN' && user.permissions && user.permissions.length >= 4);
   };
@@ -129,6 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isAuthenticated: user !== null,
     isSuperadmin: hasRole('SUPERADMIN'),
+    token,
     refetchUser,
     hasPermission,
     hasAnyPermission,

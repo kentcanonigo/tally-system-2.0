@@ -4,8 +4,8 @@ from typing import List
 from ...database import get_db
 from ...schemas.plant import PlantCreate, PlantUpdate, PlantResponse
 from ...crud import plant as crud
-from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_superadmin
-from ...models import User, UserRole
+from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_superadmin, user_has_role
+from ...models import User
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ def read_plants(
     plants = crud.get_plants(db, skip=skip, limit=limit)
     
     # Filter by accessible plants for non-superadmins
-    if current_user.role != UserRole.SUPERADMIN:
+    if not user_has_role(current_user, 'SUPERADMIN'):
         plants = [plant for plant in plants if plant.id in accessible_plant_ids]
     
     return plants
@@ -41,7 +41,7 @@ def read_plant(
         raise HTTPException(status_code=404, detail="Plant not found")
     
     # Check access for non-superadmins
-    if current_user.role != UserRole.SUPERADMIN and plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     return plant

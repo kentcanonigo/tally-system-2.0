@@ -11,6 +11,8 @@ import TallySessionLogs from './pages/TallySessionLogs';
 import Settings from './pages/Settings';
 import ExportPage from './pages/ExportPage';
 import Users from './pages/Users';
+import Roles from './pages/Roles';
+import RoleEdit from './pages/RoleEdit';
 import './App.css';
 
 // Protected Route Component
@@ -46,7 +48,10 @@ function SuperadminRoute({ children }: { children: React.ReactNode }) {
 
 // Main Layout with Sidebar
 function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isSuperadmin, hasAnyPermission } = useAuth();
+  
+  // Check if user can manage roles (SUPERADMIN or ADMIN role)
+  const canManageRoles = isSuperadmin || hasAnyPermission(['can_manage_customers', 'can_manage_weight_classes']);
 
   return (
     <div className="app">
@@ -65,8 +70,10 @@ function MainLayout({ children }: { children: React.ReactNode }) {
               <p style={{ margin: '0 0 5px 0', color: '#fff' }}>
                 <strong>{user.username}</strong>
               </p>
-              <p style={{ margin: 0, color: '#ddd', textTransform: 'capitalize' }}>
-                {user.role}
+              <p style={{ margin: 0, color: '#ddd', fontSize: '0.75rem' }}>
+                {user.permissions && user.permissions.length > 0 
+                  ? `${user.permissions.length} permission(s)` 
+                  : 'No permissions'}
               </p>
             </div>
           )}
@@ -90,10 +97,17 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           <li>
             <Link to="/export">Export</Link>
           </li>
-          {user?.role === 'superadmin' && (
-            <li>
-              <Link to="/users">User Management</Link>
-            </li>
+          {canManageRoles && (
+            <>
+              <li>
+                <Link to="/roles">Roles & Permissions</Link>
+              </li>
+              {isSuperadmin && (
+                <li>
+                  <Link to="/users">User Management</Link>
+                </li>
+              )}
+            </>
           )}
           <li>
             <Link to="/settings">Settings</Link>
@@ -148,6 +162,8 @@ function App() {
                     <Route path="/tally-sessions/:id/logs" element={<TallySessionLogs />} />
                     <Route path="/export" element={<ExportPage />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/roles" element={<Roles />} />
+                    <Route path="/roles/:id" element={<RoleEdit />} />
                     <Route
                       path="/users"
                       element={

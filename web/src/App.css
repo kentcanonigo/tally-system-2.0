@@ -273,6 +273,42 @@ tbody tr:hover {
   color: white;
 }
 
+/* Badge Styles */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.badge-primary {
+  background-color: #3498db;
+  color: white;
+}
+
+.badge-secondary {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.badge-success {
+  background-color: #27ae60;
+  color: white;
+}
+
+.badge-danger {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.badge-info {
+  background-color: #e8f4fb;
+  color: #2980b9;
+  border: 1px solid #d4e6f1;
+}
+
 /* Calendar Styles */
 .tally-calendar {
   width: 100%;

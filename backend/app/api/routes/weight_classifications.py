@@ -5,8 +5,8 @@ from ...database import get_db
 from ...schemas.weight_classification import WeightClassificationCreate, WeightClassificationUpdate, WeightClassificationResponse
 from ...crud import weight_classification as crud
 from ...crud import plant as plant_crud
-from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids
-from ...models import User, UserRole
+from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_permission, user_has_role
+from ...models import User
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ def read_weight_classifications_by_plant(
 ):
     """Get weight classifications for a plant. User must have access to the plant."""
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     # Verify plant exists
@@ -49,7 +49,7 @@ def read_weight_classification(
         raise HTTPException(status_code=404, detail="Weight classification not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and wc.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and wc.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     return wc
@@ -60,12 +60,12 @@ def create_weight_classification(
     plant_id: int,
     weight_classification: WeightClassificationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("can_manage_weight_classes")),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
-    """Create weight classification for a plant. User must have access to the plant."""
+    """Create weight classification for a plant. Requires 'can_manage_weight_classes' permission and plant access."""
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     # Verify plant exists
@@ -88,17 +88,17 @@ def update_weight_classification(
     wc_id: int,
     weight_classification: WeightClassificationUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("can_manage_weight_classes")),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
-    """Update a weight classification. User must have access to its plant."""
+    """Update a weight classification. Requires 'can_manage_weight_classes' permission and plant access."""
     # Get existing weight classification to check plant
     existing_wc = crud.get_weight_classification(db, wc_id=wc_id)
     if existing_wc is None:
         raise HTTPException(status_code=404, detail="Weight classification not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and existing_wc.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and existing_wc.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     try:
@@ -114,17 +114,17 @@ def update_weight_classification(
 def delete_weight_classification(
     wc_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("can_manage_weight_classes")),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
-    """Delete a weight classification. User must have access to its plant."""
+    """Delete a weight classification. Requires 'can_manage_weight_classes' permission and plant access."""
     # Get existing weight classification to check plant
     existing_wc = crud.get_weight_classification(db, wc_id=wc_id)
     if existing_wc is None:
         raise HTTPException(status_code=404, detail="Weight classification not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and existing_wc.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and existing_wc.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     success = crud.delete_weight_classification(db, wc_id=wc_id)

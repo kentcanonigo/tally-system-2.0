@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from ...database import get_db
 from ...schemas.user import UserCreate, UserUpdate, UserResponse
+from ...schemas.permission import PermissionResponse
 from ...crud import user as user_crud
 from ...auth.dependencies import require_superadmin
 from ...models import User
@@ -49,8 +50,10 @@ async def create_user(
     # Create user
     new_user = user_crud.create_user(db, user_data)
     
-    # Get plant IDs for response
+    # Get plant IDs, role IDs, and permissions for response
     plant_ids = user_crud.get_user_plant_ids(db, new_user.id)
+    role_ids = user_crud.get_user_role_ids(db, new_user.id)
+    permissions = user_crud.get_user_permissions(db, new_user.id)
     
     return UserResponse(
         id=new_user.id,
@@ -60,7 +63,9 @@ async def create_user(
         is_active=new_user.is_active,
         created_at=new_user.created_at,
         updated_at=new_user.updated_at,
-        plant_ids=plant_ids
+        plant_ids=plant_ids,
+        role_ids=role_ids,
+        permissions=permissions
     )
 
 
@@ -85,10 +90,12 @@ async def list_users(
     """
     users = user_crud.get_all_users(db, skip=skip, limit=limit)
     
-    # Build response with plant IDs for each user
+    # Build response with plant IDs, role IDs, and permissions for each user
     response = []
     for user in users:
         plant_ids = user_crud.get_user_plant_ids(db, user.id)
+        role_ids = user_crud.get_user_role_ids(db, user.id)
+        permissions = user_crud.get_user_permissions(db, user.id)
         response.append(UserResponse(
             id=user.id,
             username=user.username,
@@ -97,7 +104,9 @@ async def list_users(
             is_active=user.is_active,
             created_at=user.created_at,
             updated_at=user.updated_at,
-            plant_ids=plant_ids
+            plant_ids=plant_ids,
+            role_ids=role_ids,
+            permissions=permissions
         ))
     
     return response
@@ -132,6 +141,8 @@ async def get_user(
         )
     
     plant_ids = user_crud.get_user_plant_ids(db, user.id)
+    role_ids = user_crud.get_user_role_ids(db, user.id)
+    permissions = user_crud.get_user_permissions(db, user.id)
     
     return UserResponse(
         id=user.id,
@@ -141,7 +152,9 @@ async def get_user(
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at,
-        plant_ids=plant_ids
+        plant_ids=plant_ids,
+        role_ids=role_ids,
+        permissions=permissions
     )
 
 
@@ -212,6 +225,8 @@ async def update_user(
         )
     
     plant_ids = user_crud.get_user_plant_ids(db, updated_user.id)
+    role_ids = user_crud.get_user_role_ids(db, updated_user.id)
+    permissions = user_crud.get_user_permissions(db, updated_user.id)
     
     return UserResponse(
         id=updated_user.id,
@@ -221,7 +236,9 @@ async def update_user(
         is_active=updated_user.is_active,
         created_at=updated_user.created_at,
         updated_at=updated_user.updated_at,
-        plant_ids=plant_ids
+        plant_ids=plant_ids,
+        role_ids=role_ids,
+        permissions=permissions
     )
 
 
@@ -276,4 +293,36 @@ async def delete_user(
         )
     
     return None
+
+
+@router.get("/{user_id}/permissions", response_model=List[str])
+async def get_user_permissions(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_superadmin)
+):
+    """
+    Get aggregated permissions for a specific user (superadmin only).
+    
+    Args:
+        user_id: ID of the user
+        db: Database session
+        current_user: Current superadmin user
+    
+    Returns:
+        List of permission codes
+    
+    Raises:
+        HTTPException: If user not found
+    """
+    user = user_crud.get_user_by_id(db, user_id)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    permissions = user_crud.get_user_permissions(db, user_id)
+    return permissions
 

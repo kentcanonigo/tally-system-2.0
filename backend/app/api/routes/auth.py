@@ -60,12 +60,18 @@ async def get_current_user_info(
         db: Database session
     
     Returns:
-        User information including accessible plant IDs
+        User information including accessible plant IDs, role IDs, and permissions
     """
     # Get user's plant IDs
     plant_ids = user_crud.get_user_plant_ids(db, current_user.id)
     
-    # Return user info with plant IDs
+    # Get user's role IDs
+    role_ids = user_crud.get_user_role_ids(db, current_user.id)
+    
+    # Get user's aggregated permissions
+    permissions = user_crud.get_user_permissions(db, current_user.id)
+    
+    # Return user info with plant IDs, role IDs, and permissions
     user_response = UserResponse(
         id=current_user.id,
         username=current_user.username,
@@ -74,7 +80,9 @@ async def get_current_user_info(
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
-        plant_ids=plant_ids
+        plant_ids=plant_ids,
+        role_ids=role_ids,
+        permissions=permissions
     )
     
     return user_response

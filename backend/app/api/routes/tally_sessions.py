@@ -6,8 +6,8 @@ from ...schemas.tally_session import TallySessionCreate, TallySessionUpdate, Tal
 from ...crud import tally_session as crud
 from ...crud import customer as customer_crud
 from ...crud import plant as plant_crud
-from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids
-from ...models import User, UserRole
+from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_permission, user_has_role
+from ...models import User
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ def read_tally_sessions(
     )
     
     # Filter by accessible plants for non-superadmins
-    if current_user.role != UserRole.SUPERADMIN:
+    if not user_has_role(current_user, 'SUPERADMIN'):
         tally_sessions = [s for s in tally_sessions if s.plant_id in accessible_plant_ids]
     
     return tally_sessions
@@ -48,7 +48,7 @@ def read_tally_session(
         raise HTTPException(status_code=404, detail="Tally session not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and session.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and session.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     return session
@@ -58,12 +58,12 @@ def read_tally_session(
 def create_tally_session(
     tally_session: TallySessionCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("can_start_tally")),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
-    """Create a tally session. User must have access to the plant."""
+    """Create a tally session. Requires 'can_start_tally' permission and plant access."""
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and tally_session.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and tally_session.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     # Verify customer exists
@@ -94,7 +94,7 @@ def update_tally_session(
         raise HTTPException(status_code=404, detail="Tally session not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and existing_session.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and existing_session.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     # Verify customer exists if updating customer_id
@@ -110,7 +110,7 @@ def update_tally_session(
             raise HTTPException(status_code=404, detail="Plant not found")
         
         # If changing plant, check access to new plant too
-        if current_user.role != UserRole.SUPERADMIN and tally_session.plant_id not in accessible_plant_ids:
+        if not user_has_role(current_user, 'SUPERADMIN') and tally_session.plant_id not in accessible_plant_ids:
             raise HTTPException(status_code=403, detail="You don't have access to the new plant")
     
     db_session = crud.update_tally_session(db, session_id=session_id, session_update=tally_session)
@@ -133,7 +133,7 @@ def delete_tally_session(
         raise HTTPException(status_code=404, detail="Tally session not found")
     
     # Check plant access
-    if current_user.role != UserRole.SUPERADMIN and existing_session.plant_id not in accessible_plant_ids:
+    if not user_has_role(current_user, 'SUPERADMIN') and existing_session.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")
     
     success = crud.delete_tally_session(db, session_id=session_id)

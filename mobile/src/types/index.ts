@@ -95,3 +95,67 @@ export interface ExportRequest {
   customer_id?: number;
   plant_id?: number;
 }
+
+// Authentication types
+export enum UserRole {
+  SUPERADMIN = "superadmin",
+  ADMIN = "admin",
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  plant_ids: number[];
+  role_ids: number[];
+  permissions: string[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
+// RBAC types
+export interface Role {
+  id: number;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Permission {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  category: string;
+  created_at: string;
+}
+
+export interface RoleWithPermissions extends Role {
+  permissions: Permission[];
+}
+
+export interface RoleCreateRequest {
+  name: string;
+  description?: string | null;
+  permission_ids?: number[];
+}
+
+export interface RoleUpdateRequest {
+  name?: string;
+  description?: string | null;
+  permission_ids?: number[];
+}

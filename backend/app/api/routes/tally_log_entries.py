@@ -5,6 +5,8 @@ from ...database import get_db
 from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryResponse, TallyLogEntryRole
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
+from ...auth.dependencies import get_current_user, require_permission
+from ...models import User
 
 router = APIRouter()
 
@@ -17,10 +19,11 @@ router = APIRouter()
 def create_tally_log_entry(
     session_id: int,
     log_entry: TallyLogEntryCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_start_tally"))
 ):
     """
-    Create a new tally log entry for a session.
+    Create a new tally log entry for a session. Requires 'can_start_tally' permission.
     This will also automatically increment the corresponding allocation detail.
     """
     # Verify session exists
@@ -48,10 +51,11 @@ def create_tally_log_entry(
 def get_tally_log_entries_by_session(
     session_id: int,
     role: Optional[TallyLogEntryRole] = Query(None, description="Filter by role (tally or dispatcher)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_view_tally_logs"))
 ):
     """
-    Get all tally log entries for a session, optionally filtered by role.
+    Get all tally log entries for a session, optionally filtered by role. Requires 'can_view_tally_logs' permission.
     Results are ordered by created_at descending (newest first).
     """
     # Verify session exists
@@ -67,8 +71,12 @@ def get_tally_log_entries_by_session(
     "/log-entries/{entry_id}",
     response_model=TallyLogEntryResponse
 )
-def get_tally_log_entry(entry_id: int, db: Session = Depends(get_db)):
-    """Get a single tally log entry by ID."""
+def get_tally_log_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_view_tally_logs"))
+):
+    """Get a single tally log entry by ID. Requires 'can_view_tally_logs' permission."""
     entry = crud.get_tally_log_entry(db, entry_id=entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")
@@ -79,8 +87,12 @@ def get_tally_log_entry(entry_id: int, db: Session = Depends(get_db)):
     "/log-entries/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT
 )
-def delete_tally_log_entry(entry_id: int, db: Session = Depends(get_db)):
-    """Delete a tally log entry."""
+def delete_tally_log_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_start_tally"))
+):
+    """Delete a tally log entry. Requires 'can_start_tally' permission."""
     entry = crud.delete_tally_log_entry(db, entry_id=entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")

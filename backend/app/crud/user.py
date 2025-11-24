@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..models import User, UserRole, PlantPermission
+from ..models.user_role import UserRole as UserRoleModel
+from ..models.role import Role
 from ..schemas.user import UserCreate, UserUpdate
 from ..auth.password import hash_password, verify_password
 
@@ -59,6 +61,15 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         )
         db.add(permission)
     
+    # Create role assignments
+    if user_data.role_ids:
+        for role_id in user_data.role_ids:
+            user_role = UserRoleModel(
+                user_id=db_user.id,
+                role_id=role_id
+            )
+            db.add(user_role)
+    
     db.commit()
     db.refresh(db_user)
     
@@ -83,7 +94,7 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> Optional[Us
         return None
     
     # Update basic fields
-    update_data = user_data.model_dump(exclude_unset=True, exclude={'password', 'plant_ids'})
+    update_data = user_data.model_dump(exclude_unset=True, exclude={'password', 'plant_ids', 'role_ids'})
     
     for field, value in update_data.items():
         setattr(db_user, field, value)
@@ -104,6 +115,19 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> Optional[Us
                 plant_id=plant_id
             )
             db.add(permission)
+    
+    # Update role assignments if provided
+    if user_data.role_ids is not None:
+        # Remove existing role assignments
+        db.query(UserRoleModel).filter(UserRoleModel.user_id == user_id).delete()
+        
+        # Add new role assignments
+        for role_id in user_data.role_ids:
+            user_role = UserRoleModel(
+                user_id=user_id,
+                role_id=role_id
+            )
+            db.add(user_role)
     
     db.commit()
     db.refresh(db_user)
@@ -191,4 +215,49 @@ def count_superadmins(db: Session) -> int:
         User.role == UserRole.SUPERADMIN,
         User.is_active == True
     ).count()
+
+
+def get_user_role_ids(db: Session, user_id: int) -> List[int]:
+    """
+    Get list of role IDs assigned to a user.
+    
+    Args:
+        db: Database session
+        user_id: ID of the user
+    
+    Returns:
+        List of role IDs
+    """
+    user_roles = db.query(UserRoleModel).filter(UserRoleModel.user_id == user_id).all()
+    return [ur.role_id for ur in user_roles]
+
+
+def get_user_permissions(db: Session, user_id: int) -> List[str]:
+    """
+    Get aggregated list of permission codes from all user's roles.
+    
+    Args:
+        db: Database session
+        user_id: ID of the user
+    
+    Returns:
+        List of unique permission codes
+    """
+    # Get all roles assigned to the user
+    user_roles = db.query(UserRoleModel).filter(UserRoleModel.user_id == user_id).all()
+    role_ids = [ur.role_id for ur in user_roles]
+    
+    if not role_ids:
+        return []
+    
+    # Get all permissions from these roles
+    roles = db.query(Role).filter(Role.id.in_(role_ids)).all()
+    
+    # Aggregate unique permission codes
+    permission_codes = set()
+    for role in roles:
+        for permission in role.permissions:
+            permission_codes.add(permission.code)
+    
+    return list(permission_codes)
 

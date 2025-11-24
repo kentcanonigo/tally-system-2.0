@@ -24,4 +24,5 @@ class User(Base):
 
     # Relationships
     plant_permissions = relationship("PlantPermission", back_populates="user", cascade="all, delete-orphan")
+    roles = relationship("Role", secondary="user_roles", back_populates="users")
 

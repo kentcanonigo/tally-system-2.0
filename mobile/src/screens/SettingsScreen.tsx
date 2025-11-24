@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { useResponsive } from '../utils/responsive';
@@ -14,6 +15,7 @@ const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = '@tally_system_acceptable_difference
 const DEFAULT_THRESHOLD = 0;
 
 function SettingsScreen() {
+  const { user, logout } = useAuth();
   const { timezone, setTimezone, availableTimezones } = useTimezone();
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
@@ -390,6 +392,48 @@ function SettingsScreen() {
         <Text style={dynamicStyles.infoText}>
           This is the default number of heads that will be assigned to each bag when tallying. This setting is currently view-only.
         </Text>
+      </View>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Account</Text>
+        {user && (
+          <>
+            <View style={[dynamicStyles.inputWrapper, { marginBottom: responsive.spacing.sm }]}>
+              <Text style={dynamicStyles.label}>Username:</Text>
+              <Text style={[dynamicStyles.input, { backgroundColor: '#f5f5f5', color: '#7f8c8d' }]}>
+                {user.username}
+              </Text>
+            </View>
+            <View style={[dynamicStyles.inputWrapper, { marginBottom: responsive.spacing.sm }]}>
+              <Text style={dynamicStyles.label}>Role:</Text>
+              <Text style={[dynamicStyles.input, { backgroundColor: '#f5f5f5', color: '#7f8c8d' }]}>
+                {user.role}
+              </Text>
+            </View>
+          </>
+        )}
+        
+        <TouchableOpacity 
+          style={[dynamicStyles.saveButton, { backgroundColor: '#e74c3c' }]} 
+          onPress={() => {
+            Alert.alert(
+              'Logout',
+              'Are you sure you want to logout?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Logout', 
+                  style: 'destructive',
+                  onPress: async () => {
+                    await logout();
+                  }
+                },
+              ]
+            );
+          }}
+        >
+          <Text style={dynamicStyles.saveButtonText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Plant Dropdown Modal */}

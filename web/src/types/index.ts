@@ -102,6 +102,41 @@ export enum UserRole {
   ADMIN = "admin",
 }
 
+// RBAC types
+export interface Role {
+  id: number;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Permission {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  category: string;
+  created_at: string;
+}
+
+export interface RoleWithPermissions extends Role {
+  permissions: Permission[];
+}
+
+export interface RoleCreateRequest {
+  name: string;
+  description?: string | null;
+  permission_ids?: number[];
+}
+
+export interface RoleUpdateRequest {
+  name?: string;
+  description?: string | null;
+  permission_ids?: number[];
+}
+
 export interface User {
   id: number;
   username: string;
@@ -111,6 +146,8 @@ export interface User {
   created_at: string;
   updated_at: string;
   plant_ids: number[];
+  role_ids: number[];
+  permissions: string[];
 }
 
 export interface LoginRequest {
@@ -127,15 +164,17 @@ export interface UserCreateRequest {
   username: string;
   email: string;
   password: string;
-  role: UserRole;
+  role?: UserRole; // Legacy field - optional for backward compatibility
   plant_ids: number[];
+  role_ids?: number[];
 }
 
 export interface UserUpdateRequest {
   username?: string;
   email?: string;
   password?: string;
-  role?: UserRole;
+  role?: UserRole; // Legacy field - optional for backward compatibility
   is_active?: boolean;
   plant_ids?: number[];
+  role_ids?: number[];
 }

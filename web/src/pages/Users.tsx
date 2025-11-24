@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { usersApi, plantsApi } from '../services/api';
-import { User, UserRole, Plant, UserCreateRequest, UserUpdateRequest } from '../types';
+import { usersApi, plantsApi, rolesApi } from '../services/api';
+import { User, Plant, Role, UserCreateRequest, UserUpdateRequest } from '../types';
 import '../App.css';
 
 function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -19,8 +20,8 @@ function Users() {
     username: '',
     email: '',
     password: '',
-    role: UserRole.ADMIN as UserRole,
     plant_ids: [] as number[],
+    role_ids: [] as number[],
   });
 
   useEffect(() => {
@@ -30,12 +31,14 @@ function Users() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [usersRes, plantsRes] = await Promise.all([
+      const [usersRes, plantsRes, rolesRes] = await Promise.all([
         usersApi.getAll(),
-        plantsApi.getAll()
+        plantsApi.getAll(),
+        rolesApi.getAll()
       ]);
       setUsers(usersRes.data);
       setPlants(plantsRes.data);
+      setRoles(rolesRes.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load data');
     } finally {
@@ -50,8 +53,8 @@ function Users() {
       username: '',
       email: '',
       password: '',
-      role: UserRole.ADMIN,
       plant_ids: [],
+      role_ids: [],
     });
     setShowModal(true);
   };
@@ -63,8 +66,8 @@ function Users() {
       username: user.username,
       email: user.email,
       password: '',
-      role: user.role,
       plant_ids: user.plant_ids,
+      role_ids: user.role_ids || [],
     });
     setShowModal(true);
   };
@@ -79,22 +82,28 @@ function Users() {
     e.preventDefault();
     setError('');
 
+    // Validation: ensure at least one role is assigned
+    if (formData.role_ids.length === 0) {
+      setError('Please assign at least one role to the user');
+      return;
+    }
+
     try {
       if (modalMode === 'create') {
         const createData: UserCreateRequest = {
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          role: formData.role,
           plant_ids: formData.plant_ids,
+          role_ids: formData.role_ids,
         };
         await usersApi.create(createData);
       } else if (selectedUser) {
         const updateData: UserUpdateRequest = {
           username: formData.username,
           email: formData.email,
-          role: formData.role,
           plant_ids: formData.plant_ids,
+          role_ids: formData.role_ids,
         };
         
         // Include password only if it's not empty
@@ -134,6 +143,23 @@ function Users() {
     }));
   };
 
+  const toggleRoleSelection = (roleId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      role_ids: prev.role_ids.includes(roleId)
+        ? prev.role_ids.filter(id => id !== roleId)
+        : [...prev.role_ids, roleId]
+    }));
+  };
+
+  // Helper to check if user has SUPERADMIN role (for plant access check)
+  const userHasSuperadminRole = (roleIds: number[]) => {
+    return roleIds.some(id => {
+      const role = roles.find(r => r.id === id);
+      return role?.name === 'SUPERADMIN';
+    });
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -162,9 +188,10 @@ function Users() {
             <th>ID</th>
             <th>Username</th>
             <th>Email</th>
-            <th>Role</th>
+            <th>Roles</th>
+            <th>Permissions</th>
             <th>Status</th>
-            <th>Assigned Plants</th>
+            <th>Plant Access</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -175,8 +202,30 @@ function Users() {
               <td>{user.username}</td>
               <td>{user.email}</td>
               <td>
-                <span className={`badge ${user.role === UserRole.SUPERADMIN ? 'badge-primary' : 'badge-secondary'}`}>
-                  {user.role}
+                {user.role_ids && user.role_ids.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {user.role_ids.map((roleId) => {
+                      const role = roles.find(r => r.id === roleId);
+                      return role ? (
+                        <span 
+                          key={roleId} 
+                          className={`badge ${role.is_system ? 'badge-primary' : 'badge-info'}`}
+                          style={{ fontSize: '11px' }}
+                        >
+                          {role.name}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                ) : (
+                  <em style={{ color: '#95a5a6' }}>No roles</em>
+                )}
+              </td>
+              <td>
+                <span style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                  {user.permissions && user.permissions.length > 0 
+                    ? `${user.permissions.length} permission(s)` 
+                    : 'None'}
                 </span>
               </td>
               <td>
@@ -185,8 +234,8 @@ function Users() {
                 </span>
               </td>
               <td>
-                {user.role === UserRole.SUPERADMIN ? (
-                  <em>All plants</em>
+                {userHasSuperadminRole(user.role_ids || []) ? (
+                  <em style={{ color: '#3498db' }}>All plants</em>
                 ) : (
                   <span>{user.plant_ids.length} plant(s)</span>
                 )}
@@ -256,18 +305,42 @@ function Users() {
               </div>
 
               <div className="form-group">
-                <label>Role *</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  required
-                >
-                  <option value={UserRole.ADMIN}>Admin</option>
-                  <option value={UserRole.SUPERADMIN}>Superadmin</option>
-                </select>
+                <label>Assigned Roles *</label>
+                <div className="checkbox-group" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                  {roles.map((role) => (
+                    <label key={role.id} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formData.role_ids.includes(role.id)}
+                        onChange={() => toggleRoleSelection(role.id)}
+                      />
+                      <span>
+                        {role.name}
+                        {role.is_system && (
+                          <span style={{ 
+                            marginLeft: '6px', 
+                            fontSize: '11px', 
+                            color: '#7f8c8d',
+                            fontStyle: 'italic' 
+                          }}>
+                            (System)
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {formData.role_ids.length === 0 && (
+                  <small style={{ color: '#e74c3c', display: 'block', marginTop: '5px' }}>
+                    Please select at least one role
+                  </small>
+                )}
+                <small style={{ color: '#7f8c8d', display: 'block', marginTop: '4px' }}>
+                  Users inherit all permissions from their assigned roles. Select multiple roles as needed.
+                </small>
               </div>
 
-              {formData.role === UserRole.ADMIN && (
+              {!userHasSuperadminRole(formData.role_ids) && (
                 <div className="form-group">
                   <label>Assigned Plants *</label>
                   <div className="checkbox-group">
@@ -283,7 +356,9 @@ function Users() {
                     ))}
                   </div>
                   {formData.plant_ids.length === 0 && (
-                    <small style={{ color: '#e74c3c', display: 'block', marginTop: '5px' }}>Please select at least one plant</small>
+                    <small style={{ color: '#e74c3c', display: 'block', marginTop: '5px' }}>
+                      Please select at least one plant (SUPERADMIN role has access to all plants)
+                    </small>
                   )}
                 </div>
               )}
@@ -295,7 +370,10 @@ function Users() {
                 <button 
                   type="submit" 
                   className="btn btn-primary"
-                  disabled={formData.role === UserRole.ADMIN && formData.plant_ids.length === 0}
+                  disabled={
+                    formData.role_ids.length === 0 || 
+                    (!userHasSuperadminRole(formData.role_ids) && formData.plant_ids.length === 0)
+                  }
                 >
                   {modalMode === 'create' ? 'Create' : 'Update'}
                 </button>
