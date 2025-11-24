@@ -17,6 +17,7 @@ function TallyTabScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct'>('dressed');
 
   // Load active sessions and their data
   const loadActiveSessions = async () => {
@@ -90,10 +91,38 @@ function TallyTabScreen() {
     header: {
       ...styles.header,
       padding: responsive.padding.medium,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
     },
     title: {
       ...styles.title,
       fontSize: responsive.fontSize.large,
+    },
+    modeToggleContainer: {
+      flexDirection: 'row' as const,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      borderRadius: 999,
+      padding: 2,
+    },
+    modeButton: {
+      paddingHorizontal: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
+      borderRadius: 999,
+      minWidth: responsive.isTablet ? 90 : 80,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    modeButtonActive: {
+      backgroundColor: '#fff',
+    },
+    modeButtonText: {
+      color: '#ecf0f1',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '600' as const,
+    },
+    modeButtonTextActive: {
+      color: '#2c3e50',
     },
     contentRow: {
       flex: 1,
@@ -164,6 +193,40 @@ function TallyTabScreen() {
     <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Active Sessions</Text>
+        <View style={dynamicStyles.modeToggleContainer}>
+          <TouchableOpacity
+            style={[
+              dynamicStyles.modeButton,
+              tallyMode === 'dressed' && dynamicStyles.modeButtonActive,
+            ]}
+            onPress={() => setTallyMode('dressed')}
+          >
+            <Text
+              style={[
+                dynamicStyles.modeButtonText,
+                tallyMode === 'dressed' && dynamicStyles.modeButtonTextActive,
+              ]}
+            >
+              Dressed
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              dynamicStyles.modeButton,
+              tallyMode === 'byproduct' && dynamicStyles.modeButtonActive,
+            ]}
+            onPress={() => setTallyMode('byproduct')}
+          >
+            <Text
+              style={[
+                dynamicStyles.modeButtonText,
+                tallyMode === 'byproduct' && dynamicStyles.modeButtonTextActive,
+              ]}
+            >
+              Byproduct
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       <View style={dynamicStyles.contentRow}>
@@ -206,7 +269,7 @@ function TallyTabScreen() {
             <TallyScreen
               sessionId={selectedSessionId}
               tallyRole="tally"
-              tallyMode="dressed"
+              tallyMode={tallyMode}
               hideTitle={true}
               disableSafeArea={true}
             />
