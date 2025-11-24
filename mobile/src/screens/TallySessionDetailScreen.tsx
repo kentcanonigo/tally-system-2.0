@@ -364,6 +364,9 @@ function TallySessionDetailScreen() {
     const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
     const diffColor = getDifferenceColor(allocation);
     const matchStatus = getMatchStatus(allocation);
+    const hasTallyOverallocation = allocation.required_bags > 0 && allocation.allocated_bags_tally > allocation.required_bags;
+    const hasDispatcherOverallocation = allocation.required_bags > 0 && allocation.allocated_bags_dispatcher > allocation.required_bags;
+    const orangeColor = '#f39c12';
     return (
       <View 
         key={allocation.id} 
@@ -396,12 +399,24 @@ function TallySessionDetailScreen() {
           <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
         </View>
         <View style={styles.allocationRow}>
-          <Text style={dynamicStyles.allocationLabel}>Allocated (Tally):</Text>
-          <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_tally}</Text>
+          <Text style={[
+            dynamicStyles.allocationLabel,
+            hasTallyOverallocation && { color: orangeColor }
+          ]}>Allocated (Tally):</Text>
+          <Text style={[
+            dynamicStyles.allocationValue,
+            hasTallyOverallocation && { color: orangeColor }
+          ]}>{allocation.allocated_bags_tally}</Text>
         </View>
         <View style={styles.allocationRow}>
-          <Text style={dynamicStyles.allocationLabel}>Allocated (Dispatcher):</Text>
-          <Text style={dynamicStyles.allocationValue}>{allocation.allocated_bags_dispatcher}</Text>
+          <Text style={[
+            dynamicStyles.allocationLabel,
+            hasDispatcherOverallocation && { color: orangeColor }
+          ]}>Allocated (Dispatcher):</Text>
+          <Text style={[
+            dynamicStyles.allocationValue,
+            hasDispatcherOverallocation && { color: orangeColor }
+          ]}>{allocation.allocated_bags_dispatcher}</Text>
         </View>
         <View style={styles.allocationRow}>
           <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
