@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { customersApi } from '../services/api';
 import type { Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { usePermissions } from '../utils/usePermissions';
 
 function CustomersScreen() {
   const responsive = useResponsive();
+  const { hasPermission } = usePermissions();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -164,9 +166,12 @@ function CustomersScreen() {
     <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Customers</Text>
-        <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
-          <Text style={dynamicStyles.addButtonText}>+ Add</Text>
-        </TouchableOpacity>
+        {/* Only show add button if user has permission */}
+        {hasPermission('can_manage_customers') && (
+          <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
+            <Text style={dynamicStyles.addButtonText}>+ Add</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -175,14 +180,17 @@ function CustomersScreen() {
           <View style={dynamicStyles.card}>
             <View style={styles.cardContent}>
               <Text style={dynamicStyles.name}>{item.name}</Text>
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                  <Text style={styles.actionText}>✏️</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                  <Text style={styles.actionText}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Only show edit/delete buttons if user has permission */}
+              {hasPermission('can_manage_customers') && (
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+                    <Text style={styles.actionText}>✏️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
+                    <Text style={styles.actionText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}

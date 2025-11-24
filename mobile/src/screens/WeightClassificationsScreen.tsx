@@ -6,10 +6,12 @@ import { weightClassificationsApi } from '../services/api';
 import type { WeightClassification } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePlant } from '../contexts/PlantContext';
+import { usePermissions } from '../utils/usePermissions';
 
 function WeightClassificationsScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
+  const { hasPermission } = usePermissions();
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -287,9 +289,12 @@ function WeightClassificationsScreen() {
     <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Weight Classifications</Text>
-        <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
-          <Text style={dynamicStyles.addButtonText}>+ Add</Text>
-        </TouchableOpacity>
+        {/* Only show add button if user has permission */}
+        {hasPermission('can_manage_weight_classes') && (
+          <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
+            <Text style={dynamicStyles.addButtonText}>+ Add</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -313,14 +318,17 @@ function WeightClassificationsScreen() {
                       <Text style={styles.description}>{item.description}</Text>
                     )}
                   </View>
-                  <View style={styles.actions}>
-                    <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                      <Text style={styles.actionText}>✏️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                      <Text style={styles.actionText}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {/* Only show edit/delete buttons if user has permission */}
+                  {hasPermission('can_manage_weight_classes') && (
+                    <View style={styles.actions}>
+                      <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+                        <Text style={styles.actionText}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
+                        <Text style={styles.actionText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             ))
@@ -344,14 +352,17 @@ function WeightClassificationsScreen() {
                     <Text style={styles.classification}>{item.classification}</Text>
                     <Text style={styles.weightRange}>{formatWeightRange(item)}</Text>
                   </View>
-                  <View style={styles.actions}>
-                    <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                      <Text style={styles.actionText}>✏️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                      <Text style={styles.actionText}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {/* Only show edit/delete buttons if user has permission */}
+                  {hasPermission('can_manage_weight_classes') && (
+                    <View style={styles.actions}>
+                      <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+                        <Text style={styles.actionText}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
+                        <Text style={styles.actionText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             ))

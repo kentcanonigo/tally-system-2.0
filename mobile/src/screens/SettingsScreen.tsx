@@ -6,8 +6,8 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
-import { plantsApi } from '../services/api';
-import { Plant } from '../types';
+import { plantsApi, rolesApi } from '../services/api';
+import { Plant, Role } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDefaultHeadsAmount } from '../utils/settings';
 
@@ -31,6 +31,8 @@ function SettingsScreen() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [showPlantDropdown, setShowPlantDropdown] = useState(false);
   const [isLoadingPlants, setIsLoadingPlants] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
   // Update selectedTimezone when timezone changes from context
   React.useEffect(() => {
@@ -41,6 +43,7 @@ function SettingsScreen() {
   useEffect(() => {
     loadThreshold();
     fetchPlants();
+    fetchRoles();
   }, []);
 
   const fetchPlants = async () => {
@@ -53,6 +56,19 @@ function SettingsScreen() {
       Alert.alert('Error', 'Failed to load plants');
     } finally {
       setIsLoadingPlants(false);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      setIsLoadingRoles(true);
+      const response = await rolesApi.getAll();
+      setRoles(response.data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      // Silent fail – we can still fall back to legacy user.role display
+    } finally {
+      setIsLoadingRoles(false);
     }
   };
 
@@ -113,6 +129,27 @@ function SettingsScreen() {
     if (!activePlantId) return 'None Selected';
     const plant = plants.find(p => p.id === activePlantId);
     return plant ? plant.name : 'Unknown Plant';
+  };
+
+  const getUserRoleLabel = () => {
+    if (!user) return 'Unknown';
+
+    // Prefer RBAC roles from role_ids if available and roles are loaded
+    if (user.role_ids && user.role_ids.length > 0 && roles.length > 0) {
+      const assignedRoles = roles.filter(role => user.role_ids.includes(role.id));
+      if (assignedRoles.length > 0) {
+        return assignedRoles.map(role => role.name).join(', ');
+      }
+    }
+
+    // Fallback to legacy system role (superadmin/admin)
+    if (user.role) {
+      return typeof user.role === 'string'
+        ? user.role.toUpperCase()
+        : String(user.role).toUpperCase();
+    }
+
+    return 'Unknown';
   };
 
   const dynamicStyles = {
@@ -407,7 +444,7 @@ function SettingsScreen() {
             <View style={[dynamicStyles.inputWrapper, { marginBottom: responsive.spacing.sm }]}>
               <Text style={dynamicStyles.label}>Role:</Text>
               <Text style={[dynamicStyles.input, { backgroundColor: '#f5f5f5', color: '#7f8c8d' }]}>
-                {user.role}
+                {isLoadingRoles ? 'Loading...' : getUserRoleLabel()}
               </Text>
             </View>
           </>

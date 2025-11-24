@@ -21,9 +21,11 @@ import { tallySessionsApi, exportApi, customersApi } from '../services/api';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import { TallySession, Customer } from '../types';
 import { usePlant } from '../contexts/PlantContext';
+import { usePermissions } from '../utils/usePermissions';
 
 const ExportScreen = () => {
   const { activePlantId } = usePlant();
+  const { hasPermission } = usePermissions();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -384,17 +386,24 @@ const ExportScreen = () => {
 
       <View style={styles.footer}>
         <Text style={styles.selectionCount}>{selectedSessionIds.length} selected</Text>
-        <TouchableOpacity 
-          style={[styles.exportButton, (selectedSessionIds.length === 0 || exporting) && styles.disabledButton]} 
-          onPress={handleExport}
-          disabled={selectedSessionIds.length === 0 || exporting}
-        >
-          {exporting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.exportButtonText}>Export PDF</Text>
-          )}
-        </TouchableOpacity>
+        {/* Only show export button if user has permission */}
+        {hasPermission('can_export_reports') ? (
+          <TouchableOpacity 
+            style={[styles.exportButton, (selectedSessionIds.length === 0 || exporting) && styles.disabledButton]} 
+            onPress={handleExport}
+            disabled={selectedSessionIds.length === 0 || exporting}
+          >
+            {exporting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.exportButtonText}>Export PDF</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.noPermissionContainer}>
+            <Text style={styles.noPermissionText}>Export requires permission</Text>
+          </View>
+        )}
       </View>
 
       {renderFilterModal()}
@@ -664,6 +673,18 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
     fontSize: 16,
+  },
+  noPermissionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  noPermissionText: {
+    color: '#e74c3c',
+    fontSize: 14,
+    fontWeight: '600',
+    fontStyle: 'italic',
   },
 });
 
