@@ -40,6 +40,7 @@ function TallyScreen() {
   const [manualWeightInput, setManualWeightInput] = useState('0');
   const [activeInputField, setActiveInputField] = useState<'weight' | 'heads' | null>(null);
   const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
+  const [defaultHeadsAmount, setDefaultHeadsAmount] = useState<number>(15);
 
   // Determine if we should use landscape layout (side by side)
   // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
@@ -49,6 +50,8 @@ function TallyScreen() {
     if (sessionId) {
       fetchData();
     }
+    // Load default heads amount
+    getDefaultHeadsAmount().then(setDefaultHeadsAmount);
   }, [sessionId]);
 
   // Update navigation title when data is loaded
@@ -1031,8 +1034,8 @@ function TallyScreen() {
   const renderDressedMode = () => {
     const calculatorContent = (
       <>
-        {/* Toggle Button */}
-        <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Toggle Button and Allocated/Required Field */}
+        <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'stretch', gap: responsive.spacing.sm }}>
           <TouchableOpacity
             style={{
               flexDirection: 'row',
@@ -1042,10 +1045,12 @@ function TallyScreen() {
               padding: responsive.padding.small,
               borderWidth: 1,
               borderColor: '#bdc3c7',
+              flex: 1,
+              justifyContent: 'space-between',
             }}
             onPress={() => setShowManualInput(!showManualInput)}
           >
-            <Text style={{ marginRight: responsive.spacing.sm, fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600' }}>
+            <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600' }}>
               Manual Input
             </Text>
             <View
@@ -1069,6 +1074,45 @@ function TallyScreen() {
               />
             </View>
           </TouchableOpacity>
+          
+          {/* Allocated/Required Field - Always visible, matching toggle height */}
+          <View style={[
+            {
+              backgroundColor: '#ecf0f1',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: '#bdc3c7',
+              padding: responsive.padding.small,
+              flex: 1.5,
+              justifyContent: 'center',
+            }
+          ]}>
+            <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>Allocated / Required</Text>
+            <Text style={[
+              dynamicStyles.displayValue,
+              (() => {
+                const allocation = showManualInput && selectedWeightClassId
+                  ? getCurrentAllocation(selectedWeightClassId)
+                  : currentAllocation;
+                return allocation && 
+                  (tallyRole === 'tally' 
+                    ? allocation.allocated_bags_tally >= allocation.required_bags
+                    : allocation.allocated_bags_dispatcher >= allocation.required_bags) &&
+                  allocation.required_bags > 0
+                    ? { color: '#27ae60' }
+                    : {};
+              })()
+            ]}>
+              {(() => {
+                const allocation = showManualInput && selectedWeightClassId
+                  ? getCurrentAllocation(selectedWeightClassId)
+                  : currentAllocation;
+                return allocation
+                  ? `${tallyRole === 'tally' ? allocation.allocated_bags_tally : allocation.allocated_bags_dispatcher} / ${allocation.required_bags}`
+                  : '- / -';
+              })()}
+            </Text>
+          </View>
         </View>
 
         {showManualInput ? (
@@ -1145,7 +1189,7 @@ function TallyScreen() {
             </View>
           </View>
         ) : (
-          /* Three display fields in a row */
+          /* Three display fields in a row - Automatic mode */
           <View style={dynamicStyles.displayRow}>
             <View style={[dynamicStyles.displayField, { flex: 2 }]}>
               <Text style={dynamicStyles.displayLabel}>Classification</Text>
@@ -1153,21 +1197,10 @@ function TallyScreen() {
                 {matchedWC ? matchedWC.classification : '-'}
               </Text>
             </View>
-            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
-              <Text style={dynamicStyles.displayLabel}>Allocated / Required</Text>
-              <Text style={[
-                dynamicStyles.displayValue,
-                currentAllocation && 
-                (tallyRole === 'tally' 
-                  ? currentAllocation.allocated_bags_tally >= currentAllocation.required_bags
-                  : currentAllocation.allocated_bags_dispatcher >= currentAllocation.required_bags) &&
-                currentAllocation.required_bags > 0
-                  ? { color: '#27ae60' }
-                  : {}
-              ]}>
-                {currentAllocation
-                  ? `${tallyRole === 'tally' ? currentAllocation.allocated_bags_tally : currentAllocation.allocated_bags_dispatcher} / ${currentAllocation.required_bags}`
-                  : '- / -'}
+            <View style={[dynamicStyles.displayField, { flex: 1 }]}>
+              <Text style={dynamicStyles.displayLabel}>Heads</Text>
+              <Text style={dynamicStyles.displayValue}>
+                {defaultHeadsAmount}
               </Text>
             </View>
             <View style={[dynamicStyles.displayField, { flex: 1.5 }]}>
