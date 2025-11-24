@@ -165,7 +165,7 @@ async def update_user(
         Updated user information
     
     Raises:
-        HTTPException: If user not found or username/email already taken
+        HTTPException: If user not found, username/email already taken, or trying to downgrade last superadmin
     """
     # Check if user exists
     existing_user = user_crud.get_user_by_id(db, user_id)
@@ -191,6 +191,15 @@ async def update_user(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already taken"
+            )
+    
+    # Prevent downgrading the last superadmin
+    if user_data.role and existing_user.role == "superadmin" and user_data.role != "superadmin":
+        superadmin_count = user_crud.count_superadmins(db)
+        if superadmin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change the role of the last superadmin. At least one superadmin must remain in the system."
             )
     
     # Update user
@@ -231,7 +240,7 @@ async def delete_user(
         current_user: Current superadmin user
     
     Raises:
-        HTTPException: If user not found or trying to delete themselves
+        HTTPException: If user not found, trying to delete themselves, or deleting last superadmin
     """
     # Prevent superadmin from deleting themselves
     if user_id == current_user.id:
@@ -240,13 +249,30 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
     
+    # Check if user exists and get their role
+    user_to_delete = user_crud.get_user_by_id(db, user_id)
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Prevent deleting the last superadmin
+    if user_to_delete.role == "superadmin":
+        superadmin_count = user_crud.count_superadmins(db)
+        if superadmin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last superadmin. At least one superadmin must remain in the system."
+            )
+    
     # Delete user
     success = user_crud.delete_user(db, user_id)
     
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user"
         )
     
     return None

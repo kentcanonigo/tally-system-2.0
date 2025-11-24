@@ -176,3 +176,19 @@ def get_user_plant_ids(db: Session, user_id: int) -> List[int]:
     
     return [perm.plant_id for perm in permissions]
 
+
+def count_superadmins(db: Session) -> int:
+    """
+    Count the number of active superadmin users.
+    
+    Args:
+        db: Database session
+    
+    Returns:
+        Number of superadmin users
+    """
+    return db.query(User).filter(
+        User.role == UserRole.SUPERADMIN,
+        User.is_active == True
+    ).count()
+
