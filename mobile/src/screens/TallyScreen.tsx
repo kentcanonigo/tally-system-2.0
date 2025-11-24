@@ -16,14 +16,24 @@ import { getDefaultHeadsAmount } from '../utils/settings';
 import { formatDate } from '../utils/dateFormat';
 import { useTimezone } from '../contexts/TimezoneContext';
 
-function TallyScreen() {
+interface TallyScreenProps {
+  sessionId?: number;
+  tallyRole?: 'tally' | 'dispatcher';
+  tallyMode?: 'dressed' | 'byproduct';
+  hideTitle?: boolean; // If true, don't update navigation title
+}
+
+function TallyScreen(props?: TallyScreenProps) {
   const route = useRoute();
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
-  const sessionId = (route.params as any)?.sessionId;
-  const tallyRole = (route.params as any)?.tallyRole as 'tally' | 'dispatcher';
-  const tallyMode = (route.params as any)?.tallyMode as 'dressed' | 'byproduct' || 'dressed';
+  
+  // Use props if provided, otherwise fall back to route params
+  const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
+  const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
+  const tallyMode = (props?.tallyMode ?? (route.params as any)?.tallyMode) as 'dressed' | 'byproduct' || 'dressed';
+  const hideTitle = props?.hideTitle ?? false;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -77,8 +87,10 @@ function TallyScreen() {
     }
   }, [showManualInput, defaultHeadsAmount]);
 
-  // Update navigation title when data is loaded
+  // Update navigation title when data is loaded (only if not hidden)
   useLayoutEffect(() => {
+    if (hideTitle) return;
+    
     if (plant && customer && session) {
       const titleParts = [customer.name, `Session #${session.session_number}`, formatDate(session.date, timezone)];
       const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
@@ -89,7 +101,7 @@ function TallyScreen() {
       const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
       navigation.setOptions({ title: `Tally - ${modeText} - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}` });
     }
-  }, [plant, customer, session, tallyRole, tallyMode, navigation]);
+  }, [plant, customer, session, tallyRole, tallyMode, navigation, hideTitle]);
 
   const fetchData = async () => {
     try {

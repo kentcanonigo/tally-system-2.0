@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
+import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions } from '../utils/activeSessions';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -26,13 +28,24 @@ function TallySessionsScreen() {
   const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const hasInitiallyLoaded = useRef(false);
 
   useEffect(() => {
     fetchData().then(() => {
       hasInitiallyLoaded.current = true;
     });
+    loadActiveSessions();
   }, [activePlantId]); // Refetch when activePlantId changes
+
+  const loadActiveSessions = async () => {
+    try {
+      const activeIds = await getActiveSessions();
+      setActiveSessionIds(activeIds);
+    } catch (error) {
+      console.error('Error loading active sessions:', error);
+    }
+  };
 
   // Refresh sessions when screen comes into focus (e.g., when returning from session details)
   useFocusEffect(
@@ -42,6 +55,7 @@ function TallySessionsScreen() {
         // Use a small delay to ensure the previous screen has fully navigated away
         const timeoutId = setTimeout(() => {
           fetchData(false); // Don't show loading spinner on refresh
+          loadActiveSessions();
         }, 100);
         return () => clearTimeout(timeoutId);
       }
@@ -99,6 +113,36 @@ function TallySessionsScreen() {
         return '#e74c3c';
       default:
         return '#95a5a6';
+    }
+  };
+
+  const handleToggleActive = async (sessionId: number) => {
+    try {
+      const isActive = activeSessionIds.includes(sessionId);
+      
+      if (!isActive && activeSessionIds.length >= getMaxActiveSessions()) {
+        Alert.alert(
+          'Maximum Active Sessions Reached',
+          `You can only have ${getMaxActiveSessions()} active sessions at a time. Please remove an active session first.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      const newActiveStatus = await toggleActiveSession(sessionId);
+      await loadActiveSessions();
+      
+      if (!newActiveStatus && !isActive) {
+        // This means we tried to add but hit the limit (shouldn't happen due to check above, but just in case)
+        Alert.alert(
+          'Maximum Active Sessions Reached',
+          `You can only have ${getMaxActiveSessions()} active sessions at a time.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling active session:', error);
+      Alert.alert('Error', 'Failed to update active session');
     }
   };
 
@@ -276,23 +320,45 @@ function TallySessionsScreen() {
 
       <FlatList
         data={sessions}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={dynamicStyles.sessionCard}
-            onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
-          >
-            <View style={styles.sessionHeader}>
-              <Text style={dynamicStyles.sessionId}>
-                {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
-              </Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                <Text style={styles.statusText}>{item.status}</Text>
+        renderItem={({ item }) => {
+          const isActive = activeSessionIds.includes(item.id);
+          return (
+            <View style={dynamicStyles.sessionCard}>
+              <View style={styles.sessionHeader}>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={styles.activeToggleButton}
+                    onPress={() => handleToggleActive(item.id)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <MaterialIcons
+                      name={isActive ? 'star' : 'star-border'}
+                      size={24}
+                      color={isActive ? '#f39c12' : '#95a5a6'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
+                  >
+                    <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
+                      {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
               </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
+              >
+                <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
+                <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
-            <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
-          </TouchableOpacity>
-        )}
+          );
+        }}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={dynamicStyles.list}
@@ -534,6 +600,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  activeToggleButton: {
+    padding: 4,
+    marginRight: 4,
   },
   sessionId: {
     fontWeight: 'bold',

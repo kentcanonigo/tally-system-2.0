@@ -9,6 +9,7 @@ import TallySessionDetailScreen from '../screens/TallySessionDetailScreen';
 import CreateTallySessionScreen from '../screens/CreateTallySessionScreen';
 import TallyScreen from '../screens/TallyScreen';
 import TallySessionLogsScreen from '../screens/TallySessionLogsScreen';
+import TallyTabScreen from '../screens/TallyTabScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CustomersScreen from '../screens/CustomersScreen';
@@ -42,6 +43,8 @@ function AppNavigator() {
               iconName = 'home';
             } else if (route.name === 'Sessions') {
               iconName = 'list';
+            } else if (route.name === 'Tally') {
+              iconName = 'edit';
             } else if (route.name === 'Customers') {
               iconName = 'people';
             } else if (route.name === 'WeightClassifications') {
@@ -64,6 +67,7 @@ function AppNavigator() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
+        <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Customers" component={CustomersScreen} />
         <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ title: 'Weight Classes' }} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
