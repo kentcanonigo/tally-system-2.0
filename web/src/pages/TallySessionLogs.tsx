@@ -17,9 +17,11 @@ function TallySessionLogs() {
   const [filters, setFilters] = useState<{
     role: TallyLogEntryRole | 'all';
     weight_classification_id: number | 'all';
+    category: 'Dressed' | 'Byproduct' | 'all';
   }>({
     role: 'all',
     weight_classification_id: 'all',
+    category: 'all',
   });
   const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -105,6 +107,12 @@ function TallySessionLogs() {
       }
       if (filters.weight_classification_id !== 'all' && entry.weight_classification_id !== filters.weight_classification_id) {
         return false;
+      }
+      if (filters.category !== 'all') {
+        const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
+        if (!wc || wc.category !== filters.category) {
+          return false;
+        }
       }
       return true;
     });
@@ -252,6 +260,24 @@ function TallySessionLogs() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontWeight: 'bold' }}>Filter by Category:</label>
+          <select
+            value={filters.category}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                category: e.target.value as 'Dressed' | 'Byproduct' | 'all',
+              })
+            }
+            style={{ padding: '8px', minWidth: '150px' }}
+          >
+            <option value="all">All Categories</option>
+            <option value="Dressed">Dressed</option>
+            <option value="Byproduct">Byproduct</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
           <label style={{ fontWeight: 'bold' }}>Sort By:</label>
           <select
             value={sortBy}
@@ -349,6 +375,7 @@ function TallySessionLogs() {
                 <th>Role</th>
                 <th>Weight Classification</th>
                 <th>Description</th>
+                <th>Category</th>
                 <th>Weight Range</th>
                 <th>Weight</th>
                 <th>Heads</th>
@@ -378,6 +405,7 @@ function TallySessionLogs() {
                       </td>
                       <td>{getWeightClassificationName(entry.weight_classification_id)}</td>
                       <td>{wc?.description || '-'}</td>
+                      <td>{wc?.category || '-'}</td>
                       <td>{wc ? formatWeightRange(wc) : '-'}</td>
                       <td>{entry.weight.toFixed(2)}</td>
                       <td>{entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}</td>
