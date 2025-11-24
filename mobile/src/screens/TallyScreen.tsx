@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect, useMemo } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import {
@@ -41,6 +41,10 @@ function TallyScreen() {
   const [activeInputField, setActiveInputField] = useState<'weight' | 'heads' | null>(null);
   const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
   const [defaultHeadsAmount, setDefaultHeadsAmount] = useState<number>(15);
+  
+  // Refs for TextInput fields to maintain focus
+  const headsInputRef = useRef<TextInput>(null);
+  const weightInputRef = useRef<TextInput>(null);
 
   // Determine if we should use landscape layout (side by side)
   // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
@@ -53,6 +57,22 @@ function TallyScreen() {
     // Load default heads amount
     getDefaultHeadsAmount().then(setDefaultHeadsAmount);
   }, [sessionId]);
+
+  // Reset manual input state when toggle is turned off
+  useEffect(() => {
+    if (!showManualInput) {
+      // Clear all manual input fields
+      setSelectedWeightClassId(null);
+      setManualHeadsInput(defaultHeadsAmount.toString());
+      setManualWeightInput('0');
+      setActiveInputField(null);
+      // Blur any focused input fields
+      headsInputRef.current?.blur();
+      weightInputRef.current?.blur();
+      // Reset to automatic input mode
+      setTallyInput('0');
+    }
+  }, [showManualInput, defaultHeadsAmount]);
 
   // Update navigation title when data is loaded
   useLayoutEffect(() => {
@@ -172,12 +192,20 @@ function TallyScreen() {
         }
         return prev + num;
       });
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        headsInputRef.current?.focus();
+      });
     } else if (activeInputField === 'weight') {
       setManualWeightInput((prev) => {
         if (prev === '0' || prev === '') {
           return num;
         }
         return prev + num;
+      });
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        weightInputRef.current?.focus();
       });
     } else {
       setTallyInput((prev) => {
@@ -194,10 +222,18 @@ function TallyScreen() {
       if (manualHeadsInput.indexOf('.') === -1) {
         setManualHeadsInput((prev) => prev + '.');
       }
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        headsInputRef.current?.focus();
+      });
     } else if (activeInputField === 'weight') {
       if (manualWeightInput.indexOf('.') === -1) {
         setManualWeightInput((prev) => prev + '.');
       }
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        weightInputRef.current?.focus();
+      });
     } else {
       if (tallyInput.indexOf('.') === -1) {
         setTallyInput((prev) => prev + '.');
@@ -207,10 +243,19 @@ function TallyScreen() {
 
   const handleTallyClear = () => {
     if (activeInputField === 'heads') {
-      setManualHeadsInput('0');
+      // Clear heads to default heads amount
+      setManualHeadsInput(defaultHeadsAmount.toString());
+      requestAnimationFrame(() => {
+        headsInputRef.current?.focus();
+      });
     } else if (activeInputField === 'weight') {
+      // Clear weight to 0
       setManualWeightInput('0');
+      requestAnimationFrame(() => {
+        weightInputRef.current?.focus();
+      });
     } else {
+      // Clear the main tally input (automatic mode)
       setTallyInput('0');
     }
   };
@@ -223,12 +268,20 @@ function TallyScreen() {
         }
         return '0';
       });
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        headsInputRef.current?.focus();
+      });
     } else if (activeInputField === 'weight') {
       setManualWeightInput((prev) => {
         if (prev.length > 1) {
           return prev.slice(0, -1);
         }
         return '0';
+      });
+      // Immediately refocus to prevent blur
+      requestAnimationFrame(() => {
+        weightInputRef.current?.focus();
       });
     } else {
       setTallyInput((prev) => {
@@ -1119,11 +1172,29 @@ function TallyScreen() {
           /* Manual Input Form - Single Row Style */
           <View style={dynamicStyles.displayRow}>
             {/* Weight Classification Dropdown */}
-            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
+            <View style={[
+              dynamicStyles.displayField,
+              {
+                flex: 2,
+                backgroundColor: '#f8f9fa',
+                borderWidth: 2,
+                borderColor: showWeightClassDropdown ? '#3498db' : '#bdc3c7',
+              }
+            ]}>
               <Text style={dynamicStyles.displayLabel}>Weight Classification</Text>
               <TouchableOpacity
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}
-                onPress={() => setShowWeightClassDropdown(true)}
+                onPress={() => {
+                  // Clear active input field when opening dropdown
+                  if (activeInputField === 'heads') {
+                    headsInputRef.current?.blur();
+                    setActiveInputField(null);
+                  } else if (activeInputField === 'weight') {
+                    weightInputRef.current?.blur();
+                    setActiveInputField(null);
+                  }
+                  setShowWeightClassDropdown(true);
+                }}
               >
                 <Text style={{ color: selectedWeightClassId ? '#2c3e50' : '#999', flex: 1 }} numberOfLines={1}>
                   {selectedWeightClassId
@@ -1135,9 +1206,18 @@ function TallyScreen() {
             </View>
 
             {/* Heads Input */}
-            <View style={[dynamicStyles.displayField, { flex: 1 }]}>
+            <View style={[
+              dynamicStyles.displayField,
+              {
+                flex: 1,
+                backgroundColor: activeInputField === 'heads' ? '#fff' : '#f8f9fa',
+                borderWidth: 2,
+                borderColor: activeInputField === 'heads' ? '#3498db' : '#bdc3c7',
+              }
+            ]}>
               <Text style={dynamicStyles.displayLabel}>Heads</Text>
               <TextInput
+                ref={headsInputRef}
                 style={{
                   marginTop: 2,
                   padding: 0,
@@ -1149,11 +1229,16 @@ function TallyScreen() {
                 }}
                 value={manualHeadsInput}
                 onChangeText={setManualHeadsInput}
-                onFocus={() => setActiveInputField('heads')}
-                onBlur={() => {
-                  if (activeInputField === 'heads') {
-                    setActiveInputField(null);
+                onFocus={() => {
+                  setActiveInputField('heads');
+                  // Clear weight field focus when heads is focused
+                  if (activeInputField === 'weight') {
+                    weightInputRef.current?.blur();
                   }
+                }}
+                onBlur={() => {
+                  // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
+                  // This prevents losing focus when numpad buttons are pressed
                 }}
                 keyboardType="numeric"
                 placeholder="15"
@@ -1162,9 +1247,18 @@ function TallyScreen() {
             </View>
 
             {/* Weight Input */}
-            <View style={[dynamicStyles.displayField, { flex: 1.5 }]}>
+            <View style={[
+              dynamicStyles.displayField,
+              {
+                flex: 1.5,
+                backgroundColor: activeInputField === 'weight' ? '#fff' : '#f8f9fa',
+                borderWidth: 2,
+                borderColor: activeInputField === 'weight' ? '#3498db' : '#bdc3c7',
+              }
+            ]}>
               <Text style={dynamicStyles.displayLabel}>Weight</Text>
               <TextInput
+                ref={weightInputRef}
                 style={{
                   marginTop: 2,
                   padding: 0,
@@ -1176,11 +1270,16 @@ function TallyScreen() {
                 }}
                 value={manualWeightInput}
                 onChangeText={setManualWeightInput}
-                onFocus={() => setActiveInputField('weight')}
-                onBlur={() => {
-                  if (activeInputField === 'weight') {
-                    setActiveInputField(null);
+                onFocus={() => {
+                  setActiveInputField('weight');
+                  // Clear heads field focus when weight is focused
+                  if (activeInputField === 'heads') {
+                    headsInputRef.current?.blur();
                   }
+                }}
+                onBlur={() => {
+                  // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
+                  // This prevents losing focus when numpad buttons are pressed
                 }}
                 keyboardType="numeric"
                 placeholder="0"
@@ -1217,46 +1316,94 @@ function TallyScreen() {
           {/* Number pad */}
           <View style={dynamicStyles.numberPad}>
             <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('7')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('7')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>7</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('8')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('8')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>8</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('9')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('9')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>9</Text>
               </TouchableOpacity>
             </View>
             <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('4')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('4')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>4</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('5')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('5')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>5</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('6')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('6')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>6</Text>
               </TouchableOpacity>
             </View>
             <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('1')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('1')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>1</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('2')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('2')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>2</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('3')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('3')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>3</Text>
               </TouchableOpacity>
             </View>
             <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('0')}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={() => handleTallyNumberPress('0')}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>0</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyDecimal}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={handleTallyDecimal}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>.</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyBackspace}>
+              <TouchableOpacity 
+                style={dynamicStyles.numberButton} 
+                onPress={handleTallyBackspace}
+                activeOpacity={0.7}
+              >
                 <Text style={dynamicStyles.buttonText}>⌫</Text>
               </TouchableOpacity>
             </View>
