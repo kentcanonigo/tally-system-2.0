@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
@@ -133,7 +133,13 @@ function TallySessions() {
     return null;
   };
 
-  const handleDateChange = (value: Date) => {
+  const handleDateChange = (value: Date | [Date, Date] | null) => {
+    if (!value || Array.isArray(value)) {
+      // Handle null or date range (we only support single date selection)
+      setSelectedDate(null);
+      return;
+    }
+    
     if (selectedDate && selectedDate.toISOString().split('T')[0] === value.toISOString().split('T')[0]) {
       // If same date clicked, clear filter
       setSelectedDate(null);
