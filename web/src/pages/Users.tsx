@@ -117,7 +117,24 @@ function Users() {
       await loadData();
       closeModal();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Operation failed');
+      // Handle different error formats
+      let errorMessage = 'Operation failed';
+      
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        // Check if detail is an array of validation errors (Pydantic format)
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((e: any) => e.msg || JSON.stringify(e)).join(', ');
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (typeof detail === 'object') {
+          errorMessage = JSON.stringify(detail);
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
   };
 

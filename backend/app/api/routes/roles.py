@@ -12,28 +12,17 @@ from ...schemas.role import (
 from ...schemas.permission import PermissionResponse
 from ...crud import role as role_crud
 from ...crud import permission as permission_crud
-from ...auth.dependencies import get_current_user
+from ...auth.dependencies import get_current_user, require_permission, require_any_permission
 from ...models import User
 
 router = APIRouter()
-
-
-async def require_admin_or_superadmin(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency to ensure user has SUPERADMIN or ADMIN role in RBAC system."""
-    user_role_names = [role.name for role in current_user.roles]
-    if not any(role_name in ['SUPERADMIN', 'ADMIN'] for role_name in user_role_names):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin or Superadmin role required"
-        )
-    return current_user
 
 
 @router.post("", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
 async def create_role(
     role_data: RoleCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_superadmin)
+    current_user: User = Depends(require_permission("can_manage_roles"))
 ):
     """
     Create a new custom role (SUPERADMIN and ADMIN can create).
@@ -113,7 +102,7 @@ async def update_role(
     role_id: int,
     role_data: RoleUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_superadmin)
+    current_user: User = Depends(require_permission("can_manage_roles"))
 ):
     """
     Update a role (SUPERADMIN and ADMIN can update).
@@ -169,7 +158,7 @@ async def update_role(
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_superadmin)
+    current_user: User = Depends(require_permission("can_delete_roles"))
 ):
     """
     Delete a role (SUPERADMIN and ADMIN can delete).
@@ -215,10 +204,10 @@ async def assign_permissions(
     role_id: int,
     request: AssignPermissionsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_superadmin)
+    current_user: User = Depends(require_permission("can_assign_permissions"))
 ):
     """
-    Assign permissions to a role (replaces existing permissions).
+    Assign permissions to a role (replaces existing permissions). Requires 'can_assign_permissions' permission.
     """
     # Check if role exists
     role = role_crud.get_role_by_id(db, role_id)
@@ -261,10 +250,10 @@ async def remove_permission(
     role_id: int,
     permission_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_superadmin)
+    current_user: User = Depends(require_permission("can_assign_permissions"))
 ):
     """
-    Remove a permission from a role.
+    Remove a permission from a role. Requires 'can_assign_permissions' permission.
     """
     # Check if role exists
     role = role_crud.get_role_by_id(db, role_id)

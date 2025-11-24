@@ -5,7 +5,7 @@ from ...database import get_db
 from ...schemas.user import UserCreate, UserUpdate, UserResponse
 from ...schemas.permission import PermissionResponse
 from ...crud import user as user_crud
-from ...auth.dependencies import require_superadmin
+from ...auth.dependencies import require_superadmin, require_permission, require_any_permission
 from ...models import User
 
 router = APIRouter()
@@ -15,10 +15,10 @@ router = APIRouter()
 async def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_superadmin)
+    current_user: User = Depends(require_any_permission(["can_manage_users", "can_assign_admin_roles"]))
 ):
     """
-    Create a new user (superadmin only).
+    Create a new user. Requires 'can_manage_users' or 'can_assign_admin_roles' permission.
     
     Args:
         user_data: User creation data
@@ -163,10 +163,10 @@ async def update_user(
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_superadmin)
+    current_user: User = Depends(require_any_permission(["can_manage_users", "can_assign_admin_roles"]))
 ):
     """
-    Update a user (superadmin only).
+    Update a user. Requires 'can_manage_users' or 'can_assign_admin_roles' permission.
     
     Args:
         user_id: ID of the user to update
@@ -246,10 +246,10 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_superadmin)
+    current_user: User = Depends(require_permission("can_delete_users"))
 ):
     """
-    Delete a user (superadmin only).
+    Delete a user. Requires 'can_delete_users' permission.
     
     Args:
         user_id: ID of the user to delete
