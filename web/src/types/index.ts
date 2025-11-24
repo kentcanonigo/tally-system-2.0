@@ -95,3 +95,47 @@ export interface ExportRequest {
   customer_id?: number;
   plant_id?: number;
 }
+
+// Authentication types
+export enum UserRole {
+  SUPERADMIN = "superadmin",
+  ADMIN = "admin",
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  plant_ids: number[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserCreateRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  plant_ids: number[];
+}
+
+export interface UserUpdateRequest {
+  username?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+  is_active?: boolean;
+  plant_ids?: number[];
+}

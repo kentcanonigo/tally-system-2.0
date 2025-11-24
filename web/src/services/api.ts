@@ -9,7 +9,11 @@ import type {
   TallyLogEntryRole,
   ExportRequest,
   ExportResponse,
+  User,
+  UserCreateRequest,
+  UserUpdateRequest,
 } from '../types';
+import { getToken, removeToken } from './auth';
 
 // Vite replaces import.meta.env.VITE_API_URL at build time
 // If not set, fallback to localhost for local development
@@ -21,6 +25,33 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor to add JWT token
+api.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token and redirect to login
+      removeToken();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Customers API
 export const customersApi = {
@@ -102,6 +133,15 @@ export const tallyLogEntriesApi = {
 export const exportApi = {
   exportSessions: (data: ExportRequest) =>
     api.post<ExportResponse>('/export/sessions', data),
+};
+
+// Users API (superadmin only)
+export const usersApi = {
+  getAll: () => api.get<User[]>('/users'),
+  getById: (id: number) => api.get<User>(`/users/${id}`),
+  create: (data: UserCreateRequest) => api.post<User>('/users', data),
+  update: (id: number, data: UserUpdateRequest) => api.put<User>(`/users/${id}`, data),
+  delete: (id: number) => api.delete(`/users/${id}`),
 };
 
 export default api;

@@ -3,6 +3,9 @@ from .plant import Plant
 from .weight_classification import WeightClassification
 from .tally_session import TallySession
 from .allocation_details import AllocationDetails
+from .tally_log_entry import TallyLogEntry
+from .user import User, UserRole
+from .plant_permission import PlantPermission
 
 __all__ = [
     "Customer",
@@ -10,5 +13,8 @@ __all__ = [
     "WeightClassification",
     "TallySession",
     "AllocationDetails",
+    "TallyLogEntry",
+    "User",
+    "UserRole",
+    "PlantPermission",
 ]
-

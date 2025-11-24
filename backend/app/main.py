@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from .config import settings
-from .api.routes import customers, plants, weight_classifications, tally_sessions, allocation_details, tally_log_entries, export
+from .api.routes import customers, plants, weight_classifications, tally_sessions, allocation_details, tally_log_entries, export, auth, users
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +35,11 @@ app.add_middleware(
 )
 
 # Include routers
+# Authentication routes (no auth required for login)
+app.include_router(auth.router, prefix=f"{settings.api_v1_prefix}/auth", tags=["auth"])
+app.include_router(users.router, prefix=f"{settings.api_v1_prefix}/users", tags=["users"])
+
+# Other routes
 app.include_router(customers.router, prefix=settings.api_v1_prefix, tags=["customers"])
 app.include_router(plants.router, prefix=settings.api_v1_prefix, tags=["plants"])
 app.include_router(weight_classifications.router, prefix=settings.api_v1_prefix, tags=["weight-classifications"])
