@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate } from '../utils/dateFormat';
 import { useAcceptableDifference } from '../utils/settings';
@@ -437,6 +438,14 @@ function TallySessionDetailScreen() {
     return 'N/A';
   };
 
+  const formatDateForFilename = (date: Date): string => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  };
+
   const handleExportPDF = async () => {
     if (!session) return;
     try {
@@ -444,7 +453,29 @@ function TallySessionDetailScreen() {
       const response = await exportApi.exportSessions({ session_ids: [session.id] });
       const html = generateSessionReportHTML(response.data);
       const { uri } = await printToFileAsync({ html, base64: false });
-      await shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      
+      // Generate filename with current date
+      const currentDate = new Date();
+      const dateString = formatDateForFilename(currentDate);
+      const filename = `Allocation Report (${dateString}).pdf`;
+      
+      // Get the directory of the original file
+      const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+      const newUri = fileDir + filename;
+      
+      // Delete existing file if it exists (in case of multiple exports on same day)
+      const fileInfo = await FileSystem.getInfoAsync(newUri);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(newUri, { idempotent: true });
+      }
+      
+      // Move/rename the file to the desired filename
+      await FileSystem.moveAsync({
+        from: uri,
+        to: newUri,
+      });
+      
+      await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Error', 'Failed to export PDF');
