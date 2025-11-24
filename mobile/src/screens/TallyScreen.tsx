@@ -184,6 +184,15 @@ function TallyScreen() {
       .reduce((sum, entry) => sum + entry.weight, 0);
   };
 
+  const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    return logEntries
+      .filter(entry => 
+        entry.weight_classification_id === wcId && 
+        entry.role === (tallyRole === 'tally' ? TallyLogEntryRole.TALLY : TallyLogEntryRole.DISPATCHER)
+      )
+      .reduce((sum, entry) => sum + (entry.heads || 0), 0);
+  };
+
   const handleTallyNumberPress = (num: string) => {
     if (activeInputField === 'heads') {
       setManualHeadsInput((prev) => {
@@ -1459,9 +1468,9 @@ function TallyScreen() {
             <View style={dynamicStyles.summaryTable}>
               <View style={dynamicStyles.summaryHeader}>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Weight Range</Text>
                 <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Allocated / Required</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Sum</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
+                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
               </View>
               {filteredAllocations.map((allocation) => {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -1473,14 +1482,12 @@ function TallyScreen() {
                 
                 const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
                 const sum = getSumForWeightClassification(allocation.weight_classification_id);
+                const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                 
                 return (
                   <View key={allocation.id} style={dynamicStyles.summaryRow}>
                     <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
                       {wc.classification}
-                    </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
-                      {formatWeightRange(wc)}
                     </Text>
                     <Text style={[
                       dynamicStyles.summaryCell, 
@@ -1488,6 +1495,9 @@ function TallyScreen() {
                       isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
                     ]}>
                       {allocatedBags} / {allocation.required_bags}
+                    </Text>
+                    <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                      {totalHeads.toFixed(0)}
                     </Text>
                     <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
                       {sum.toFixed(2)}
