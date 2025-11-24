@@ -30,6 +30,7 @@ class TallySessionUpdate(BaseModel):
 
 class TallySessionResponse(TallySessionBase):
     id: int
+    session_number: int
     created_at: datetime
     updated_at: datetime
 

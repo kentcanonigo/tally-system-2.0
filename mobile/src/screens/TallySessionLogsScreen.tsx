@@ -560,7 +560,9 @@ function TallySessionLogsScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={dynamicStyles.title}>Tally Logs - Session #{session.id}</Text>
+        <Text style={dynamicStyles.title}>
+          {customer?.name || 'Unknown'} - Session #{session.session_number} - {formatDate(session.date, timezone)}
+        </Text>
         <Text style={dynamicStyles.infoText}>
           {customer?.name} | {plant?.name}
         </Text>

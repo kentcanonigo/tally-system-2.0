@@ -214,9 +214,9 @@ function TallySessionLogs() {
         <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}`)} style={{ marginBottom: '20px' }}>
           ← Back to Session Details
         </button>
-        <h1>Tally Logs - Session #{session.id}</h1>
+        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}</h1>
         <p>
-          Customer: {customer?.name} | Plant: {plant?.name} | Date: {new Date(session.date).toLocaleDateString()}
+          Plant: {plant?.name}
         </p>
         <p>
           Status: <span className={`status-badge status-${session.status}`}>{session.status}</span>

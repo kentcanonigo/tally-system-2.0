@@ -236,7 +236,7 @@ function TallySessionDetailScreen() {
 
     Alert.alert(
       'Delete Session',
-      `Are you sure you want to delete Session #${session.id}? This will delete all associated allocations and log entries. This action cannot be undone.`,
+      `Are you sure you want to delete Session #${session.session_number}? This will delete all associated allocations and log entries. This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -846,7 +846,9 @@ function TallySessionDetailScreen() {
     >
       <View style={dynamicStyles.contentWrapper}>
         <View style={dynamicStyles.header}>
-          <Text style={dynamicStyles.sessionId}>Session #{session.id}</Text>
+          <Text style={dynamicStyles.sessionId}>
+            {customer?.name || 'Unknown'} - Session #{session.session_number} - {formatDate(session.date, timezone)}
+          </Text>
           <View style={dynamicStyles.statusPickerContainer}>
             <TouchableOpacity
               style={dynamicStyles.statusDropdownButton}

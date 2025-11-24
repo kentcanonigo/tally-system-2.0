@@ -1,11 +1,24 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from ..models.tally_session import TallySession
 from ..schemas.tally_session import TallySessionCreate, TallySessionUpdate
 
 
 def create_tally_session(db: Session, tally_session: TallySessionCreate) -> TallySession:
-    db_session = TallySession(**tally_session.model_dump())
+    # Generate the next session number for this customer
+    # Use a subquery to get the max session_number for this customer, or 0 if none exists
+    max_session_number = db.query(func.coalesce(func.max(TallySession.session_number), 0)).filter(
+        TallySession.customer_id == tally_session.customer_id
+    ).scalar()
+    
+    next_session_number = max_session_number + 1
+    
+    # Create the session with the generated session_number
+    session_data = tally_session.model_dump()
+    session_data['session_number'] = next_session_number
+    
+    db_session = TallySession(**session_data)
     db.add(db_session)
     db.commit()
     db.refresh(db_session)

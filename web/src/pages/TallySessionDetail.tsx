@@ -237,9 +237,9 @@ function TallySessionDetail() {
         <button className="btn btn-secondary" onClick={() => navigate('/tally-sessions')} style={{ marginBottom: '20px' }}>
           ← Back to Sessions
         </button>
-        <h1>Tally Session #{session.id}</h1>
+        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}</h1>
         <p>
-          Customer: {customer?.name} | Plant: {plant?.name} | Date: {new Date(session.date).toLocaleDateString()}
+          Plant: {plant?.name}
         </p>
         <p>
           Status:{' '}

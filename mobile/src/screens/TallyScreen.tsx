@@ -13,11 +13,14 @@ import type { AllocationDetails, WeightClassification, TallySession, Customer, P
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getDefaultHeadsAmount } from '../utils/settings';
+import { formatDate } from '../utils/dateFormat';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 function TallyScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { timezone } = useTimezone();
   const sessionId = (route.params as any)?.sessionId;
   const tallyRole = (route.params as any)?.tallyRole as 'tally' | 'dispatcher';
   const tallyMode = (route.params as any)?.tallyMode as 'dressed' | 'byproduct' || 'dressed';
@@ -77,7 +80,7 @@ function TallyScreen() {
   // Update navigation title when data is loaded
   useLayoutEffect(() => {
     if (plant && customer && session) {
-      const titleParts = [plant.name, customer.name, `Session #${session.id}`];
+      const titleParts = [customer.name, `Session #${session.session_number}`, formatDate(session.date, timezone)];
       const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
       const roleText = tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher';
       const titleText = `${titleParts.join(' - ')} (${modeText} - ${roleText})`;

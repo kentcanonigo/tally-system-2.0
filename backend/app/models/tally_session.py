@@ -19,6 +19,7 @@ class TallySession(Base):
     plant_id = Column(Integer, ForeignKey("plants.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
     status = Column(SQLEnum(TallySessionStatus), nullable=False, default=TallySessionStatus.ONGOING, index=True)
+    session_number = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -32,5 +33,6 @@ class TallySession(Base):
     __table_args__ = (
         Index('idx_customer_plant_date', 'customer_id', 'plant_id', 'date'),
         Index('idx_status_date', 'status', 'date'),
+        Index('idx_customer_session_number', 'customer_id', 'session_number'),
     )
 
