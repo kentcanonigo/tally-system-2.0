@@ -1180,6 +1180,49 @@ function TallyScreen() {
         {showManualInput ? (
           /* Manual Input Form - Single Row Style */
           <View style={dynamicStyles.displayRow}>
+            {/* Weight Input - Main Input (First Position) */}
+            <View style={[
+              dynamicStyles.displayField,
+              {
+                flex: 1.5,
+                backgroundColor: activeInputField === 'weight' ? '#fff' : '#f8f9fa',
+                borderWidth: 2,
+                borderColor: activeInputField === 'weight' ? '#3498db' : '#bdc3c7',
+                borderLeftWidth: 3,
+                borderLeftColor: '#3498db',
+              }
+            ]}>
+              <Text style={dynamicStyles.displayLabel}>Weight</Text>
+              <TextInput
+                ref={weightInputRef}
+                style={{
+                  marginTop: 2,
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  borderWidth: 0,
+                  fontSize: responsive.isTablet ? 18 : 16,
+                  color: '#2c3e50',
+                  fontWeight: '600',
+                }}
+                value={manualWeightInput}
+                onChangeText={setManualWeightInput}
+                onFocus={() => {
+                  setActiveInputField('weight');
+                  // Clear heads field focus when weight is focused
+                  if (activeInputField === 'heads') {
+                    headsInputRef.current?.blur();
+                  }
+                }}
+                onBlur={() => {
+                  // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
+                  // This prevents losing focus when numpad buttons are pressed
+                }}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#999"
+              />
+            </View>
+
             {/* Weight Classification Dropdown */}
             <View style={[
               dynamicStyles.displayField,
@@ -1254,51 +1297,24 @@ function TallyScreen() {
                 placeholderTextColor="#999"
               />
             </View>
-
-            {/* Weight Input */}
-            <View style={[
-              dynamicStyles.displayField,
-              {
-                flex: 1.5,
-                backgroundColor: activeInputField === 'weight' ? '#fff' : '#f8f9fa',
-                borderWidth: 2,
-                borderColor: activeInputField === 'weight' ? '#3498db' : '#bdc3c7',
-              }
-            ]}>
-              <Text style={dynamicStyles.displayLabel}>Weight</Text>
-              <TextInput
-                ref={weightInputRef}
-                style={{
-                  marginTop: 2,
-                  padding: 0,
-                  backgroundColor: 'transparent',
-                  borderWidth: 0,
-                  fontSize: responsive.isTablet ? 18 : 16,
-                  color: '#2c3e50',
-                  fontWeight: '600',
-                }}
-                value={manualWeightInput}
-                onChangeText={setManualWeightInput}
-                onFocus={() => {
-                  setActiveInputField('weight');
-                  // Clear heads field focus when weight is focused
-                  if (activeInputField === 'heads') {
-                    headsInputRef.current?.blur();
-                  }
-                }}
-                onBlur={() => {
-                  // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
-                  // This prevents losing focus when numpad buttons are pressed
-                }}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor="#999"
-              />
-            </View>
           </View>
         ) : (
           /* Three display fields in a row - Automatic mode */
           <View style={dynamicStyles.displayRow}>
+            {/* Weight - Main Input (First Position) */}
+            <View style={[
+              dynamicStyles.displayField, 
+              { 
+                flex: 1.5,
+                borderLeftWidth: 3,
+                borderLeftColor: '#27ae60',
+              }
+            ]}>
+              <Text style={dynamicStyles.displayLabel}>Weight</Text>
+              <Text style={dynamicStyles.weightDisplayValue}>
+                {tallyInput}
+              </Text>
+            </View>
             <View style={[dynamicStyles.displayField, { flex: 2 }]}>
               <Text style={dynamicStyles.displayLabel}>Classification</Text>
               <Text style={dynamicStyles.displayValue} numberOfLines={1}>
@@ -1309,12 +1325,6 @@ function TallyScreen() {
               <Text style={dynamicStyles.displayLabel}>Heads</Text>
               <Text style={dynamicStyles.displayValue}>
                 {defaultHeadsAmount}
-              </Text>
-            </View>
-            <View style={[dynamicStyles.displayField, { flex: 1.5 }]}>
-              <Text style={dynamicStyles.displayLabel}>Weight</Text>
-              <Text style={dynamicStyles.weightDisplayValue}>
-                {tallyInput}
               </Text>
             </View>
           </View>
