@@ -6,12 +6,13 @@ This document provides comprehensive information about the Tally System backend 
 
 1. [Overview](#overview)
 2. [Architecture](#architecture)
-3. [Database Models & Relationships](#database-models--relationships)
-4. [Destructive Operation Guards](#destructive-operation-guards)
-5. [Business Logic Rules](#business-logic-rules)
-6. [API Structure](#api-structure)
-7. [Important Implementation Details](#important-implementation-details)
-8. [Configuration](#configuration)
+3. [Authentication & Authorization](#authentication--authorization)
+4. [Database Models & Relationships](#database-models--relationships)
+5. [Destructive Operation Guards](#destructive-operation-guards)
+6. [Business Logic Rules](#business-logic-rules)
+7. [API Structure](#api-structure)
+8. [Important Implementation Details](#important-implementation-details)
+9. [Configuration](#configuration)
 
 ---
 
@@ -60,12 +61,98 @@ backend/
 
 ---
 
+## Authentication & Authorization
+
+The Tally System implements **JWT-based authentication** with **role-based access control (RBAC)**.
+
+### Quick Overview
+
+- **Authentication Method**: JWT (JSON Web Tokens)
+- **Password Hashing**: bcrypt
+- **Token Lifetime**: 8 hours (default)
+- **Roles**: SUPERADMIN (full access) and ADMIN (plant-specific access)
+
+### User Roles
+
+| Role | Access Level | Capabilities |
+|------|--------------|--------------|
+| **SUPERADMIN** | Full system access | Can manage users, access all plants, perform all operations |
+| **ADMIN** | Plant-specific | Can only access assigned plants, cannot manage users |
+
+### Authentication Models
+
+#### User
+- **Table**: `users`
+- **Fields**: `id`, `username`, `email`, `hashed_password`, `role`, `is_active`, `created_at`, `updated_at`
+- **Relationships**: Many-to-many with Plant through PlantPermission
+
+#### PlantPermission
+- **Table**: `plant_permissions`
+- **Fields**: `id`, `user_id`, `plant_id`, `created_at`
+- **Purpose**: Maps ADMIN users to plants they can access
+- **Constraint**: Unique on `(user_id, plant_id)`
+
+### Default Credentials
+
+```bash
+Username: admin
+Password: admin123
+Role: SUPERADMIN
+```
+
+**⚠️ Change the default password after first login!**
+
+### Protected Endpoints
+
+All endpoints except `/auth/login` require authentication via JWT token:
+
+```http
+Authorization: Bearer <token>
+```
+
+### Permission Checks
+
+- **Public**: `/auth/login` (no authentication)
+- **Authenticated**: `/auth/me` and most endpoints (requires valid token)
+- **SUPERADMIN Only**: `/users/*` endpoints (user management)
+- **Plant-Based**: Some endpoints check plant access for ADMIN users
+
+### Configuration
+
+**Required in `.env` file:**
+
+```env
+SECRET_KEY=your-secure-random-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+```
+
+**⚠️ CRITICAL**: The `SECRET_KEY` must remain constant. If it changes, all tokens become invalid.
+
+### Detailed Documentation
+
+For comprehensive authentication documentation, see:
+- **[AUTH_GUIDE.md](./AUTH_GUIDE.md)** - Complete authentication & authorization guide
+
+Topics covered in AUTH_GUIDE.md:
+- Authentication flow and JWT tokens
+- Password management and bcrypt implementation
+- All auth-related API endpoints
+- Role-based access control in detail
+- Frontend integration
+- Security best practices
+- Troubleshooting common auth issues
+
+---
+
 ## Database Models & Relationships
 
 ### Entity Relationship Diagram
 
 ```
-Customer (1) ──< (N) TallySession (N) >── (1) Plant
+User (1) ──< (N) PlantPermission (N) >── (1) Plant
+                                            │
+Customer (1) ──< (N) TallySession (N) >────┤
                               │
                               │ (1)
                               │
@@ -79,7 +166,24 @@ Customer (1) ──< (N) TallySession (N) >── (1) Plant
                     TallyLogEntry
 ```
 
-### Models
+### Core Models
+
+#### User
+- **Fields**: `id`, `username`, `email`, `hashed_password`, `role`, `is_active`, `created_at`, `updated_at`
+- **Enums**: `role` can be "superadmin" or "admin"
+- **Constraints**: 
+  - Unique on `username`
+  - Unique on `email`
+- **Relationships**: 
+  - `plant_permissions` (one-to-many with PlantPermission)
+  
+#### PlantPermission
+- **Fields**: `id`, `user_id`, `plant_id`, `created_at`
+- **Constraints**: Unique on `(user_id, plant_id)`
+- **Relationships**:
+  - `user` (many-to-one with User)
+  - `plant` (many-to-one with Plant)
+  - Cascade: Deletes when user or plant is deleted
 
 #### Customer
 - **Fields**: `id`, `name`, `created_at`, `updated_at`
@@ -357,35 +461,46 @@ elif log_entry.role == TallyLogEntryRole.DISPATCHER:
 
 ### Endpoints
 
-#### Customers
+#### Authentication
+- `POST /api/v1/auth/login` - Login with username/password (returns JWT token)
+- `GET /api/v1/auth/me` - Get current user info (🔒 requires authentication)
+
+#### User Management (🔒 SUPERADMIN only)
+- `GET /api/v1/users` - List all users
+- `GET /api/v1/users/{user_id}` - Get user by ID
+- `POST /api/v1/users` - Create new user
+- `PUT /api/v1/users/{user_id}` - Update user
+- `DELETE /api/v1/users/{user_id}` - Delete user
+
+#### Customers (🔒 requires authentication)
 - `GET /api/v1/customers` - List all customers
 - `GET /api/v1/customers/{customer_id}` - Get customer by ID
 - `POST /api/v1/customers` - Create customer
 - `PUT /api/v1/customers/{customer_id}` - Update customer
 - `DELETE /api/v1/customers/{customer_id}` - Delete customer (⚠️ guarded)
 
-#### Plants
+#### Plants (🔒 requires authentication)
 - `GET /api/v1/plants` - List all plants
 - `GET /api/v1/plants/{plant_id}` - Get plant by ID
 - `POST /api/v1/plants` - Create plant
 - `PUT /api/v1/plants/{plant_id}` - Update plant
 - `DELETE /api/v1/plants/{plant_id}` - Delete plant (⚠️ guarded)
 
-#### Weight Classifications
+#### Weight Classifications (🔒 requires authentication)
 - `GET /api/v1/plants/{plant_id}/weight-classifications` - List by plant
 - `GET /api/v1/weight-classifications/{wc_id}` - Get by ID
 - `POST /api/v1/plants/{plant_id}/weight-classifications` - Create (⚠️ validation)
 - `PUT /api/v1/weight-classifications/{wc_id}` - Update (⚠️ validation)
 - `DELETE /api/v1/weight-classifications/{wc_id}` - Delete
 
-#### Tally Sessions
+#### Tally Sessions (🔒 requires authentication)
 - `GET /api/v1/tally-sessions` - List (supports `customer_id`, `plant_id`, `status` filters)
 - `GET /api/v1/tally-sessions/{session_id}` - Get by ID
 - `POST /api/v1/tally-sessions` - Create (⚠️ validates customer/plant exist)
 - `PUT /api/v1/tally-sessions/{session_id}` - Update (⚠️ validates customer/plant exist)
 - `DELETE /api/v1/tally-sessions/{session_id}` - Delete
 
-#### Allocation Details
+#### Allocation Details (🔒 requires authentication)
 - `GET /api/v1/tally-sessions/{session_id}/allocations` - List by session
 - `GET /api/v1/allocations/{allocation_id}` - Get by ID
 - `POST /api/v1/tally-sessions/{session_id}/allocations` - Create (⚠️ validates uniqueness)
@@ -394,16 +509,20 @@ elif log_entry.role == TallyLogEntryRole.DISPATCHER:
 - `POST /api/v1/tally-sessions/{session_id}/allocations/reset-tally` - Reset tally allocations
 - `POST /api/v1/tally-sessions/{session_id}/allocations/reset-dispatcher` - Reset dispatcher allocations
 
-#### Tally Log Entries
+#### Tally Log Entries (🔒 requires authentication)
 - `GET /api/v1/tally-sessions/{session_id}/log-entries` - List by session (supports `role` filter)
 - `GET /api/v1/log-entries/{entry_id}` - Get by ID
 - `POST /api/v1/tally-sessions/{session_id}/log-entries` - Create (⚠️ auto-creates allocation, increments counts)
 - `DELETE /api/v1/log-entries/{entry_id}` - Delete (⚠️ decrements allocation counts)
 
-### Health Checks
+### Health Checks (public)
 - `GET /` - API info
 - `GET /health` - Basic health check
 - `GET /health/db` - Database connection health check
+
+**Legend:**
+- 🔒 = Requires authentication (JWT token)
+- 🔒 SUPERADMIN only = Requires SUPERADMIN role
 
 ---
 
@@ -471,6 +590,9 @@ elif log_entry.role == TallyLogEntryRole.DISPATCHER:
 | `API_V1_PREFIX` | `/api/v1` | API version prefix |
 | `DEBUG` | `True` | Enable debug mode |
 | `CORS_ORIGINS` | `*` | CORS allowed origins (comma-separated) |
+| `SECRET_KEY` | *(required)* | JWT token signing key (must be set in .env) |
+| `ALGORITHM` | `HS256` | JWT algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Token expiration time (8 hours) |
 
 ### Database URLs
 
@@ -517,6 +639,9 @@ mssql+pyodbc://username:password@server.database.windows.net/database?driver=ODB
 5. **Cascade settings in models are informational** - guards control actual behavior
 6. **SQL Server requires ORDER BY** for paginated queries
 7. **All timestamps are UTC** - handle timezone conversion in frontend
+8. **SECRET_KEY must be fixed in .env** - changing it invalidates all tokens
+9. **JWT sub claim must be a string** - use `str(user.id)` when creating tokens
+10. **SUPERADMIN can access all plants** - ADMIN users need explicit PlantPermission records
 
 ---
 
@@ -526,6 +651,32 @@ mssql+pyodbc://username:password@server.database.windows.net/database?driver=ODB
 - Migration files are in `alembic/versions/`
 - Run migrations with: `alembic upgrade head`
 - Create new migration: `alembic revision --autogenerate -m "description"`
+- Authentication tables added in migration `009_add_authentication_tables`
+
+## Seeding Data
+
+### Create Default Superadmin
+
+```bash
+cd backend
+python seed_admin.py
+```
+
+Creates default superadmin user:
+- Username: `admin`
+- Password: `admin123`
+- Email: `admin@tallysystem.local`
+- Role: `SUPERADMIN`
+
+**⚠️ Change the default password after first login!**
+
+---
+
+## Related Documentation
+
+- **[AUTH_GUIDE.md](./AUTH_GUIDE.md)** - Comprehensive authentication and authorization guide
+- **[INSTALL.md](./INSTALL.md)** - Installation and setup instructions
+- **[AZURE_SQL_SETUP.md](./AZURE_SQL_SETUP.md)** - Azure SQL Database configuration
 
 ---
 

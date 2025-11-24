@@ -164,7 +164,81 @@ If you're still getting errors:
 
 5. **Check error message**: The error will tell you which package is causing issues. You can usually skip that package if it's optional.
 
+## Authentication Setup
+
+After installing dependencies, you need to configure authentication:
+
+### 1. Create `.env` File
+
+Copy the example file and update it:
+
+```bash
+cp .env.example .env
+```
+
+### 2. Generate a Secure SECRET_KEY
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Copy the output and update `SECRET_KEY` in your `.env` file:
+
+```env
+SECRET_KEY=your-generated-secret-key-here
+```
+
+**⚠️ CRITICAL**: Never commit `.env` to git! The SECRET_KEY must remain secret.
+
+### 3. Run Database Migrations
+
+```bash
+alembic upgrade head
+```
+
+This creates the authentication tables (users, plant_permissions).
+
+### 4. Create Default Admin User
+
+```bash
+python seed_admin.py
+```
+
+Default credentials:
+- Username: `admin`
+- Password: `admin123`
+- Role: `SUPERADMIN`
+
+**⚠️ Change the password after first login!**
+
+### 5. Test Authentication
+
+Start the server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Test login:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}'
+```
+
+You should receive a JWT token in the response.
+
+For more details, see **[AUTH_GUIDE.md](./AUTH_GUIDE.md)**.
+
 ## For Production (Azure Deployment)
 
 When deploying to Azure, PostgreSQL drivers will be installed automatically in the Docker container, so you won't need to worry about Rust on your local machine.
+
+**Production Auth Configuration:**
+1. Set a strong SECRET_KEY in Azure environment variables
+2. Change default admin password immediately
+3. Use HTTPS only
+4. Consider implementing password complexity requirements
+5. Set appropriate CORS_ORIGINS (not `*`)
 
