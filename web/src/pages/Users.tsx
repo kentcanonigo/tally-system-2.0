@@ -217,7 +217,6 @@ function Users() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{modalMode === 'create' ? 'Create New User' : 'Edit User'}</h2>
-              <button className="modal-close" onClick={closeModal}>&times;</button>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -271,23 +270,20 @@ function Users() {
               {formData.role === UserRole.ADMIN && (
                 <div className="form-group">
                   <label>Assigned Plants *</label>
-                  <div style={{ maxHeight: '200px', overflow: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+                  <div className="checkbox-group">
                     {plants.map((plant) => (
-                      <div key={plant.id} style={{ marginBottom: '8px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.plant_ids.includes(plant.id)}
-                            onChange={() => togglePlantSelection(plant.id)}
-                            style={{ marginRight: '8px' }}
-                          />
-                          {plant.name}
-                        </label>
-                      </div>
+                      <label key={plant.id} className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={formData.plant_ids.includes(plant.id)}
+                          onChange={() => togglePlantSelection(plant.id)}
+                        />
+                        <span>{plant.name}</span>
+                      </label>
                     ))}
                   </div>
                   {formData.plant_ids.length === 0 && (
-                    <small style={{ color: '#c33' }}>Please select at least one plant</small>
+                    <small style={{ color: '#e74c3c', display: 'block', marginTop: '5px' }}>Please select at least one plant</small>
                   )}
                 </div>
               )}
