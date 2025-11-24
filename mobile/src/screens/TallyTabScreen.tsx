@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { tallySessionsApi, customersApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
@@ -140,27 +141,27 @@ function TallyTabScreen() {
 
   if (loading) {
     return (
-      <View style={[dynamicStyles.container, styles.centered]}>
+      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={Platform.OS === 'android' ? ['top'] : []}>
         <ActivityIndicator size="large" color="#3498db" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (activeSessionIds.length === 0 || sessions.length === 0) {
     return (
-      <View style={[dynamicStyles.container, styles.centered]}>
+      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={Platform.OS === 'android' ? ['top'] : []}>
         <View style={dynamicStyles.emptyContainer}>
           <Text style={dynamicStyles.emptyText}>
             No active sessions found.{'\n\n'}
             Go to the Sessions tab to mark sessions as active (up to 10 sessions).
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={dynamicStyles.container}>
+    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Active Sessions</Text>
       </View>
@@ -207,11 +208,12 @@ function TallyTabScreen() {
               tallyRole="tally"
               tallyMode="dressed"
               hideTitle={true}
+              disableSafeArea={true}
             />
           </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

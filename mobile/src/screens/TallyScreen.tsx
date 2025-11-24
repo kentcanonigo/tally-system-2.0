@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useLayoutEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import {
   allocationDetailsApi,
@@ -21,6 +22,7 @@ interface TallyScreenProps {
   tallyRole?: 'tally' | 'dispatcher';
   tallyMode?: 'dressed' | 'byproduct';
   hideTitle?: boolean; // If true, don't update navigation title
+  disableSafeArea?: boolean; // If true, don't wrap with SafeAreaView (for use as child component)
 }
 
 function TallyScreen(props?: TallyScreenProps) {
@@ -34,6 +36,7 @@ function TallyScreen(props?: TallyScreenProps) {
   const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
   const tallyMode = (props?.tallyMode ?? (route.params as any)?.tallyMode) as 'dressed' | 'byproduct' || 'dressed';
   const hideTitle = props?.hideTitle ?? false;
+  const disableSafeArea = props?.disableSafeArea ?? false;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -1637,8 +1640,8 @@ function TallyScreen(props?: TallyScreenProps) {
 
   const content = tallyMode === 'byproduct' ? renderByproductMode() : renderDressedMode();
 
-  return (
-    <View style={dynamicStyles.container}>
+  const mainContent = (
+    <>
       {isLandscape ? (
         content
       ) : (
@@ -1798,7 +1801,18 @@ function TallyScreen(props?: TallyScreenProps) {
           </TouchableOpacity>
         </Modal>
       )}
-    </View>
+    </>
+  );
+
+  // Wrap with SafeAreaView only if not disabled (when used as child component)
+  if (disableSafeArea) {
+    return <View style={dynamicStyles.container}>{mainContent}</View>;
+  }
+
+  return (
+    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+      {mainContent}
+    </SafeAreaView>
   );
 }
 
