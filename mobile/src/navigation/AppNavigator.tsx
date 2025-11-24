@@ -21,12 +21,12 @@ const Tab = createBottomTabNavigator();
 
 function SessionsStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="TallySessionsList" component={TallySessionsScreen} options={{ title: 'Tally Sessions' }} />
-      <Stack.Screen name="TallySessionDetail" component={TallySessionDetailScreen} options={{ title: 'Session Details' }} />
-      <Stack.Screen name="CreateTallySession" component={CreateTallySessionScreen} options={{ title: 'New Session' }} />
-      <Stack.Screen name="Tally" component={TallyScreen} options={{ title: 'Tally' }} />
-      <Stack.Screen name="TallySessionLogs" component={TallySessionLogsScreen} options={{ title: 'Session Logs' }} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="TallySessionsList" component={TallySessionsScreen} />
+      <Stack.Screen name="TallySessionDetail" component={TallySessionDetailScreen} />
+      <Stack.Screen name="CreateTallySession" component={CreateTallySessionScreen} />
+      <Stack.Screen name="Tally" component={TallyScreen} />
+      <Stack.Screen name="TallySessionLogs" component={TallySessionLogsScreen} />
     </Stack.Navigator>
   );
 }
@@ -65,14 +65,14 @@ function AppNavigator() {
           tabBarInactiveTintColor: '#7f8c8d',
         })}
       >
-        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
         <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Customers" component={CustomersScreen} />
-        <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ title: 'Weight Classes' }} />
+        <Tab.Screen name="Customers" component={CustomersScreen} options={{ headerShown: false }} />
+        <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Export" component={ExportScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
+        <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
+        <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
       </Tab.Navigator>
     </NavigationContainer>
   );

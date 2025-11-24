@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { useResponsive } from '../utils/responsive';
@@ -17,6 +18,7 @@ function SettingsScreen() {
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
   const defaultHeadsAmount = useDefaultHeadsAmount();
+  const insets = useSafeAreaInsets();
   
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
@@ -114,7 +116,9 @@ function SettingsScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
-      padding: responsive.padding.medium,
+      // Only apply horizontal + top padding so bottom can align cleanly with tab bar
+      paddingHorizontal: responsive.padding.medium,
+      paddingTop: responsive.padding.medium,
     },
     title: {
       ...styles.title,
@@ -260,7 +264,13 @@ function SettingsScreen() {
   }
 
   return (
-    <ScrollView style={dynamicStyles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <View style={dynamicStyles.container}>
+      <View style={{ paddingTop: Platform.OS === 'android' ? insets.top : 0, flex: 1 }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ paddingBottom: responsive.spacing.md }}
+          showsVerticalScrollIndicator={true}
+        >
       <Text style={dynamicStyles.title}>Settings</Text>
 
       <View style={dynamicStyles.section}>
@@ -496,7 +506,9 @@ function SettingsScreen() {
           </TouchableOpacity>
         </Modal>
       )}
-    </ScrollView>
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
