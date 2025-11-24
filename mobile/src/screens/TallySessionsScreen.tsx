@@ -6,7 +6,7 @@ import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
-import { formatDate } from '../utils/dateFormat';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -154,10 +154,12 @@ function TallySessionsScreen() {
     },
   };
 
+  const activePlantName = activePlantId ? getPlantName(activePlantId) : '';
+
   return (
     <View style={dynamicStyles.container}>
       <View style={dynamicStyles.header}>
-        <Text style={dynamicStyles.title}>Tally Sessions</Text>
+        <Text style={dynamicStyles.title}>{activePlantName || 'Tally Sessions'}</Text>
         <TouchableOpacity
           style={dynamicStyles.addButton}
           onPress={() => navigation.navigate('CreateTallySession' as never)}
@@ -174,14 +176,15 @@ function TallySessionsScreen() {
             onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
           >
             <View style={styles.sessionHeader}>
-              <Text style={dynamicStyles.sessionId}>Session #{item.id}</Text>
+              <Text style={dynamicStyles.sessionId}>
+                {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
+              </Text>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                 <Text style={styles.statusText}>{item.status}</Text>
               </View>
             </View>
-            <Text style={dynamicStyles.sessionInfo}>{getCustomerName(item.customer_id)}</Text>
-            <Text style={dynamicStyles.sessionInfo}>{getPlantName(item.plant_id)}</Text>
-            <Text style={styles.sessionDate}>{formatDate(item.date, timezone)}</Text>
+            <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
+            <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
           </TouchableOpacity>
         )}
         keyExtractor={(item) => item.id.toString()}
