@@ -22,6 +22,10 @@ function TallySessionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
+  const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const hasInitiallyLoaded = useRef(false);
 
   useEffect(() => {
@@ -148,6 +152,22 @@ function TallySessionsScreen() {
     setShowCalendar(false);
   };
 
+  const handleMonthYearSelect = () => {
+    const newMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    setCurrentMonth(newMonth);
+    setShowMonthYearPicker(false);
+    // Force calendar to update by ensuring the current prop changes
+    // The Calendar component will automatically navigate to the new month
+  };
+
+  // Generate year options (current year ± 10 years)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
 
   if (loading && sessions.length === 0) {
     return (
@@ -201,6 +221,11 @@ function TallySessionsScreen() {
     calendarModal: {
       ...styles.calendarModal,
       width: responsive.isTablet ? Math.min(responsive.width * 0.8, 400) : '90%',
+    },
+    monthYearPickerModal: {
+      ...styles.monthYearPickerModal,
+      width: responsive.isTablet ? Math.min(responsive.width * 0.8, 500) : '90%',
+      maxHeight: responsive.isTablet ? '70%' : '80%',
     },
     calendarTitle: {
       ...styles.calendarTitle,
@@ -292,14 +317,42 @@ function TallySessionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={dynamicStyles.calendarModal}>
             <View style={styles.calendarHeader}>
-              <Text style={dynamicStyles.calendarTitle}>Filter by Date Created</Text>
-              <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
+              <Text style={dynamicStyles.calendarTitle}>Filter</Text>
+              <View style={styles.calendarHeaderButtons}>
+                <TouchableOpacity
+                  style={styles.monthYearButton}
+                  onPress={() => {
+                    const current = new Date(currentMonth + '-01');
+                    setSelectedYear(current.getFullYear());
+                    setSelectedMonth(current.getMonth() + 1);
+                    setShowMonthYearPicker(true);
+                  }}
+                >
+                  <Text style={styles.monthYearButtonText}>
+                    {new Date(currentMonth + '-01').toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                  <Text style={styles.closeButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <Calendar
+              key={currentMonth} // Force re-render when month changes
+              current={currentMonth}
               onDayPress={handleDateSelect}
+              onMonthChange={(month) => {
+                setCurrentMonth(month.dateString.slice(0, 7));
+              }}
               markedDates={markedDates}
+              enableSwipeMonths={true}
+              hideExtraDays={true}
+              firstDay={1}
+              // Enable month/year selection by tapping the header
+              // The library handles this automatically - tapping month/year opens picker
               theme={{
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
@@ -318,7 +371,7 @@ function TallySessionsScreen() {
                 textMonthFontWeight: 'bold',
                 textDayHeaderFontWeight: '600',
                 textDayFontSize: 16,
-                textMonthFontSize: 16,
+                textMonthFontSize: 18,
                 textDayHeaderFontSize: 13,
               }}
             />
@@ -332,6 +385,103 @@ function TallySessionsScreen() {
                 </TouchableOpacity>
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Month/Year Picker Modal */}
+      <Modal
+        visible={showMonthYearPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMonthYearPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={dynamicStyles.monthYearPickerModal}>
+            <View style={styles.monthYearPickerHeader}>
+              <Text style={dynamicStyles.calendarTitle}>Select Month & Year</Text>
+              <TouchableOpacity onPress={() => setShowMonthYearPicker(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerColumn}>
+                <Text style={styles.pickerLabel}>Month</Text>
+                <FlatList
+                  data={months}
+                  keyExtractor={(_, index) => String(index + 1)}
+                  renderItem={({ item, index }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerOption,
+                        selectedMonth === index + 1 && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => setSelectedMonth(index + 1)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          selectedMonth === index + 1 && styles.pickerOptionTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  initialScrollIndex={selectedMonth - 1}
+                  getItemLayout={(_, index) => ({
+                    length: 44,
+                    offset: 44 * index,
+                    index,
+                  })}
+                />
+              </View>
+              <View style={styles.pickerColumn}>
+                <Text style={styles.pickerLabel}>Year</Text>
+                <FlatList
+                  data={years}
+                  keyExtractor={(item) => String(item)}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerOption,
+                        selectedYear === item && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => setSelectedYear(item)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          selectedYear === item && styles.pickerOptionTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  initialScrollIndex={years.indexOf(selectedYear)}
+                  getItemLayout={(_, index) => ({
+                    length: 44,
+                    offset: 44 * index,
+                    index,
+                  })}
+                />
+              </View>
+            </View>
+            <View style={styles.monthYearPickerActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowMonthYearPicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleMonthYearSelect}
+              >
+                <Text style={styles.confirmButtonText}>Select</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -481,6 +631,112 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  monthYearHeader: {
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+  },
+  monthYearText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2d4150',
+  },
+  calendarHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  monthYearButton: {
+    backgroundColor: '#ecf0f1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  monthYearButtonText: {
+    color: '#2c3e50',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  monthYearPickerModal: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  monthYearPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    height: 300,
+    marginBottom: 15,
+  },
+  pickerColumn: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  pickerOption: {
+    padding: 12,
+    borderRadius: 5,
+    marginBottom: 2,
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#3498db',
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  pickerOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  monthYearPickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#95a5a6',
+    borderRadius: 5,
+    padding: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#3498db',
+    borderRadius: 5,
+    padding: 12,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
