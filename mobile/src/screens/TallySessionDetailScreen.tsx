@@ -19,6 +19,7 @@ import {
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { usePermissions } from '../utils/usePermissions';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
@@ -26,6 +27,7 @@ function TallySessionDetailScreen() {
   const responsive = useResponsive();
   const { timezone } = useTimezone();
   const threshold = useAcceptableDifference();
+  const { hasPermission } = usePermissions();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -82,21 +84,38 @@ function TallySessionDetailScreen() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
-      const [customerRes, plantRes, allocationsRes, wcRes, logEntriesRes] = await Promise.all([
+      // Check if user has permission to view log entries
+      const canViewLogs = hasPermission('can_view_tally_logs');
+      
+      // Build list of promises - only include log entries if user has permission
+      const promises = [
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
-        tallyLogEntriesApi.getBySession(sessionId),
-      ]);
+      ];
+      
+      if (canViewLogs) {
+        promises.push(tallyLogEntriesApi.getBySession(sessionId));
+      }
+      
+      const results = await Promise.all(promises);
 
-      setCustomer(customerRes.data);
-      setPlant(plantRes.data);
-      setAllocations(allocationsRes.data);
-      setWeightClassifications(wcRes.data);
-      setLogEntries(logEntriesRes.data);
-      if (wcRes.data.length > 0) {
-        setFormData((prev) => ({ ...prev, weight_classification_id: wcRes.data[0].id }));
+      setCustomer(results[0].data);
+      setPlant(results[1].data);
+      setAllocations(results[2].data);
+      setWeightClassifications(results[3].data);
+      
+      // Only set log entries if we fetched them
+      if (canViewLogs && results[4]) {
+        setLogEntries(results[4].data);
+      } else {
+        setLogEntries([]); // Empty array if user can't view logs
+      }
+      
+      // Set default weight classification for form
+      if (results[3].data.length > 0) {
+        setFormData((prev) => ({ ...prev, weight_classification_id: results[3].data[0].id }));
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -304,8 +323,14 @@ function TallySessionDetailScreen() {
   }, [allocations, weightClassifications]);
 
   const getMatchStatus = (allocation: AllocationDetails): string => {
-    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
-    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    // Check if progress data exists
+    const hasProgressData = 'allocated_bags_tally' in allocation;
+    if (!hasProgressData) return '-';
+    
+    const allocatedTally = allocation.allocated_bags_tally ?? 0;
+    const allocatedDispatcher = allocation.allocated_bags_dispatcher ?? 0;
+    const difference = allocatedTally - allocatedDispatcher;
+    const isNotStarted = allocatedTally === 0 && allocatedDispatcher === 0;
     
     if (isNotStarted) {
       return 'Not started';
@@ -313,7 +338,7 @@ function TallySessionDetailScreen() {
     
     if (difference === 0) {
       // Tally and dispatcher match
-      const matchedCount = allocation.allocated_bags_tally;
+      const matchedCount = allocatedTally;
       if (allocation.required_bags > 0) {
         if (matchedCount < allocation.required_bags) {
           return 'Match (Short)';
@@ -330,8 +355,14 @@ function TallySessionDetailScreen() {
   };
 
   const getDifferenceColor = (allocation: AllocationDetails): string => {
-    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
-    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+    // Check if progress data exists
+    const hasProgressData = 'allocated_bags_tally' in allocation;
+    if (!hasProgressData) return '#666';
+    
+    const allocatedTally = allocation.allocated_bags_tally ?? 0;
+    const allocatedDispatcher = allocation.allocated_bags_dispatcher ?? 0;
+    const difference = allocatedTally - allocatedDispatcher;
+    const isNotStarted = allocatedTally === 0 && allocatedDispatcher === 0;
     
     if (isNotStarted) {
       return '#666';
@@ -339,7 +370,7 @@ function TallySessionDetailScreen() {
     
     if (difference === 0) {
       // Tally and dispatcher match - check if short, over, or exact
-      const matchedCount = allocation.allocated_bags_tally;
+      const matchedCount = allocatedTally;
       if (allocation.required_bags > 0) {
         if (matchedCount < allocation.required_bags) {
           return '#f39c12'; // Orange for short
@@ -366,13 +397,19 @@ function TallySessionDetailScreen() {
   };
 
   const renderAllocationCard = (allocation: AllocationDetails) => {
-    const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
-    const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
-    const diffColor = getDifferenceColor(allocation);
-    const matchStatus = getMatchStatus(allocation);
-    const hasTallyOverallocation = allocation.required_bags > 0 && allocation.allocated_bags_tally > allocation.required_bags;
-    const hasDispatcherOverallocation = allocation.required_bags > 0 && allocation.allocated_bags_dispatcher > allocation.required_bags;
+    // Check if user has permission to view progress data
+    const canViewLogs = hasPermission('can_view_tally_logs');
+    const hasProgressData = 'allocated_bags_tally' in allocation;
+    
+    // Only calculate these if user can view logs and data exists
+    const difference = hasProgressData ? (allocation.allocated_bags_tally ?? 0) - (allocation.allocated_bags_dispatcher ?? 0) : 0;
+    const isNotStarted = hasProgressData ? (allocation.allocated_bags_tally ?? 0) === 0 && (allocation.allocated_bags_dispatcher ?? 0) === 0 : true;
+    const diffColor = hasProgressData ? getDifferenceColor(allocation) : '#666';
+    const matchStatus = hasProgressData ? getMatchStatus(allocation) : '-';
+    const hasTallyOverallocation = hasProgressData && allocation.required_bags > 0 && (allocation.allocated_bags_tally ?? 0) > allocation.required_bags;
+    const hasDispatcherOverallocation = hasProgressData && allocation.required_bags > 0 && (allocation.allocated_bags_dispatcher ?? 0) > allocation.required_bags;
     const orangeColor = '#f39c12';
+    
     return (
       <View 
         key={allocation.id} 
@@ -385,63 +422,83 @@ function TallySessionDetailScreen() {
           <Text style={dynamicStyles.allocationTitle}>
             {getWeightClassificationName(allocation.weight_classification_id)}
           </Text>
-          <View style={styles.allocationActions}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => handleEditAllocation(allocation)}
-            >
-              <Text style={styles.editButtonText}>✏️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteAllocationButton}
-              onPress={() => handleDeleteAllocation(allocation.id)}
-            >
-              <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Only show edit/delete buttons if user has permission */}
+          {hasPermission('can_edit_tally_session') && (
+            <View style={styles.allocationActions}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => handleEditAllocation(allocation)}
+              >
+                <Text style={styles.editButtonText}>✏️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteAllocationButton}
+                onPress={() => handleDeleteAllocation(allocation.id)}
+              >
+                <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+        
+        {/* Required - Always visible */}
         <View style={styles.allocationRow}>
           <Text style={dynamicStyles.allocationLabel}>Required:</Text>
           <Text style={dynamicStyles.allocationValue}>{allocation.required_bags}</Text>
         </View>
-        <View style={styles.allocationRow}>
-          <Text style={[
-            dynamicStyles.allocationLabel,
-            hasTallyOverallocation && { color: orangeColor }
-          ]}>Allocated (Tally):</Text>
-          <Text style={[
-            dynamicStyles.allocationValue,
-            hasTallyOverallocation && { color: orangeColor }
-          ]}>{allocation.allocated_bags_tally}</Text>
-        </View>
-        <View style={styles.allocationRow}>
-          <Text style={[
-            dynamicStyles.allocationLabel,
-            hasDispatcherOverallocation && { color: orangeColor }
-          ]}>Allocated (Dispatcher):</Text>
-          <Text style={[
-            dynamicStyles.allocationValue,
-            hasDispatcherOverallocation && { color: orangeColor }
-          ]}>{allocation.allocated_bags_dispatcher}</Text>
-        </View>
-        <View style={styles.allocationRow}>
-          <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
-          <Text style={[
-            dynamicStyles.allocationValue, 
-            { 
-              color: diffColor,
-              fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
-            }
-          ]}>
-            {matchStatus}
-          </Text>
-        </View>
-        <View style={styles.allocationRow}>
-          <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
-          <Text style={dynamicStyles.allocationValue}>
-            {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
-          </Text>
-        </View>
+        
+        {/* Progress fields - Only visible if user has permission and data exists */}
+        {canViewLogs && hasProgressData && (
+          <>
+            <View style={styles.allocationRow}>
+              <Text style={[
+                dynamicStyles.allocationLabel,
+                hasTallyOverallocation && { color: orangeColor }
+              ]}>Allocated (Tally):</Text>
+              <Text style={[
+                dynamicStyles.allocationValue,
+                hasTallyOverallocation && { color: orangeColor }
+              ]}>{allocation.allocated_bags_tally ?? 0}</Text>
+            </View>
+            <View style={styles.allocationRow}>
+              <Text style={[
+                dynamicStyles.allocationLabel,
+                hasDispatcherOverallocation && { color: orangeColor }
+              ]}>Allocated (Dispatcher):</Text>
+              <Text style={[
+                dynamicStyles.allocationValue,
+                hasDispatcherOverallocation && { color: orangeColor }
+              ]}>{allocation.allocated_bags_dispatcher ?? 0}</Text>
+            </View>
+            <View style={styles.allocationRow}>
+              <Text style={dynamicStyles.allocationLabel}>Difference:</Text>
+              <Text style={[
+                dynamicStyles.allocationValue, 
+                { 
+                  color: diffColor,
+                  fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold'
+                }
+              ]}>
+                {matchStatus}
+              </Text>
+            </View>
+            <View style={styles.allocationRow}>
+              <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
+              <Text style={dynamicStyles.allocationValue}>
+                {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
+              </Text>
+            </View>
+          </>
+        )}
+        
+        {/* Show minimal message for users without permission */}
+        {!canViewLogs && (
+          <View style={[styles.allocationRow, { marginTop: responsive.spacing.sm }]}>
+            <Text style={[dynamicStyles.allocationLabel, { fontSize: responsive.fontSize.small, color: '#7f8c8d', fontStyle: 'italic' }]}>
+              Progress data requires view logs permission
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -875,12 +932,15 @@ function TallySessionDetailScreen() {
         </View>
 
         <View style={dynamicStyles.actions}>
-          <TouchableOpacity
-            style={[dynamicStyles.actionButton, styles.viewLogsButton]}
-            onPress={() => navigation.navigate('TallySessionLogs' as never, { sessionId: session.id } as never)}
-          >
-            <Text style={dynamicStyles.actionButtonText}>View Logs</Text>
-          </TouchableOpacity>
+          {/* Only show View Logs button if user has permission */}
+          {hasPermission('can_view_tally_logs') && (
+            <TouchableOpacity
+              style={[dynamicStyles.actionButton, styles.viewLogsButton]}
+              onPress={() => navigation.navigate('TallySessionLogs' as never, { sessionId: session.id } as never)}
+            >
+              <Text style={dynamicStyles.actionButtonText}>View Logs</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[dynamicStyles.actionButton, styles.exportButton]}
             onPress={handleExportPDF}
@@ -901,7 +961,8 @@ function TallySessionDetailScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
-          {session.status === 'ongoing' && (
+          {/* Only show add allocation button if session is ongoing and user has permission */}
+          {session.status === 'ongoing' && hasPermission('can_edit_tally_session') && (
             <TouchableOpacity
               style={styles.addAllocationButton}
               onPress={() => setShowAddModal(true)}

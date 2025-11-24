@@ -14,6 +14,7 @@ import {
 import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { usePermissions } from '../utils/usePermissions';
 
 function TallySessionLogsScreen() {
   const route = useRoute();
@@ -21,6 +22,7 @@ function TallySessionLogsScreen() {
   const responsive = useResponsive();
   const { timezone } = useTimezone();
   const threshold = useAcceptableDifference();
+  const { hasPermission } = usePermissions();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -74,6 +76,13 @@ function TallySessionLogsScreen() {
 
   const fetchData = async (showLoading = true) => {
     if (!sessionId) return;
+    
+    // Check permission before fetching
+    if (!hasPermission('can_view_tally_logs')) {
+      setLoading(false);
+      return;
+    }
+    
     if (showLoading) {
       setLoading(true);
     }

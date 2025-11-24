@@ -55,7 +55,8 @@ def get_tally_log_entries_by_session(
     current_user: User = Depends(require_permission("can_view_tally_logs"))
 ):
     """
-    Get all tally log entries for a session, optionally filtered by role. Requires 'can_view_tally_logs' permission.
+    Get all tally log entries for a session, optionally filtered by role.
+    Requires 'can_view_tally_logs' permission for viewing historical/detailed data.
     Results are ordered by created_at descending (newest first).
     """
     # Verify session exists
@@ -76,7 +77,10 @@ def get_tally_log_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("can_view_tally_logs"))
 ):
-    """Get a single tally log entry by ID. Requires 'can_view_tally_logs' permission."""
+    """
+    Get a single tally log entry by ID.
+    Requires 'can_view_tally_logs' permission.
+    """
     entry = crud.get_tally_log_entry(db, entry_id=entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")

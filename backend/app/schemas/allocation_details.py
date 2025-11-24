@@ -52,3 +52,17 @@ class AllocationDetailsResponse(AllocationDetailsBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class AllocationDetailsMinimalResponse(BaseModel):
+    """
+    Minimal allocation details for tally operators with only can_start_tally permission.
+    Shows ONLY what needs to be tallied (requirements), without progress/completion data.
+    """
+    id: int
+    tally_session_id: int
+    weight_classification_id: int
+    required_bags: float
+    heads: Optional[float] = 0.0
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

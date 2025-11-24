@@ -2,39 +2,96 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from ...database import get_db
-from ...schemas.allocation_details import AllocationDetailsCreate, AllocationDetailsUpdate, AllocationDetailsResponse
+from ...schemas.allocation_details import (
+    AllocationDetailsCreate, 
+    AllocationDetailsUpdate, 
+    AllocationDetailsResponse,
+    AllocationDetailsMinimalResponse
+)
 from ...crud import allocation_details as crud
 from ...crud import tally_session as session_crud
 from ...crud import weight_classification as wc_crud
+from ...auth.dependencies import get_current_user, require_any_permission, require_permission, user_has_role
+from ...models import User
+from ...crud import user as user_crud
+from typing import Union
 
 router = APIRouter()
 
 
-@router.get("/tally-sessions/{session_id}/allocations", response_model=List[AllocationDetailsResponse])
-def read_allocation_details_by_session(session_id: int, db: Session = Depends(get_db)):
+@router.get("/tally-sessions/{session_id}/allocations")
+def read_allocation_details_by_session(
+    session_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_permission(["can_start_tally", "can_view_tally_logs"]))
+):
+    """
+    Get allocation details for a tally session.
+    
+    Permissions:
+    - 'can_start_tally': Returns minimal data (requirements only, no progress)
+    - 'can_view_tally_logs': Returns full data (includes progress/completion)
+    
+    Response varies based on user permissions.
+    """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Tally session not found")
     
     allocations = crud.get_allocation_details_by_session(db, session_id=session_id)
-    return allocations
+    
+    # Check if user has view_logs permission (shows full data)
+    user_permissions = user_crud.get_user_permissions(db, current_user.id)
+    has_view_logs = 'can_view_tally_logs' in user_permissions or user_has_role(current_user, 'SUPERADMIN')
+    
+    if has_view_logs:
+        # Return full allocation details with progress
+        return [AllocationDetailsResponse.model_validate(alloc) for alloc in allocations]
+    else:
+        # Return minimal details (requirements only, no progress)
+        return [AllocationDetailsMinimalResponse.model_validate(alloc) for alloc in allocations]
 
 
-@router.get("/allocations/{allocation_id}", response_model=AllocationDetailsResponse)
-def read_allocation_detail(allocation_id: int, db: Session = Depends(get_db)):
+@router.get("/allocations/{allocation_id}")
+def read_allocation_detail(
+    allocation_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_permission(["can_start_tally", "can_view_tally_logs"]))
+):
+    """
+    Get a specific allocation detail.
+    
+    Permissions:
+    - 'can_start_tally': Returns minimal data (requirements only, no progress)
+    - 'can_view_tally_logs': Returns full data (includes progress/completion)
+    
+    Response varies based on user permissions.
+    """
     allocation = crud.get_allocation_detail(db, allocation_id=allocation_id)
     if allocation is None:
         raise HTTPException(status_code=404, detail="Allocation detail not found")
-    return allocation
+    
+    # Check if user has view_logs permission (shows full data)
+    user_permissions = user_crud.get_user_permissions(db, current_user.id)
+    has_view_logs = 'can_view_tally_logs' in user_permissions or user_has_role(current_user, 'SUPERADMIN')
+    
+    if has_view_logs:
+        # Return full allocation details with progress
+        return AllocationDetailsResponse.model_validate(allocation)
+    else:
+        # Return minimal details (requirements only, no progress)
+        return AllocationDetailsMinimalResponse.model_validate(allocation)
 
 
 @router.post("/tally-sessions/{session_id}/allocations", response_model=AllocationDetailsResponse, status_code=status.HTTP_201_CREATED)
 def create_allocation_detail(
     session_id: int,
     allocation_detail: AllocationDetailsCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_start_tally"))
 ):
+    """Create allocation detail. Requires 'can_start_tally' permission."""
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -59,8 +116,10 @@ def create_allocation_detail(
 def update_allocation_detail(
     allocation_id: int,
     allocation_detail: AllocationDetailsUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_permission(["can_edit_tally_session", "can_start_tally"]))
 ):
+    """Update allocation detail. Requires 'can_edit_tally_session' OR 'can_start_tally'."""
     # Verify weight classification exists if it's being updated
     if allocation_detail.weight_classification_id is not None:
         wc = wc_crud.get_weight_classification(db, wc_id=allocation_detail.weight_classification_id)
@@ -79,7 +138,12 @@ def update_allocation_detail(
 
 
 @router.delete("/allocations/{allocation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_allocation_detail(allocation_id: int, db: Session = Depends(get_db)):
+def delete_allocation_detail(
+    allocation_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+):
+    """Delete allocation detail. Requires 'can_delete_tally_entries' permission."""
     success = crud.delete_allocation_detail(db, allocation_id=allocation_id)
     if not success:
         raise HTTPException(status_code=404, detail="Allocation detail not found")
@@ -87,8 +151,15 @@ def delete_allocation_detail(allocation_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/tally-sessions/{session_id}/allocations/reset-tally", status_code=status.HTTP_200_OK)
-def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
-    """Delete all TALLY role log entries for a session and recalculate allocated_bags_tally from remaining log entries."""
+def reset_tally_allocations(
+    session_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+):
+    """
+    Delete all TALLY role log entries for a session and recalculate allocated_bags_tally.
+    Requires 'can_delete_tally_entries' permission.
+    """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -103,8 +174,15 @@ def reset_tally_allocations(session_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/tally-sessions/{session_id}/allocations/reset-dispatcher", status_code=status.HTTP_200_OK)
-def reset_dispatcher_allocations(session_id: int, db: Session = Depends(get_db)):
-    """Delete all DISPATCHER role log entries for a session and recalculate allocated_bags_dispatcher from remaining log entries."""
+def reset_dispatcher_allocations(
+    session_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+):
+    """
+    Delete all DISPATCHER role log entries for a session and recalculate allocated_bags_dispatcher.
+    Requires 'can_delete_tally_entries' permission.
+    """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:

@@ -16,6 +16,7 @@ import { useResponsive } from '../utils/responsive';
 import { getDefaultHeadsAmount } from '../utils/settings';
 import { formatDate } from '../utils/dateFormat';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { usePermissions } from '../utils/usePermissions';
 
 interface TallyScreenProps {
   sessionId?: number;
@@ -30,6 +31,7 @@ function TallyScreen(props?: TallyScreenProps) {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
+  const { hasPermission } = usePermissions();
   
   // Use props if provided, otherwise fall back to route params
   const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
@@ -113,20 +115,34 @@ function TallyScreen(props?: TallyScreenProps) {
       const sessionData = sessionRes.data;
       setSession(sessionData);
       
-      // Then fetch customer, plant, allocations, weight classifications, and log entries
-      const [customerRes, plantRes, allocationsRes, wcRes, logEntriesRes] = await Promise.all([
+      // Check if user has permission to view log entries
+      const canViewLogs = hasPermission('can_view_tally_logs');
+      
+      // Build list of promises - only include log entries if user has permission
+      const promises = [
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
-        tallyLogEntriesApi.getBySession(sessionId),
-      ]);
+      ];
       
-      setCustomer(customerRes.data);
-      setPlant(plantRes.data);
-      setAllocations(allocationsRes.data);
-      setWeightClassifications(wcRes.data);
-      setLogEntries(logEntriesRes.data);
+      if (canViewLogs) {
+        promises.push(tallyLogEntriesApi.getBySession(sessionId));
+      }
+      
+      const results = await Promise.all(promises);
+      
+      setCustomer(results[0].data);
+      setPlant(results[1].data);
+      setAllocations(results[2].data);
+      setWeightClassifications(results[3].data);
+      
+      // Only set log entries if we fetched them
+      if (canViewLogs && results[4]) {
+        setLogEntries(results[4].data);
+      } else {
+        setLogEntries([]); // Empty array if user can't view logs
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       Alert.alert('Error', 'Failed to load tally data');
@@ -426,12 +442,19 @@ function TallyScreen(props?: TallyScreenProps) {
           setActiveInputField(null);
 
           // Refresh allocations and log entries
-          const [allocationsRes, logEntriesRes] = await Promise.all([
-            allocationDetailsApi.getBySession(sessionId),
-            tallyLogEntriesApi.getBySession(sessionId),
-          ]);
-          setAllocations(allocationsRes.data);
-          setLogEntries(logEntriesRes.data);
+          const canViewLogs = hasPermission('can_view_tally_logs');
+          const promises = [allocationDetailsApi.getBySession(sessionId)];
+          
+          if (canViewLogs) {
+            promises.push(tallyLogEntriesApi.getBySession(sessionId));
+          }
+          
+          const results = await Promise.all(promises);
+          setAllocations(results[0].data);
+          
+          if (canViewLogs && results[1]) {
+            setLogEntries(results[1].data);
+          }
         } catch (error: any) {
           console.error('Error creating manual log entry:', error);
           const errorMessage = error.response?.data?.detail
@@ -546,12 +569,19 @@ function TallyScreen(props?: TallyScreenProps) {
         setTallyInput('0');
 
         // Refresh allocations and log entries to show updated counts
-        const [allocationsRes, logEntriesRes] = await Promise.all([
-          allocationDetailsApi.getBySession(sessionId),
-          tallyLogEntriesApi.getBySession(sessionId),
-        ]);
-        setAllocations(allocationsRes.data);
-        setLogEntries(logEntriesRes.data);
+        const canViewLogs = hasPermission('can_view_tally_logs');
+        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        
+        if (canViewLogs) {
+          promises.push(tallyLogEntriesApi.getBySession(sessionId));
+        }
+        
+        const results = await Promise.all(promises);
+        setAllocations(results[0].data);
+        
+        if (canViewLogs && results[1]) {
+          setLogEntries(results[1].data);
+        }
 
         // Show success feedback (optional - you can remove this if it's too much)
         // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
@@ -671,12 +701,19 @@ function TallyScreen(props?: TallyScreenProps) {
         });
 
         // Refresh allocations and log entries
-        const [allocationsRes, logEntriesRes] = await Promise.all([
-          allocationDetailsApi.getBySession(sessionId),
-          tallyLogEntriesApi.getBySession(sessionId),
-        ]);
-        setAllocations(allocationsRes.data);
-        setLogEntries(logEntriesRes.data);
+        const canViewLogs = hasPermission('can_view_tally_logs');
+        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        
+        if (canViewLogs) {
+          promises.push(tallyLogEntriesApi.getBySession(sessionId));
+        }
+        
+        const results = await Promise.all(promises);
+        setAllocations(results[0].data);
+        
+        if (canViewLogs && results[1]) {
+          setLogEntries(results[1].data);
+        }
       } catch (error: any) {
         console.error('Error creating byproduct log entry:', error);
         const errorMessage = error.response?.data?.detail
@@ -780,14 +817,21 @@ function TallyScreen(props?: TallyScreenProps) {
         }
 
         // Refresh allocations and log entries
-        const [allocationsRes, logEntriesRes] = await Promise.all([
-          allocationDetailsApi.getBySession(sessionId),
-          tallyLogEntriesApi.getBySession(sessionId),
-        ]);
+        const canViewLogs = hasPermission('can_view_tally_logs');
+        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        
+        if (canViewLogs) {
+          promises.push(tallyLogEntriesApi.getBySession(sessionId));
+        }
+        
+        const results = await Promise.all(promises);
         
         // Update state first
-        setAllocations(allocationsRes.data);
-        setLogEntries(logEntriesRes.data);
+        setAllocations(results[0].data);
+        
+        if (canViewLogs && results[1]) {
+          setLogEntries(results[1].data);
+        }
 
         // Close modal and reset after state updates
         // Use setTimeout to ensure state updates are processed before closing modal
@@ -912,12 +956,19 @@ function TallyScreen(props?: TallyScreenProps) {
         setActiveInputField(null);
 
         // Refresh allocations and log entries
-        const [allocationsRes, logEntriesRes] = await Promise.all([
-          allocationDetailsApi.getBySession(sessionId),
-          tallyLogEntriesApi.getBySession(sessionId),
-        ]);
-        setAllocations(allocationsRes.data);
-        setLogEntries(logEntriesRes.data);
+        const canViewLogs = hasPermission('can_view_tally_logs');
+        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        
+        if (canViewLogs) {
+          promises.push(tallyLogEntriesApi.getBySession(sessionId));
+        }
+        
+        const results = await Promise.all(promises);
+        setAllocations(results[0].data);
+        
+        if (canViewLogs && results[1]) {
+          setLogEntries(results[1].data);
+        }
       } catch (error: any) {
         console.error('Error creating manual log entry:', error);
         const errorMessage = error.response?.data?.detail
@@ -1069,11 +1120,13 @@ function TallyScreen(props?: TallyScreenProps) {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                 if (!wc) return null;
 
+                // Handle case where allocated_bags might not be available (users without can_view_tally_logs)
                 const allocatedBags = tallyRole === 'tally'
-                  ? allocation.allocated_bags_tally
-                  : allocation.allocated_bags_dispatcher;
+                  ? (allocation.allocated_bags_tally ?? 0)
+                  : (allocation.allocated_bags_dispatcher ?? 0);
 
                 const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                const hasProgressData = 'allocated_bags_tally' in allocation;
 
                 return (
                   <View key={allocation.id} style={dynamicStyles.summaryRow}>
@@ -1088,7 +1141,7 @@ function TallyScreen(props?: TallyScreenProps) {
                       { flex: 1.5 },
                       isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
                     ]}>
-                      {allocatedBags} / {allocation.required_bags}
+                      {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
                     </Text>
                     <View style={{ flex: 1, alignItems: 'center' }}>
                       <TouchableOpacity
@@ -1160,7 +1213,7 @@ function TallyScreen(props?: TallyScreenProps) {
             </View>
           </TouchableOpacity>
           
-          {/* Allocated/Required Field - Always visible, matching toggle height */}
+            {/* Allocated/Required Field - Always visible, matching toggle height */}
           <View style={[
             {
               backgroundColor: '#ecf0f1',
@@ -1172,13 +1225,20 @@ function TallyScreen(props?: TallyScreenProps) {
               justifyContent: 'center',
             }
           ]}>
-            <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>Alloc / Req</Text>
+            <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>
+              {hasPermission('can_view_tally_logs') ? 'Alloc / Req' : 'Required'}
+            </Text>
             <Text style={[
               dynamicStyles.displayValue,
               (() => {
                 const allocation = showManualInput && selectedWeightClassId
                   ? getCurrentAllocation(selectedWeightClassId)
                   : currentAllocation;
+                if (!allocation) return {};
+                
+                const hasProgressData = 'allocated_bags_tally' in allocation;
+                if (!hasProgressData) return {};
+                
                 return allocation && 
                   (tallyRole === 'tally' 
                     ? allocation.allocated_bags_tally >= allocation.required_bags
@@ -1192,9 +1252,17 @@ function TallyScreen(props?: TallyScreenProps) {
                 const allocation = showManualInput && selectedWeightClassId
                   ? getCurrentAllocation(selectedWeightClassId)
                   : currentAllocation;
-                return allocation
-                  ? `${tallyRole === 'tally' ? allocation.allocated_bags_tally : allocation.allocated_bags_dispatcher} / ${allocation.required_bags}`
-                  : '- / -';
+                if (!allocation) return '- / -';
+                
+                const hasProgressData = 'allocated_bags_tally' in allocation;
+                if (!hasProgressData) {
+                  return `${allocation.required_bags}`;
+                }
+                
+                const allocatedBags = tallyRole === 'tally' 
+                  ? (allocation.allocated_bags_tally ?? 0)
+                  : (allocation.allocated_bags_dispatcher ?? 0);
+                return `${allocatedBags} / ${allocation.required_bags}`;
               })()}
             </Text>
           </View>
@@ -1521,12 +1589,13 @@ function TallyScreen(props?: TallyScreenProps) {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
+                        const hasProgressData = 'allocated_bags_tally' in allocation;
                         const allocatedBags = tallyRole === 'tally' 
-                          ? allocation.allocated_bags_tally 
-                          : allocation.allocated_bags_dispatcher;
+                          ? (allocation.allocated_bags_tally ?? 0)
+                          : (allocation.allocated_bags_dispatcher ?? 0);
                         
-                        const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                        const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        const isFulfilled = hasProgressData && allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                        const isOverAllocated = hasProgressData && allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1544,13 +1613,13 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {allocatedBags} / {allocation.required_bags}
+                              {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                              {totalHeads.toFixed(0)}
+                              {hasProgressData ? totalHeads.toFixed(0) : '-'}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
-                              {sum.toFixed(2)}
+                              {hasProgressData ? sum.toFixed(2) : '-'}
                             </Text>
                           </View>
                         );
@@ -1584,12 +1653,13 @@ function TallyScreen(props?: TallyScreenProps) {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
+                        const hasProgressData = 'allocated_bags_tally' in allocation;
                         const allocatedBags = tallyRole === 'tally' 
-                          ? allocation.allocated_bags_tally 
-                          : allocation.allocated_bags_dispatcher;
+                          ? (allocation.allocated_bags_tally ?? 0)
+                          : (allocation.allocated_bags_dispatcher ?? 0);
                         
-                        const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                        const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        const isFulfilled = hasProgressData && allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                        const isOverAllocated = hasProgressData && allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1607,13 +1677,13 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {allocatedBags} / {allocation.required_bags}
+                              {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                              {totalHeads.toFixed(0)}
+                              {hasProgressData ? totalHeads.toFixed(0) : '-'}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
-                              {sum.toFixed(2)}
+                              {hasProgressData ? sum.toFixed(2) : '-'}
                             </Text>
                           </View>
                         );

@@ -14,6 +14,7 @@ from .allocation_details import (
     AllocationDetailsCreate,
     AllocationDetailsUpdate,
     AllocationDetailsResponse,
+    AllocationDetailsMinimalResponse,
 )
 from .tally_log_entry import (
     TallyLogEntryCreate,
@@ -54,6 +55,7 @@ __all__ = [
     "AllocationDetailsCreate",
     "AllocationDetailsUpdate",
     "AllocationDetailsResponse",
+    "AllocationDetailsMinimalResponse",
     "TallyLogEntryCreate",
     "TallyLogEntryResponse",
     "ExportRequest",
