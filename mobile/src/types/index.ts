@@ -113,6 +113,18 @@ export interface User {
   plant_ids: number[];
   role_ids: number[];
   permissions: string[];
+  // User preferences
+  timezone?: string | null;
+  active_plant_id?: number | null;
+  acceptable_difference_threshold?: number;
+  visible_tabs?: string[] | null;
+}
+
+export interface UserPreferencesUpdate {
+  timezone?: string;
+  active_plant_id?: number;
+  acceptable_difference_threshold?: number;
+  visible_tabs?: string[];
 }
 
 export interface LoginRequest {

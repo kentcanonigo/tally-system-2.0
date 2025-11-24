@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { User, LoginRequest, AuthResponse, UserRole } from '../types';
+import { User, LoginRequest, AuthResponse, UserRole, UserPreferencesUpdate } from '../types';
 
 const TOKEN_KEY = 'tally_system_token';
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   isSuperadmin: boolean;
   token: string | null;
   refetchUser: () => Promise<void>;
+  updatePreferences: (preferences: UserPreferencesUpdate) => Promise<void>;
   hasPermission: (permissionCode: string) => boolean;
   hasAnyPermission: (permissionCodes: string[]) => boolean;
   hasAllPermissions: (permissionCodes: string[]) => boolean;
@@ -124,6 +125,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     }
   };
 
+  const updatePreferences = async (preferences: UserPreferencesUpdate) => {
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+    
+    try {
+      setLoading(true);
+      const response = await axios.put<User>(
+        `${apiBaseUrl}/auth/me/preferences`,
+        preferences,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setUser(response.data);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Failed to update preferences';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Helper to check if user has a specific RBAC role
   const hasRole = (roleName: string): boolean => {
     if (!user || !user.role_ids || user.role_ids.length === 0) return false;
@@ -161,6 +188,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     isSuperadmin: hasRole('SUPERADMIN'),
     token,
     refetchUser,
+    updatePreferences,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,

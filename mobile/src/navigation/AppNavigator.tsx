@@ -35,6 +35,24 @@ function SessionsStack() {
 }
 
 function MainTabs() {
+  const { user } = useAuth();
+  
+  // Get visible tabs from user preferences, default to all tabs
+  const visibleTabs = user?.visible_tabs || [
+    'Home',
+    'Sessions',
+    'Tally',
+    'Customers',
+    'WeightClassifications',
+    'Calculator',
+    'Export',
+  ];
+
+  // Helper to check if a tab should be visible
+  const isTabVisible = (tabName: string) => {
+    return tabName === 'Settings' || visibleTabs.includes(tabName);
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -67,13 +85,28 @@ function MainTabs() {
         tabBarInactiveTintColor: '#7f8c8d',
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
-      <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Customers" component={CustomersScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
+      {isTabVisible('Home') && (
+        <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('Sessions') && (
+        <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('Tally') && (
+        <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('Customers') && (
+        <Tab.Screen name="Customers" component={CustomersScreen} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('WeightClassifications') && (
+        <Tab.Screen name="WeightClassifications" component={WeightClassificationsScreen} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('Calculator') && (
+        <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
+      )}
+      {isTabVisible('Export') && (
+        <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
+      )}
+      {/* Settings is always visible */}
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );

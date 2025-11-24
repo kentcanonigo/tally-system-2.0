@@ -114,13 +114,19 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    role: UserRole
+    role: Optional[UserRole] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
     plant_ids: List[int] = Field(default_factory=list, description="List of plant IDs this user can access")
     role_ids: List[int] = Field(default_factory=list, description="List of role IDs assigned to this user")
     permissions: List[str] = Field(default_factory=list, description="Aggregated permission codes from all roles")
+    
+    # User preferences
+    timezone: Optional[str] = 'UTC'
+    active_plant_id: Optional[int] = None
+    acceptable_difference_threshold: int = 0
+    visible_tabs: Optional[List[str]] = None  # List of visible tab names
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -130,11 +136,21 @@ class UserDetailResponse(BaseModel):
     id: int
     username: str
     email: str
-    role: UserRole
+    role: Optional[UserRole] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
     plant_permissions: List[dict] = Field(default_factory=list)
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# User preferences update schema
+class UserPreferencesUpdate(BaseModel):
+    timezone: Optional[str] = None
+    active_plant_id: Optional[int] = None
+    acceptable_difference_threshold: Optional[int] = None
+    visible_tabs: Optional[List[str]] = None  # List of visible tab names
     
     model_config = ConfigDict(from_attributes=True)
 

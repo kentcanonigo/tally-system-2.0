@@ -17,6 +17,8 @@ import type {
   RoleCreateRequest,
   RoleUpdateRequest,
   Permission,
+  User,
+  UserPreferencesUpdate,
 } from '../types';
 
 // Get the debugger host IP from Expo Constants (works for physical devices)
@@ -262,6 +264,11 @@ export const rolesApi = {
 // Permissions API
 export const permissionsApi = {
   getAll: () => api.get<Permission[]>('/permissions'),
+};
+
+// User Preferences API
+export const userPreferencesApi = {
+  update: (data: UserPreferencesUpdate) => api.put<User>('/auth/me/preferences', data),
 };
 
 // Cache helpers

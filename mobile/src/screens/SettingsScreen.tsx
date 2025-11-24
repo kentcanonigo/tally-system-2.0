@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Switch } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -8,24 +8,35 @@ import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
 import { plantsApi, rolesApi } from '../services/api';
 import { Plant, Role } from '../types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDefaultHeadsAmount } from '../utils/settings';
 
-const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = '@tally_system_acceptable_difference_threshold';
-const DEFAULT_THRESHOLD = 0;
+// Available tabs that can be shown/hidden
+const AVAILABLE_TABS = [
+  { key: 'Home', label: 'Home' },
+  { key: 'Sessions', label: 'Sessions' },
+  { key: 'Tally', label: 'Tally' },
+  { key: 'Customers', label: 'Customers' },
+  { key: 'WeightClassifications', label: 'Weight Classifications' },
+  { key: 'Calculator', label: 'Calculator' },
+  { key: 'Export', label: 'Export' },
+  // Settings is always visible, so we don't include it here
+];
 
 function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, updatePreferences, refetchUser } = useAuth();
   const { timezone, setTimezone, availableTimezones } = useTimezone();
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
   const defaultHeadsAmount = useDefaultHeadsAmount();
   const insets = useSafeAreaInsets();
   
-  const [selectedTimezone, setSelectedTimezone] = useState(timezone);
+  const [selectedTimezone, setSelectedTimezone] = useState(user?.timezone || timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
-  const [threshold, setThreshold] = useState<string>('0');
-  const [currentThreshold, setCurrentThreshold] = useState<number>(0);
+  const [threshold, setThreshold] = useState<string>((user?.acceptable_difference_threshold || 0).toString());
+  const [selectedActivePlant, setSelectedActivePlant] = useState<number | null>(user?.active_plant_id || activePlantId);
+  const [visibleTabs, setVisibleTabs] = useState<string[]>(
+    user?.visible_tabs || AVAILABLE_TABS.map(tab => tab.key)
+  );
   
   // Plants state
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -33,15 +44,20 @@ function SettingsScreen() {
   const [isLoadingPlants, setIsLoadingPlants] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Update selectedTimezone when timezone changes from context
-  React.useEffect(() => {
-    setSelectedTimezone(timezone);
-  }, [timezone]);
-
-  // Load threshold on mount
+  // Update state when user data changes
   useEffect(() => {
-    loadThreshold();
+    if (user) {
+      setSelectedTimezone(user.timezone || timezone);
+      setThreshold((user.acceptable_difference_threshold || 0).toString());
+      setSelectedActivePlant(user.active_plant_id || activePlantId);
+      setVisibleTabs(user.visible_tabs || AVAILABLE_TABS.map(tab => tab.key));
+    }
+  }, [user, timezone, activePlantId]);
+
+  // Load data on mount
+  useEffect(() => {
     fetchPlants();
     fetchRoles();
   }, []);
@@ -72,63 +88,74 @@ function SettingsScreen() {
     }
   };
 
-  const loadThreshold = async () => {
+  const handleSaveAllPreferences = async () => {
     try {
-      const stored = await AsyncStorage.getItem(ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY);
-      if (stored !== null) {
-        const value = parseFloat(stored);
-        setCurrentThreshold(value);
-        setThreshold(value.toString());
-      } else {
-        setCurrentThreshold(DEFAULT_THRESHOLD);
-        setThreshold(DEFAULT_THRESHOLD.toString());
-      }
-    } catch (error) {
-      console.error('Error loading threshold:', error);
-    }
-  };
-
-  const handleSaveTimezone = async () => {
-    try {
-      await setTimezone(selectedTimezone);
-      Alert.alert('Success', `Timezone preference saved successfully. All dates and times will now display in ${selectedTimezone}.`);
-    } catch (error) {
-      console.error('Error saving timezone:', error);
-      Alert.alert('Error', 'Failed to save timezone preference');
-    }
-  };
-
-  const handleSaveThreshold = async () => {
-    try {
+      setIsSaving(true);
+      
       const thresholdValue = parseFloat(threshold);
       if (isNaN(thresholdValue) || thresholdValue < 0) {
-        Alert.alert('Error', 'Please enter a valid number greater than or equal to 0');
+        Alert.alert('Error', 'Please enter a valid number for threshold (≥ 0)');
         return;
       }
-      await AsyncStorage.setItem(ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY, thresholdValue.toString());
-      setCurrentThreshold(thresholdValue);
-      Alert.alert('Success', `Acceptable difference threshold saved successfully. Differences within ${thresholdValue} will now be displayed in orange.`);
-    } catch (error) {
-      console.error('Error saving threshold:', error);
-      Alert.alert('Error', 'Failed to save threshold preference');
+
+      await updatePreferences({
+        timezone: selectedTimezone,
+        active_plant_id: selectedActivePlant,
+        acceptable_difference_threshold: thresholdValue,
+        visible_tabs: visibleTabs,
+      });
+
+      // Update contexts for backward compatibility
+      await setTimezone(selectedTimezone);
+      if (selectedActivePlant) {
+        await setActivePlantId(selectedActivePlant);
+      }
+
+      Alert.alert('Success', 'All preferences saved successfully!');
+    } catch (error: any) {
+      console.error('Error saving preferences:', error);
+      Alert.alert('Error', error.message || 'Failed to save preferences');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSelectPlant = async (plantId: number) => {
-    try {
-      await setActivePlantId(plantId);
-      setShowPlantDropdown(false);
-      Alert.alert('Success', 'Active plant updated successfully.');
-    } catch (error) {
-      console.error('Error saving active plant:', error);
-      Alert.alert('Error', 'Failed to save active plant');
-    }
+  const handleSelectPlant = (plantId: number) => {
+    setSelectedActivePlant(plantId);
+    setShowPlantDropdown(false);
+  };
+
+  const toggleTabVisibility = (tabKey: string) => {
+    setVisibleTabs(prev => {
+      if (prev.includes(tabKey)) {
+        // Don't allow hiding all tabs - keep at least one
+        if (prev.length <= 1) {
+          Alert.alert('Notice', 'You must have at least one tab visible.');
+          return prev;
+        }
+        return prev.filter(key => key !== tabKey);
+      } else {
+        return [...prev, tabKey];
+      }
+    });
   };
 
   const getActivePlantName = () => {
-    if (!activePlantId) return 'None Selected';
-    const plant = plants.find(p => p.id === activePlantId);
+    if (!selectedActivePlant) return 'None Selected';
+    const plant = plants.find(p => p.id === selectedActivePlant);
     return plant ? plant.name : 'Unknown Plant';
+  };
+
+  const hasUnsavedChanges = () => {
+    if (!user) return false;
+    
+    const thresholdValue = parseFloat(threshold);
+    return (
+      selectedTimezone !== (user.timezone || timezone) ||
+      selectedActivePlant !== (user.active_plant_id || activePlantId) ||
+      thresholdValue !== (user.acceptable_difference_threshold || 0) ||
+      JSON.stringify(visibleTabs.sort()) !== JSON.stringify((user.visible_tabs || AVAILABLE_TABS.map(t => t.key)).sort())
+    );
   };
 
   const getUserRoleLabel = () => {
@@ -292,6 +319,10 @@ function SettingsScreen() {
       color: '#2c3e50',
       backgroundColor: '#fff',
     },
+    tabToggleLabel: {
+      ...styles.tabToggleLabel,
+      fontSize: responsive.fontSize.medium,
+    },
   };
 
   if (isPlantLoading) {
@@ -360,16 +391,6 @@ function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={dynamicStyles.currentTimezone}>
-          Current: {timezone} ({getTimezoneAbbreviation(timezone)})
-        </Text>
-
-        {selectedTimezone !== timezone && (
-          <TouchableOpacity style={dynamicStyles.saveButton} onPress={handleSaveTimezone}>
-            <Text style={dynamicStyles.saveButtonText}>Save Timezone</Text>
-          </TouchableOpacity>
-        )}
-
         <Text style={dynamicStyles.infoText}>
           All dates and times throughout the app will be displayed in your selected timezone.
           Log entries are stored in UTC and converted to your timezone for display.
@@ -393,21 +414,48 @@ function SettingsScreen() {
           />
         </View>
 
-        <Text style={dynamicStyles.currentTimezone}>
-          Current: {currentThreshold}
-        </Text>
-
-        {parseFloat(threshold) !== currentThreshold && !isNaN(parseFloat(threshold)) && parseFloat(threshold) >= 0 && (
-          <TouchableOpacity style={dynamicStyles.saveButton} onPress={handleSaveThreshold}>
-            <Text style={dynamicStyles.saveButtonText}>Save Threshold</Text>
-          </TouchableOpacity>
-        )}
-
         <Text style={dynamicStyles.infoText}>
           When viewing session logs, differences within this threshold will be displayed in orange (acceptable).
           Exact matches (0) will be green, and differences beyond the threshold will be red (unacceptable).
         </Text>
       </View>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Visible Tabs</Text>
+        <Text style={dynamicStyles.label}>
+          Customize which tabs appear in your navigation bar:
+        </Text>
+
+        {AVAILABLE_TABS.map((tab) => (
+          <View key={tab.key} style={styles.tabToggleRow}>
+            <Text style={dynamicStyles.tabToggleLabel}>{tab.label}</Text>
+            <Switch
+              value={visibleTabs.includes(tab.key)}
+              onValueChange={() => toggleTabVisibility(tab.key)}
+              trackColor={{ false: '#ccc', true: '#3498db' }}
+              thumbColor={visibleTabs.includes(tab.key) ? '#fff' : '#f4f3f4'}
+            />
+          </View>
+        ))}
+
+        <Text style={dynamicStyles.infoText}>
+          Settings tab is always visible. You must have at least one other tab visible.
+        </Text>
+      </View>
+
+      {hasUnsavedChanges() && (
+        <TouchableOpacity 
+          style={[dynamicStyles.saveButton, { backgroundColor: '#27ae60', marginBottom: responsive.spacing.lg }]} 
+          onPress={handleSaveAllPreferences}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={dynamicStyles.saveButtonText}>💾 Save All Settings</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       <View style={dynamicStyles.section}>
         <Text style={dynamicStyles.sectionTitle}>Default Heads Amount</Text>
@@ -657,6 +705,18 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     marginTop: 12,
+  },
+  tabToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  tabToggleLabel: {
+    fontSize: 16,
+    color: '#2c3e50',
   },
 });
 
