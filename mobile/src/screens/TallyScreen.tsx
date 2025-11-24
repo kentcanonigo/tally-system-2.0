@@ -571,15 +571,20 @@ function TallyScreen(props?: TallyScreenProps) {
     }
   };
 
-  // Filter allocations to only byproducts when in byproduct mode
+  // Filter allocations based on mode: byproduct mode shows only byproducts, dressed mode shows only dressed
   const filteredAllocations = useMemo(() => {
     if (tallyMode === 'byproduct') {
       return allocations.filter((allocation) => {
         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
         return wc && wc.category === 'Byproduct';
       });
+    } else {
+      // dressed mode - show only dressed allocations
+      return allocations.filter((allocation) => {
+        const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+        return wc && wc.category === 'Dressed';
+      });
     }
-    return allocations;
   }, [tallyMode, allocations, weightClassifications]);
 
   const currentWeight = parseFloat(tallyInput) || 0;
@@ -1164,7 +1169,7 @@ function TallyScreen(props?: TallyScreenProps) {
               justifyContent: 'center',
             }
           ]}>
-            <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>Allocated / Required</Text>
+            <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>Alloc / Req</Text>
             <Text style={[
               dynamicStyles.displayValue,
               (() => {
@@ -1486,63 +1491,144 @@ function TallyScreen(props?: TallyScreenProps) {
           )}
         </View>
 
-        {/* Summary table */}
+        {/* Summary tables */}
         <View style={dynamicStyles.summarySection}>
           <View style={dynamicStyles.summaryContainer}>
             <Text style={dynamicStyles.summaryTitle}>Allocations Summary</Text>
-            <View style={dynamicStyles.summaryTable}>
-              <View style={dynamicStyles.summaryHeader}>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Allocated / Required</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
-                <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
-              </View>
-              {filteredAllocations.map((allocation) => {
+            
+            {/* Dressed Allocations Table */}
+            {(() => {
+              const dressedAllocations = filteredAllocations.filter((allocation) => {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
-                if (!wc) return null;
-                
-                const allocatedBags = tallyRole === 'tally' 
-                  ? allocation.allocated_bags_tally 
-                  : allocation.allocated_bags_dispatcher;
-                
-                const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
-                const sum = getSumForWeightClassification(allocation.weight_classification_id);
-                const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
-                
+                return wc && wc.category === 'Dressed';
+              });
+              
+              if (dressedAllocations.length > 0) {
                 return (
-                  <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
-                      {wc.classification}
-                    </Text>
-                    <Text style={[
-                      dynamicStyles.summaryCell, 
-                      { flex: 1.5 },
-                      isOverAllocated 
-                        ? { color: '#e67e22', fontWeight: '600' } 
-                        : isFulfilled 
-                          ? { color: '#27ae60', fontWeight: '600' } 
-                          : {}
-                    ]}>
-                      {allocatedBags} / {allocation.required_bags}
-                    </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                      {totalHeads.toFixed(0)}
-                    </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                      {sum.toFixed(2)}
-                    </Text>
+                  <View style={{ marginBottom: responsive.spacing.md }}>
+                    <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Dressed</Text>
+                    <View style={dynamicStyles.summaryTable}>
+                      <View style={dynamicStyles.summaryHeader}>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
+                      </View>
+                      {dressedAllocations.map((allocation) => {
+                        const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                        if (!wc) return null;
+                        
+                        const allocatedBags = tallyRole === 'tally' 
+                          ? allocation.allocated_bags_tally 
+                          : allocation.allocated_bags_dispatcher;
+                        
+                        const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                        const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        const sum = getSumForWeightClassification(allocation.weight_classification_id);
+                        const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
+                        
+                        return (
+                          <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
+                              {wc.classification}
+                            </Text>
+                            <Text style={[
+                              dynamicStyles.summaryCell, 
+                              { flex: 1.5 },
+                              isOverAllocated 
+                                ? { color: '#e67e22', fontWeight: '600' } 
+                                : isFulfilled 
+                                  ? { color: '#27ae60', fontWeight: '600' } 
+                                  : {}
+                            ]}>
+                              {allocatedBags} / {allocation.required_bags}
+                            </Text>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                              {totalHeads.toFixed(0)}
+                            </Text>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                              {sum.toFixed(2)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
                   </View>
                 );
-              })}
-              {filteredAllocations.length === 0 && (
-                <View style={dynamicStyles.summaryRow}>
-                  <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
-                    No allocations yet
-                  </Text>
-                </View>
-              )}
-            </View>
+              }
+              return null;
+            })()}
+            
+            {/* Byproduct Allocations Table */}
+            {(() => {
+              const byproductAllocations = filteredAllocations.filter((allocation) => {
+                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                return wc && wc.category === 'Byproduct';
+              });
+              
+              if (byproductAllocations.length > 0) {
+                return (
+                  <View>
+                    <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Byproduct</Text>
+                    <View style={dynamicStyles.summaryTable}>
+                      <View style={dynamicStyles.summaryHeader}>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
+                      </View>
+                      {byproductAllocations.map((allocation) => {
+                        const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                        if (!wc) return null;
+                        
+                        const allocatedBags = tallyRole === 'tally' 
+                          ? allocation.allocated_bags_tally 
+                          : allocation.allocated_bags_dispatcher;
+                        
+                        const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                        const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        const sum = getSumForWeightClassification(allocation.weight_classification_id);
+                        const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
+                        
+                        return (
+                          <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
+                              {wc.classification}
+                            </Text>
+                            <Text style={[
+                              dynamicStyles.summaryCell, 
+                              { flex: 1.5 },
+                              isOverAllocated 
+                                ? { color: '#e67e22', fontWeight: '600' } 
+                                : isFulfilled 
+                                  ? { color: '#27ae60', fontWeight: '600' } 
+                                  : {}
+                            ]}>
+                              {allocatedBags} / {allocation.required_bags}
+                            </Text>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                              {totalHeads.toFixed(0)}
+                            </Text>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                              {sum.toFixed(2)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              }
+              return null;
+            })()}
+            
+            {filteredAllocations.length === 0 && (
+              <View style={dynamicStyles.summaryRow}>
+                <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
+                  No allocations yet
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
