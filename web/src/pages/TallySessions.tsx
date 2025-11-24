@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import type { Customer, Plant, TallySession } from '../types';
 
 function TallySessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
+  const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [formData, setFormData] = useState({
     customer_id: '',
     plant_id: '',
@@ -29,6 +34,20 @@ function TallySessions() {
   useEffect(() => {
     fetchSessions();
   }, [filters]);
+
+  // Filter sessions by selected date
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const filtered = allSessions.filter((session) => {
+        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        return sessionDate === dateStr;
+      });
+      setSessions(filtered);
+    } else {
+      setSessions(allSessions);
+    }
+  }, [selectedDate, allSessions]);
 
   const fetchData = async () => {
     try {
@@ -52,7 +71,18 @@ function TallySessions() {
       if (filters.status) params.status = filters.status;
 
       const response = await tallySessionsApi.getAll(params);
-      setSessions(response.data);
+      setAllSessions(response.data);
+      // Apply date filter if selected
+      if (selectedDate) {
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        const filtered = response.data.filter((session) => {
+          const sessionDate = new Date(session.date).toISOString().split('T')[0];
+          return sessionDate === dateStr;
+        });
+        setSessions(filtered);
+      } else {
+        setSessions(response.data);
+      }
     } catch (error) {
       console.error('Error fetching sessions:', error);
       alert('Error fetching tally sessions');
@@ -71,6 +101,50 @@ function TallySessions() {
 
   const getStatusBadge = (status: string) => {
     return <span className={`status-badge status-${status}`}>{status}</span>;
+  };
+
+  // Create tile content for calendar to mark dates with sessions
+  const tileContent = ({ date, view }: { date: Date; view: string }) => {
+    if (view === 'month') {
+      const dateStr = date.toISOString().split('T')[0];
+      const hasSessions = allSessions.some((session) => {
+        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        return sessionDate === dateStr;
+      });
+      if (hasSessions) {
+        return <div style={{ height: '4px', width: '4px', backgroundColor: '#3498db', borderRadius: '50%', margin: '2px auto' }} />;
+      }
+    }
+    return null;
+  };
+
+  // Mark dates with sessions
+  const tileClassName = ({ date, view }: { date: Date; view: string }) => {
+    if (view === 'month') {
+      const dateStr = date.toISOString().split('T')[0];
+      const hasSessions = allSessions.some((session) => {
+        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        return sessionDate === dateStr;
+      });
+      if (hasSessions) {
+        return 'has-sessions';
+      }
+    }
+    return null;
+  };
+
+  const handleDateChange = (value: Date) => {
+    if (selectedDate && selectedDate.toISOString().split('T')[0] === value.toISOString().split('T')[0]) {
+      // If same date clicked, clear filter
+      setSelectedDate(null);
+    } else {
+      setSelectedDate(value);
+    }
+  };
+
+  const clearDateFilter = () => {
+    setSelectedDate(null);
+    setShowCalendar(false);
   };
 
   const handleDelete = async (sessionId: number) => {
@@ -138,10 +212,22 @@ function TallySessions() {
         <p>View and manage tally sessions</p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={handleCreate}>
           Create New Session
         </button>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setShowCalendar(!showCalendar)}
+          style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+        >
+          📅 {selectedDate ? `Filtered: ${selectedDate.toLocaleDateString()}` : 'Calendar'}
+        </button>
+        {selectedDate && (
+          <button className="btn btn-secondary" onClick={clearDateFilter}>
+            Clear Date Filter
+          </button>
+        )}
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
@@ -312,6 +398,34 @@ function TallySessions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showCalendar && (
+        <div className="modal" onClick={() => setShowCalendar(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Select Date</h2>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Calendar
+                onChange={handleDateChange}
+                value={selectedDate || undefined}
+                tileContent={tileContent}
+                tileClassName={tileClassName}
+                className="tally-calendar"
+              />
+              {selectedDate && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={clearDateFilter}
+                  style={{ marginTop: '15px' }}
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

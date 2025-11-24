@@ -236,3 +236,87 @@ tbody tr:hover {
   color: white;
 }
 
+/* Calendar Styles */
+.tally-calendar {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.tally-calendar .react-calendar__tile {
+  padding: 10px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.tally-calendar .react-calendar__tile:hover {
+  background-color: #e8f4f8;
+}
+
+.tally-calendar .react-calendar__tile--active {
+  background-color: #3498db;
+  color: white;
+}
+
+.tally-calendar .react-calendar__tile--active:hover {
+  background-color: #2980b9;
+}
+
+.tally-calendar .react-calendar__tile--now {
+  background-color: #ecf0f1;
+  font-weight: bold;
+}
+
+.tally-calendar .react-calendar__tile--now:enabled:hover {
+  background-color: #d5dbdb;
+}
+
+.tally-calendar .react-calendar__tile.has-sessions {
+  position: relative;
+}
+
+.tally-calendar .react-calendar__tile.has-sessions:not(.react-calendar__tile--active) {
+  background-color: #f8f9fa;
+}
+
+.tally-calendar .react-calendar__navigation {
+  margin-bottom: 15px;
+}
+
+.tally-calendar .react-calendar__navigation button {
+  min-width: 44px;
+  background: none;
+  font-size: 16px;
+  margin-top: 8px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.tally-calendar .react-calendar__navigation button:enabled:hover,
+.tally-calendar .react-calendar__navigation button:enabled:focus {
+  background-color: #ecf0f1;
+  border-radius: 4px;
+}
+
+.tally-calendar .react-calendar__month-view__weekdays {
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 10px;
+}
+
+.tally-calendar .react-calendar__month-view__weekdays__weekday {
+  padding: 10px;
+}
+
+.tally-calendar .react-calendar__month-view__days__day--weekend {
+  color: #e74c3c;
+}
+
+.tally-calendar .react-calendar__month-view__days__day--neighboringMonth {
+  color: #bdc3c7;
+}
+
