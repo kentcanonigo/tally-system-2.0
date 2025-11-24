@@ -14,6 +14,10 @@ cd /home/site/wwwroot
 echo "Running database migrations..."
 alembic upgrade head
 
+# Seed admin user (idempotent - safe to run multiple times)
+echo "Ensuring default admin user exists..."
+python seed_admin.py
+
 # Start the server
 echo "Starting FastAPI server..."
 uvicorn app.main:app --host 0.0.0.0 --port 8000

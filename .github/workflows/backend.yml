@@ -55,5 +55,5 @@ jobs:
       with:
         app-name: 'tally-system-api'
         package: ./backend
-        startup-command: 'python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000'
+        startup-command: 'python -m alembic upgrade head && python seed_admin.py && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000'
 

@@ -136,9 +136,22 @@ This guide will help you deploy the Tally System to Azure using free tier servic
    DATABASE_URL = mssql+pyodbc://tallyadmin:PASSWORD@tally-system-sql-XXXX.database.windows.net:1433/tally-system-db?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&Connection+Timeout=30
    API_V1_PREFIX = /api/v1
    DEBUG = False
+   SECRET_KEY = <generate-a-secure-random-key>
+   ALGORITHM = HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES = 480
    ```
 
    (Replace PASSWORD with your actual database password and tally-system-sql-XXXX with your server name)
+
+   **To generate a secure SECRET_KEY:**
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+   
+   **⚠️ IMPORTANT**: 
+   - Use a DIFFERENT SECRET_KEY for production than local development
+   - Never commit SECRET_KEY to git
+   - This key is used to sign JWT authentication tokens
 
 5. Click "Save"
 6. Click "Continue" when prompted
@@ -218,32 +231,39 @@ az webapp up --name tally-system-api --resource-group tally-system-rg --runtime 
 2. Right-click backend folder → "Deploy to Web App"
 3. Select your App Service
 
-### 6.5 Run Database Migrations
+### 6.5 Run Database Migrations and Seed Admin User
 
-After deployment, run migrations:
+After deployment, migrations and admin user creation are handled automatically by the startup script.
+
+**Important**: Azure App Service needs to install dependencies first. The startup command is configured in the GitHub Actions workflow:
+
+```bash
+alembic upgrade head && python seed_admin.py && uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+This will:
+1. Run database migrations
+2. Create/update the default admin user (username: `admin`, password: `admin123`)
+3. Start the FastAPI server
+
+**Alternative: Manual Setup via SSH**
+
+If you need to run commands manually:
 
 1. Go to App Service → "SSH" or "Console"
 2. Run:
    ```bash
    cd /home/site/wwwroot
    alembic upgrade head
+   python seed_admin.py
    ```
-
-**Important**: Azure App Service needs to install dependencies first. Configure the startup command:
-
-1. Go to App Service → **Configuration** → **General settings**
-2. Set **Startup Command** to:
-   ```
-   alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
-   ```
-3. Ensure **SCM_DO_BUILD_DURING_DEPLOYMENT** is enabled (should be automatic)
-4. Click **Save**
-5. **Restart** the app service
 
 **Note**: If you get "alembic: Permission denied" or "command not found", Azure hasn't installed dependencies yet. Make sure:
 - `requirements.txt` is in the root of your deployment (`/home/site/wwwroot/requirements.txt`)
 - Azure detects it as a Python app (should auto-detect)
 - Check **Deployment Center** → **Logs** to see if build succeeded
+
+**⚠️ SECURITY**: After first deployment, log in to the web dashboard and **change the default admin password immediately**!
 
 ## Step 7: Deploy Web Dashboard (Azure Static Web Apps)
 
@@ -292,22 +312,24 @@ Update `mobile/src/services/api.ts`:
 const API_BASE_URL = 'https://tally-system-api.azurewebsites.net/api/v1';
 ```
 
-## Step 9: Configure CORS
+## Step 9: Configure CORS (Optional but Recommended)
 
-The backend already has CORS configured to allow all origins. For production, update `backend/app/main.py`:
+The backend is configured to read CORS settings from the `CORS_ORIGINS` environment variable.
 
-```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://tally-system-web.azurestaticapps.net",  # Your Static Web App URL
-        "http://localhost:3000",  # For local development
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
+**For production security**, add this to your App Service Configuration:
+
+1. Go to App Service → Configuration → Application settings
+2. Click "+ New application setting"
+3. Add:
+   ```
+   Name: CORS_ORIGINS
+   Value: https://tally-system-web.azurestaticapps.net,https://yourdomain.com
+   ```
+   (Comma-separated list of allowed origins)
+
+4. Click "Save"
+
+**Note**: By default, CORS is set to `*` (allow all origins), which is fine for development but not recommended for production
 
 ## Step 10: Test Deployment
 
@@ -315,13 +337,26 @@ app.add_middleware(
    - Go to: `https://tally-system-api.azurewebsites.net/docs`
    - Test endpoints
 
-2. **Web Dashboard**:
+2. **Authentication**:
+   - Test login endpoint:
+     ```bash
+     curl -X POST https://tally-system-api.azurewebsites.net/api/v1/auth/login \
+       -H "Content-Type: application/json" \
+       -d '{"username": "admin", "password": "admin123"}'
+     ```
+   - Should return a JWT token
+
+3. **Web Dashboard**:
    - Go to: `https://tally-system-web.azurestaticapps.net`
+   - Log in with:
+     - Username: `admin`
+     - Password: `admin123`
+   - **⚠️ IMMEDIATELY change the password** after first login
    - Should load and connect to API
 
-3. **Database**:
-   - Create a customer via API
-   - Verify it appears in dashboard
+4. **Database**:
+   - Create a customer via dashboard
+   - Verify it persists after refresh
 
 ## Step 11: Set Up Custom Domains (Optional)
 
@@ -399,11 +434,13 @@ app.add_middleware(
 
 ## Next Steps
 
-1. Set up monitoring and alerts
-2. Configure backup for database
-3. Set up staging environment
-4. Implement authentication (if needed)
-5. Set up CI/CD pipelines
+1. **Change default admin password** (critical security step!)
+2. Create additional admin users with plant-specific permissions
+3. Set up monitoring and alerts
+4. Configure backup for database
+5. Set up staging environment with separate SECRET_KEY
+6. Configure custom domains
+7. Set up application insights for monitoring
 
 ## Useful Commands
 
