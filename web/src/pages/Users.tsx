@@ -135,15 +135,19 @@ function Users() {
   };
 
   if (loading) {
-    return <div className="container"><p>Loading...</p></div>;
+    return <div>Loading...</div>;
   }
 
   return (
-    <div className="container">
-      <div className="header">
+    <div>
+      <div className="page-header">
         <h1>User Management</h1>
-        <button className="btn-primary" onClick={openCreateModal}>
-          Create New User
+        <p>Manage users and their permissions</p>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <button className="btn btn-primary" onClick={openCreateModal}>
+          Add User
         </button>
       </div>
 
@@ -151,7 +155,8 @@ function Users() {
         <div className="error-message">{error}</div>
       )}
 
-      <table className="data-table">
+      <div className="table-container">
+        <table>
         <thead>
           <tr>
             <th>ID</th>
@@ -188,14 +193,14 @@ function Users() {
               </td>
               <td>
                 <button
-                  className="btn-small btn-secondary"
+                  className="btn btn-secondary"
                   onClick={() => openEditModal(user)}
-                  style={{ marginRight: '5px' }}
+                  style={{ marginRight: '10px' }}
                 >
                   Edit
                 </button>
                 <button
-                  className="btn-small btn-danger"
+                  className="btn btn-danger"
                   onClick={() => handleDelete(user.id)}
                 >
                   Delete
@@ -205,9 +210,10 @@ function Users() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
+        <div className="modal" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{modalMode === 'create' ? 'Create New User' : 'Edit User'}</h2>
@@ -287,15 +293,15 @@ function Users() {
               )}
 
               <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={closeModal}>
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="btn-primary"
+                  className="btn btn-primary"
                   disabled={formData.role === UserRole.ADMIN && formData.plant_ids.length === 0}
                 >
-                  {modalMode === 'create' ? 'Create User' : 'Update User'}
+                  {modalMode === 'create' ? 'Create' : 'Update'}
                 </button>
               </div>
             </form>
