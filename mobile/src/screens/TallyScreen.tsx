@@ -352,7 +352,8 @@ function TallyScreen(props?: TallyScreenProps) {
       const heads = parseFloat(manualHeadsInput);
       const weight = parseFloat(manualWeightInput);
 
-      if (isNaN(heads) || heads < 0) {
+      // Skip heads validation for byproducts (will be set to 1 automatically)
+      if (!isSelectedWCByproduct && (isNaN(heads) || heads < 0)) {
         Alert.alert('Error', 'Please enter a valid heads amount');
         return;
       }
@@ -427,11 +428,14 @@ function TallyScreen(props?: TallyScreenProps) {
       async function createManualLogEntry() {
         setIsSubmitting(true);
         try {
+          // Force heads=1 for byproducts
+          const finalHeads = isSelectedWCByproduct ? 1 : heads;
+          
           await tallyLogEntriesApi.create(sessionId, {
             weight_classification_id: selectedWeightClassId,
             role: tallyRole as TallyLogEntryRole,
             weight: weight,
-            heads: heads,
+            heads: finalHeads,
             notes: null,
           });
 
@@ -623,6 +627,10 @@ function TallyScreen(props?: TallyScreenProps) {
   const currentWeight = parseFloat(tallyInput) || 0;
   const matchedWC = currentWeight > 0 ? findWeightClassification(currentWeight) : null;
   const currentAllocation = matchedWC ? getCurrentAllocation(matchedWC.id) : null;
+
+  // Check if the selected weight classification (in manual mode) is a byproduct
+  const selectedWC = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+  const isSelectedWCByproduct = selectedWC?.category === 'Byproduct';
 
   // Byproduct increment function
   const handleByproductIncrement = async (wcId: number) => {
@@ -1348,46 +1356,48 @@ function TallyScreen(props?: TallyScreenProps) {
               </TouchableOpacity>
             </View>
 
-            {/* Heads Input */}
-            <View style={[
-              dynamicStyles.displayField,
-              {
-                flex: 1,
-                backgroundColor: activeInputField === 'heads' ? '#fff' : '#f8f9fa',
-                borderWidth: 2,
-                borderColor: activeInputField === 'heads' ? '#3498db' : '#bdc3c7',
-              }
-            ]}>
-              <Text style={dynamicStyles.displayLabel}>Heads</Text>
-              <TextInput
-                ref={headsInputRef}
-                style={{
-                  marginTop: 2,
-                  padding: 0,
-                  backgroundColor: 'transparent',
-                  borderWidth: 0,
-                  fontSize: responsive.fontSize.small,
-                  color: '#2c3e50',
-                  fontWeight: '600',
-                }}
-                value={manualHeadsInput}
-                onChangeText={setManualHeadsInput}
-                onFocus={() => {
-                  setActiveInputField('heads');
-                  // Clear weight field focus when heads is focused
-                  if (activeInputField === 'weight') {
-                    weightInputRef.current?.blur();
-                  }
-                }}
-                onBlur={() => {
-                  // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
-                  // This prevents losing focus when numpad buttons are pressed
-                }}
-                keyboardType="numeric"
-                placeholder="15"
-                placeholderTextColor="#999"
-              />
-            </View>
+            {/* Heads Input - Hidden for byproducts */}
+            {!isSelectedWCByproduct && (
+              <View style={[
+                dynamicStyles.displayField,
+                {
+                  flex: 1,
+                  backgroundColor: activeInputField === 'heads' ? '#fff' : '#f8f9fa',
+                  borderWidth: 2,
+                  borderColor: activeInputField === 'heads' ? '#3498db' : '#bdc3c7',
+                }
+              ]}>
+                <Text style={dynamicStyles.displayLabel}>Heads</Text>
+                <TextInput
+                  ref={headsInputRef}
+                  style={{
+                    marginTop: 2,
+                    padding: 0,
+                    backgroundColor: 'transparent',
+                    borderWidth: 0,
+                    fontSize: responsive.fontSize.small,
+                    color: '#2c3e50',
+                    fontWeight: '600',
+                  }}
+                  value={manualHeadsInput}
+                  onChangeText={setManualHeadsInput}
+                  onFocus={() => {
+                    setActiveInputField('heads');
+                    // Clear weight field focus when heads is focused
+                    if (activeInputField === 'weight') {
+                      weightInputRef.current?.blur();
+                    }
+                  }}
+                  onBlur={() => {
+                    // Don't clear activeInputField on blur - only clear when user explicitly focuses another field
+                    // This prevents losing focus when numpad buttons are pressed
+                  }}
+                  keyboardType="numeric"
+                  placeholder="15"
+                  placeholderTextColor="#999"
+                />
+              </View>
+            )}
           </View>
         ) : (
           /* Three display fields in a row - Automatic mode */

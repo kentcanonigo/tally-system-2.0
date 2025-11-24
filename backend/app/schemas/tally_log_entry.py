@@ -12,7 +12,7 @@ class TallyLogEntryRole(str, Enum):
 class TallyLogEntryBase(BaseModel):
     weight: float
     role: TallyLogEntryRole
-    heads: Optional[float] = 15.0
+    heads: Optional[float] = 15.0  # Note: For Byproduct category items, heads is automatically set to 1.0 regardless of input
     notes: Optional[str] = None
 
     @field_validator('weight')

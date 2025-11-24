@@ -484,12 +484,18 @@ function TallySessionDetailScreen() {
                 {matchStatus}
               </Text>
             </View>
-            <View style={styles.allocationRow}>
-              <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
-              <Text style={dynamicStyles.allocationValue}>
-                {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
-              </Text>
-            </View>
+            {/* Heads - Hidden for byproducts */}
+            {(() => {
+              const wc = weightClassifications.find(w => w.id === allocation.weight_classification_id);
+              return wc?.category !== 'Byproduct' && (
+                <View style={styles.allocationRow}>
+                  <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
+                  <Text style={dynamicStyles.allocationValue}>
+                    {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
+                  </Text>
+                </View>
+              );
+            })()}
           </>
         )}
         

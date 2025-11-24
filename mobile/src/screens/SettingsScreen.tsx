@@ -427,7 +427,7 @@ function SettingsScreen() {
         </View>
 
         <Text style={dynamicStyles.infoText}>
-          This is the default number of heads that will be assigned to each bag when tallying. This setting is currently view-only.
+          This is the default number of heads per bag for Dressed category items. Byproduct items do not use heads tracking. This setting is currently view-only.
         </Text>
       </View>
 
