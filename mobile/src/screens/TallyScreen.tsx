@@ -243,6 +243,126 @@ function TallyScreen() {
       return;
     }
 
+    // If manual input mode is enabled, handle manual entry
+    if (showManualInput) {
+      if (!selectedWeightClassId) {
+        Alert.alert('Error', 'Please select a weight classification');
+        return;
+      }
+
+      const heads = parseFloat(manualHeadsInput);
+      const weight = parseFloat(manualWeightInput);
+
+      if (isNaN(heads) || heads < 0) {
+        Alert.alert('Error', 'Please enter a valid heads amount');
+        return;
+      }
+
+      if (isNaN(weight) || weight <= 0) {
+        Alert.alert('Error', 'Please enter a valid weight');
+        return;
+      }
+
+      if (!sessionId) {
+        Alert.alert('Error', 'Session ID is missing');
+        return;
+      }
+
+      // Check for over-allocation
+      const allocation = getCurrentAllocation(selectedWeightClassId);
+      
+      if (!allocation || allocation.required_bags === 0) {
+        const wc = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+        const wcName = wc?.classification || 'this classification';
+        Alert.alert(
+          'No Required Allocation',
+          `There is no required allocation for ${wcName}.\n\n` +
+          `Are you sure you want to add this tally entry?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Yes, Add It',
+              onPress: () => createManualLogEntry(),
+            },
+          ]
+        );
+        return;
+      }
+      
+      if (allocation.required_bags > 0) {
+        const currentAllocated = tallyRole === 'tally' 
+          ? allocation.allocated_bags_tally 
+          : allocation.allocated_bags_dispatcher;
+        const newAllocated = currentAllocated + 1;
+        
+        if (newAllocated > allocation.required_bags) {
+          const wc = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+          const wcName = wc?.classification || 'this classification';
+          Alert.alert(
+            'Over-Allocation Warning',
+            `This entry would cause over-allocation for ${wcName}.\n\n` +
+            `Required: ${allocation.required_bags}\n` +
+            `Current: ${currentAllocated}\n` +
+            `After this entry: ${newAllocated}\n\n` +
+            `Do you want to proceed?`,
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+              {
+                text: 'Proceed',
+                onPress: () => createManualLogEntry(),
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      createManualLogEntry();
+
+      async function createManualLogEntry() {
+        setIsSubmitting(true);
+        try {
+          await tallyLogEntriesApi.create(sessionId, {
+            weight_classification_id: selectedWeightClassId,
+            role: tallyRole as TallyLogEntryRole,
+            weight: weight,
+            heads: heads,
+            notes: null,
+          });
+
+          // Reset manual inputs
+          setSelectedWeightClassId(null);
+          setManualHeadsInput('15');
+          setManualWeightInput('0');
+          setActiveInputField(null);
+
+          // Refresh allocations and log entries
+          const [allocationsRes, logEntriesRes] = await Promise.all([
+            allocationDetailsApi.getBySession(sessionId),
+            tallyLogEntriesApi.getBySession(sessionId),
+          ]);
+          setAllocations(allocationsRes.data);
+          setLogEntries(logEntriesRes.data);
+        } catch (error: any) {
+          console.error('Error creating manual log entry:', error);
+          const errorMessage = error.response?.data?.detail
+            || error.message
+            || 'Failed to log tally entry. Please try again.';
+          Alert.alert('Error', errorMessage);
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
+      return;
+    }
+
+    // Normal mode: handle weight-based entry
     const weight = parseFloat(tallyInput);
     if (isNaN(weight) || weight <= 0) {
       Alert.alert('Error', 'Please enter a valid weight');
@@ -952,80 +1072,76 @@ function TallyScreen() {
         </View>
 
         {showManualInput ? (
-          /* Manual Input Form */
-          <View style={{ marginBottom: responsive.spacing.md, padding: responsive.padding.medium, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#bdc3c7' }}>
+          /* Manual Input Form - Single Row Style */
+          <View style={dynamicStyles.displayRow}>
             {/* Weight Classification Dropdown */}
-            <View style={{ marginBottom: responsive.spacing.sm }}>
-              <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Weight Classification</Text>
+            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
+              <Text style={dynamicStyles.displayLabel}>Weight Classification</Text>
               <TouchableOpacity
-                style={[styles.modalInput, { padding: responsive.padding.small, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#ddd', borderRadius: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}
                 onPress={() => setShowWeightClassDropdown(true)}
               >
                 <Text style={{ color: selectedWeightClassId ? '#2c3e50' : '#999', flex: 1 }} numberOfLines={1}>
                   {selectedWeightClassId
                     ? dressedWeightClassifications.find((wc) => wc.id === selectedWeightClassId)?.classification || 'Select...'
-                    : 'Select weight classification...'}
+                    : 'Select...'}
                 </Text>
                 <Text style={{ color: '#2c3e50', fontSize: 10, marginLeft: responsive.spacing.xs }}>▼</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Heads and Weight Input Row */}
-            <View style={{ flexDirection: 'row', gap: responsive.spacing.sm }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Heads</Text>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      padding: responsive.padding.small,
-                      backgroundColor: activeInputField === 'heads' ? '#fff' : '#f9f9f9',
-                      borderWidth: 2,
-                      borderColor: activeInputField === 'heads' ? '#3498db' : '#ddd',
-                      borderRadius: 4,
-                      fontSize: responsive.fontSize.medium,
-                    },
-                  ]}
-                  value={manualHeadsInput}
-                  onChangeText={setManualHeadsInput}
-                  onFocus={() => setActiveInputField('heads')}
-                  onBlur={() => {
-                    if (activeInputField === 'heads') {
-                      setActiveInputField(null);
-                    }
-                  }}
-                  keyboardType="numeric"
-                  placeholder="15"
-                  placeholderTextColor="#999"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Weight</Text>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      padding: responsive.padding.small,
-                      backgroundColor: activeInputField === 'weight' ? '#fff' : '#f9f9f9',
-                      borderWidth: 2,
-                      borderColor: activeInputField === 'weight' ? '#3498db' : '#ddd',
-                      borderRadius: 4,
-                      fontSize: responsive.fontSize.medium,
-                    },
-                  ]}
-                  value={manualWeightInput}
-                  onChangeText={setManualWeightInput}
-                  onFocus={() => setActiveInputField('weight')}
-                  onBlur={() => {
-                    if (activeInputField === 'weight') {
-                      setActiveInputField(null);
-                    }
-                  }}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
+            {/* Heads Input */}
+            <View style={[dynamicStyles.displayField, { flex: 1 }]}>
+              <Text style={dynamicStyles.displayLabel}>Heads</Text>
+              <TextInput
+                style={{
+                  marginTop: 2,
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  borderWidth: 0,
+                  fontSize: responsive.fontSize.small,
+                  color: '#2c3e50',
+                  fontWeight: '600',
+                }}
+                value={manualHeadsInput}
+                onChangeText={setManualHeadsInput}
+                onFocus={() => setActiveInputField('heads')}
+                onBlur={() => {
+                  if (activeInputField === 'heads') {
+                    setActiveInputField(null);
+                  }
+                }}
+                keyboardType="numeric"
+                placeholder="15"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {/* Weight Input */}
+            <View style={[dynamicStyles.displayField, { flex: 1.5 }]}>
+              <Text style={dynamicStyles.displayLabel}>Weight</Text>
+              <TextInput
+                style={{
+                  marginTop: 2,
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  borderWidth: 0,
+                  fontSize: responsive.isTablet ? 18 : 16,
+                  color: '#2c3e50',
+                  fontWeight: '600',
+                }}
+                value={manualWeightInput}
+                onChangeText={setManualWeightInput}
+                onFocus={() => setActiveInputField('weight')}
+                onBlur={() => {
+                  if (activeInputField === 'weight') {
+                    setActiveInputField(null);
+                  }
+                }}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#999"
+              />
             </View>
           </View>
         ) : (
@@ -1124,40 +1240,18 @@ function TallyScreen() {
             <TouchableOpacity
               style={[
                 dynamicStyles.actionButton,
-                styles.enterButton,
+                showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton,
                 isSubmitting && { opacity: 0.6 }
               ]}
               onPress={handleTallyEnter}
               disabled={isSubmitting}
             >
               <Text style={dynamicStyles.actionButtonText}>
-                {isSubmitting ? 'Saving...' : 'Enter'}
+                {isSubmitting ? 'Saving...' : (showManualInput ? 'Enter (Manual)' : 'Enter')}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Submit Button for Manual Input - Only show when manual input is active */}
-        {showManualInput && (
-          <TouchableOpacity
-            style={[
-              styles.modalSubmitButton,
-              {
-                padding: responsive.padding.medium,
-                borderRadius: 4,
-                alignItems: 'center',
-                opacity: isSubmitting ? 0.6 : 1,
-                marginTop: responsive.spacing.md,
-              },
-            ]}
-            onPress={handleManualEntry}
-            disabled={isSubmitting}
-          >
-            <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.medium }]}>
-              {isSubmitting ? 'Submitting...' : 'Submit Manual Entry'}
-            </Text>
-          </TouchableOpacity>
-        )}
       </>
     );
 
