@@ -2,6 +2,14 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ExportResponse } from '../types';
 
+const formatDateForFilename = (date: Date): string => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${month}-${day}-${year}`;
+};
+
 export const generateSessionReportPDF = (data: ExportResponse) => {
   const doc = new jsPDF();
   const { customers, grand_total_dc, grand_total_bp } = data;
@@ -155,5 +163,10 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
   doc.text('BP', startX + 5, finalY + 20);
   doc.text(grand_total_bp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), startX + boxWidth - 5, finalY + 20, { align: 'right' });
 
-  doc.save('tally-report.pdf');
+  // Generate filename with current date
+  const currentDate = new Date();
+  const dateString = formatDateForFilename(currentDate);
+  const filename = `Allocation Report (${dateString}).pdf`;
+
+  doc.save(filename);
 };
