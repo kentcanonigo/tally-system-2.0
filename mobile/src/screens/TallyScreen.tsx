@@ -1491,6 +1491,7 @@ function TallyScreen() {
                   : allocation.allocated_bags_dispatcher;
                 
                 const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                const isOverAllocated = allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
                 const sum = getSumForWeightClassification(allocation.weight_classification_id);
                 const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                 
@@ -1502,7 +1503,11 @@ function TallyScreen() {
                     <Text style={[
                       dynamicStyles.summaryCell, 
                       { flex: 1.5 },
-                      isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
+                      isOverAllocated 
+                        ? { color: '#e67e22', fontWeight: '600' } 
+                        : isFulfilled 
+                          ? { color: '#27ae60', fontWeight: '600' } 
+                          : {}
                     ]}>
                       {allocatedBags} / {allocation.required_bags}
                     </Text>
