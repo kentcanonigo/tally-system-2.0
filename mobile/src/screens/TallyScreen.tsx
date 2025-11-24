@@ -753,19 +753,21 @@ function TallyScreen() {
     },
     displayField: {
       ...styles.displayField,
-      padding: responsive.padding.medium,
+      padding: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
     },
     displayLabel: {
       ...styles.displayLabel,
-      fontSize: responsive.fontSize.small,
+      fontSize: responsive.isTablet ? 10 : 9,
+      marginBottom: 2,
     },
     displayValue: {
       ...styles.displayValue,
-      fontSize: responsive.fontSize.medium,
+      fontSize: responsive.fontSize.small,
     },
     weightDisplayValue: {
       ...styles.displayValue,
-      fontSize: responsive.isTablet ? 28 : 24,
+      fontSize: responsive.isTablet ? 18 : 16,
     },
     buttonsContainer: {
       ...styles.buttonsContainer,
