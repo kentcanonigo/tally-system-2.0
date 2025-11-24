@@ -236,7 +236,8 @@ function TallySessions() {
           onClick={() => setShowCalendar(!showCalendar)}
           style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
         >
-          📅 {selectedDate ? `Filtered: ${selectedDate.toLocaleDateString()}` : 'Calendar'}
+          <span className="material-icons">calendar_today</span>
+          {selectedDate ? `Filtered: ${selectedDate.toLocaleDateString()}` : 'Calendar'}
         </button>
         {selectedDate && (
           <button className="btn btn-secondary" onClick={clearDateFilter}>

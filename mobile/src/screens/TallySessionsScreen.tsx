@@ -248,6 +248,9 @@ function TallySessionsScreen() {
       ...styles.addButton,
       paddingHorizontal: responsive.padding.medium,
       paddingVertical: responsive.spacing.sm,
+      minHeight: responsive.isTablet ? 48 : 40,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     addButtonText: {
       ...styles.addButtonText,
@@ -258,6 +261,9 @@ function TallySessionsScreen() {
       paddingHorizontal: responsive.padding.medium,
       paddingVertical: responsive.spacing.sm,
       marginRight: responsive.spacing.sm,
+      minHeight: responsive.isTablet ? 48 : 40,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     calendarButtonText: {
       ...styles.calendarButtonText,
@@ -308,7 +314,7 @@ function TallySessionsScreen() {
             style={[dynamicStyles.calendarButton, selectedDate && styles.calendarButtonActive]}
             onPress={() => setShowCalendar(true)}
           >
-            <Text style={dynamicStyles.calendarButtonText}>📅</Text>
+            <MaterialIcons name="calendar-today" size={responsive.fontSize.large} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={dynamicStyles.addButton}
@@ -338,25 +344,25 @@ function TallySessionsScreen() {
                       color={isActive ? '#f39c12' : '#95a5a6'}
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity
+          <TouchableOpacity
                     style={{ flex: 1 }}
-                    onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
-                  >
+            onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
+          >
                     <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
-                      {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
-                    </Text>
+                {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
+              </Text>
                   </TouchableOpacity>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                  <Text style={styles.statusText}>{item.status}</Text>
-                </View>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                <Text style={styles.statusText}>{item.status}</Text>
               </View>
+            </View>
               <TouchableOpacity
                 onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
               >
-                <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
-                <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
-              </TouchableOpacity>
+            <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
+            <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
+          </TouchableOpacity>
             </View>
           );
         }}
