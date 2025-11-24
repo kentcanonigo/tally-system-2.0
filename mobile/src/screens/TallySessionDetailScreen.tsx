@@ -359,6 +359,12 @@ function TallySessionDetailScreen() {
     return '#e74c3c';
   };
 
+  const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    return logEntries
+      .filter(entry => entry.weight_classification_id === wcId)
+      .reduce((sum, entry) => sum + (entry.heads || 0), 0);
+  };
+
   const renderAllocationCard = (allocation: AllocationDetails) => {
     const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
     const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
@@ -430,14 +436,12 @@ function TallySessionDetailScreen() {
             {matchStatus}
           </Text>
         </View>
-        {allocation.heads !== undefined && allocation.heads !== null && (
-          <View style={styles.allocationRow}>
-            <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
-            <Text style={dynamicStyles.allocationValue}>
-              {allocation.heads.toFixed(0)}
-            </Text>
-          </View>
-        )}
+        <View style={styles.allocationRow}>
+          <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
+          <Text style={dynamicStyles.allocationValue}>
+            {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
+          </Text>
+        </View>
       </View>
     );
   };

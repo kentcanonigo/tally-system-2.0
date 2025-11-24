@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi, exportApi } from '../services/api';
+import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi, exportApi, tallyLogEntriesApi } from '../services/api';
 import { generateSessionReportPDF } from '../utils/pdfGenerator';
-import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification } from '../types';
+import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
@@ -13,6 +13,7 @@ function TallySessionDetail() {
   const [plant, setPlant] = useState<Plant | null>(null);
   const [allocations, setAllocations] = useState<AllocationDetails[]>([]);
   const [weightClassifications, setWeightClassifications] = useState<WeightClassification[]>([]);
+  const [logEntries, setLogEntries] = useState<TallyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
@@ -40,17 +41,19 @@ function TallySessionDetail() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
-      const [customerRes, plantRes, allocationsRes, wcRes] = await Promise.all([
+      const [customerRes, plantRes, allocationsRes, wcRes, logEntriesRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(Number(id)),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
+        tallyLogEntriesApi.getBySession(Number(id)),
       ]);
 
       setCustomer(customerRes.data);
       setPlant(plantRes.data);
       setAllocations(allocationsRes.data);
       setWeightClassifications(wcRes.data);
+      setLogEntries(logEntriesRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       alert('Error fetching session details');
@@ -179,6 +182,12 @@ function TallySessionDetail() {
 
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
+  };
+
+  const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    return logEntries
+      .filter(entry => entry.weight_classification_id === wcId)
+      .reduce((sum, entry) => sum + (entry.heads || 0), 0);
   };
 
   // Helper function to get color based on difference and threshold
@@ -317,7 +326,7 @@ function TallySessionDetail() {
                     {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
                   </td>
                   <td>
-                    {allocation.heads !== undefined && allocation.heads !== null ? allocation.heads.toFixed(0) : '-'}
+                    {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
                   </td>
                   <td>
                     <button
