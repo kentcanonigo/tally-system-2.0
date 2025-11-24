@@ -1,23 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { tallySessionsApi, customersApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getActiveSessions } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
 import { usePlant } from '../contexts/PlantContext';
+import { MaterialIcons } from '@expo/vector-icons';
 
 function TallyTabScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
+  const navigation = useNavigation<any>();
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct'>('dressed');
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // Load active sessions and their data
   const loadActiveSessions = async () => {
@@ -76,6 +79,13 @@ function TallyTabScreen() {
     }, [activePlantId])
   );
 
+  // Toggle bottom tab bar visibility when in focus mode (per-screen tabBarStyle)
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: isFocusMode ? { display: 'none' } : undefined,
+    });
+  }, [navigation, isFocusMode]);
+
   const getCustomerName = (customerId: number) => {
     return customers.find((c) => c.id === customerId)?.name || `Customer ${customerId}`;
   };
@@ -122,6 +132,29 @@ function TallyTabScreen() {
       fontWeight: '600' as const,
     },
     modeButtonTextActive: {
+      color: '#2c3e50',
+    },
+    focusButton: {
+      marginLeft: responsive.spacing.sm,
+      paddingHorizontal: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: '#ecf0f1',
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      backgroundColor: 'transparent',
+    },
+    focusButtonActive: {
+      backgroundColor: '#ecf0f1',
+      borderColor: '#fff',
+    },
+    focusButtonText: {
+      color: '#ecf0f1',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '600' as const,
+    },
+    focusButtonTextActive: {
       color: '#2c3e50',
     },
     contentRow: {
@@ -225,6 +258,19 @@ function TallyTabScreen() {
             >
               Byproduct
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              dynamicStyles.focusButton,
+              isFocusMode && dynamicStyles.focusButtonActive,
+            ]}
+            onPress={() => setIsFocusMode((prev) => !prev)}
+          >
+            <MaterialIcons
+              name={isFocusMode ? 'lock-open' : 'lock'}
+              size={responsive.isTablet ? 20 : 18}
+              color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
+            />
           </TouchableOpacity>
         </View>
       </View>

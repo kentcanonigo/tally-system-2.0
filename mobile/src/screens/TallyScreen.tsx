@@ -1512,10 +1512,10 @@ function TallyScreen(props?: TallyScreenProps) {
                     <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Dressed</Text>
                     <View style={dynamicStyles.summaryTable}>
                       <View style={dynamicStyles.summaryHeader}>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.2 }]}>Class</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total Weight</Text>
                       </View>
                       {dressedAllocations.map((allocation) => {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -1532,7 +1532,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         
                         return (
                           <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2 }]} numberOfLines={1}>
                               {wc.classification}
                             </Text>
                             <Text style={[
@@ -1549,7 +1549,7 @@ function TallyScreen(props?: TallyScreenProps) {
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
                               {totalHeads.toFixed(0)}
                             </Text>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
                               {sum.toFixed(2)}
                             </Text>
                           </View>
@@ -1575,10 +1575,10 @@ function TallyScreen(props?: TallyScreenProps) {
                     <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Byproduct</Text>
                     <View style={dynamicStyles.summaryTable}>
                       <View style={dynamicStyles.summaryHeader}>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Label</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.2 }]}>Class</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Weight</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total Weight</Text>
                       </View>
                       {byproductAllocations.map((allocation) => {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -1595,7 +1595,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         
                         return (
                           <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1.5 }]} numberOfLines={1}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2 }]} numberOfLines={1}>
                               {wc.classification}
                             </Text>
                             <Text style={[
@@ -1612,7 +1612,7 @@ function TallyScreen(props?: TallyScreenProps) {
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
                               {totalHeads.toFixed(0)}
                             </Text>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
                               {sum.toFixed(2)}
                             </Text>
                           </View>
