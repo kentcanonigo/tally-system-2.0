@@ -7,6 +7,7 @@ import { getTimezoneAbbreviation } from '../utils/dateFormat';
 import { plantsApi } from '../services/api';
 import { Plant } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDefaultHeadsAmount } from '../utils/settings';
 
 const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = '@tally_system_acceptable_difference_threshold';
 const DEFAULT_THRESHOLD = 0;
@@ -15,6 +16,7 @@ function SettingsScreen() {
   const { timezone, setTimezone, availableTimezones } = useTimezone();
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
+  const defaultHeadsAmount = useDefaultHeadsAmount();
   
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
@@ -355,6 +357,28 @@ function SettingsScreen() {
         <Text style={dynamicStyles.infoText}>
           When viewing session logs, differences within this threshold will be displayed in orange (acceptable).
           Exact matches (0) will be green, and differences beyond the threshold will be red (unacceptable).
+        </Text>
+      </View>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Default Heads Amount</Text>
+        <Text style={dynamicStyles.label}>
+          Default number of heads per bag:
+        </Text>
+
+        <View style={dynamicStyles.inputWrapper}>
+          <TextInput
+            style={[dynamicStyles.input, { backgroundColor: '#f5f5f5', color: '#7f8c8d' }]}
+            value={defaultHeadsAmount.toString()}
+            editable={false}
+            placeholder="15"
+            keyboardType="numeric"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <Text style={dynamicStyles.infoText}>
+          This is the default number of heads that will be assigned to each bag when tallying. This setting is currently view-only.
         </Text>
       </View>
 

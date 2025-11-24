@@ -293,6 +293,7 @@ function TallySessionDetail() {
               <th>Allocated (Tally)</th>
               <th>Allocated (Dispatcher)</th>
               <th>Difference</th>
+              <th>Heads</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -314,6 +315,9 @@ function TallySessionDetail() {
                   <td>{allocation.allocated_bags_dispatcher}</td>
                   <td style={{ color: diffColor, fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
                     {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
+                  </td>
+                  <td>
+                    {allocation.heads !== undefined && allocation.heads !== null ? allocation.heads.toFixed(0) : '-'}
                   </td>
                   <td>
                     <button

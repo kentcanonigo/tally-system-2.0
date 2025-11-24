@@ -768,6 +768,7 @@ function TallySessionLogsScreen() {
           )}
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1 }]}>Category</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
+          <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Heads</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
         </View>
         {filteredEntries.length > 0 ? (
@@ -827,6 +828,9 @@ function TallySessionLogsScreen() {
                 </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
                   {entry.weight.toFixed(2)}
+                </Text>
+                <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
+                  {entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}
                 </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}

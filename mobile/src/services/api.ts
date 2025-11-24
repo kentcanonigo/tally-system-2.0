@@ -184,7 +184,7 @@ export const allocationDetailsApi = {
 
 // Tally Log Entries API
 export const tallyLogEntriesApi = {
-  create: (sessionId: number, data: { weight_classification_id: number; role: TallyLogEntryRole; weight: number; notes?: string | null }) =>
+  create: (sessionId: number, data: { weight_classification_id: number; role: TallyLogEntryRole; weight: number; heads?: number; notes?: string | null }) =>
     api.post<TallyLogEntry>(`/tally-sessions/${sessionId}/log-entries`, {
       ...data,
       tally_session_id: sessionId,

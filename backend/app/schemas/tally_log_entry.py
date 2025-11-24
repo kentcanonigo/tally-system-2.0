@@ -12,6 +12,7 @@ class TallyLogEntryRole(str, Enum):
 class TallyLogEntryBase(BaseModel):
     weight: float
     role: TallyLogEntryRole
+    heads: Optional[float] = 15.0
     notes: Optional[str] = None
 
     @field_validator('weight')
@@ -19,6 +20,13 @@ class TallyLogEntryBase(BaseModel):
     def validate_weight(cls, v):
         if v <= 0:
             raise ValueError('weight must be greater than 0')
+        return v
+
+    @field_validator('heads')
+    @classmethod
+    def validate_heads(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('heads must be non-negative')
         return v
 
 

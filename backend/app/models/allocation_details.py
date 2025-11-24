@@ -13,6 +13,7 @@ class AllocationDetails(Base):
     required_bags = Column(Float, nullable=False, default=0.0)
     allocated_bags_tally = Column(Float, nullable=False, default=0.0)
     allocated_bags_dispatcher = Column(Float, nullable=False, default=0.0)
+    heads = Column(Float, nullable=True, default=0.0)
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

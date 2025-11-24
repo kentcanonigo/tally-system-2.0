@@ -129,7 +129,7 @@ def reset_allocated_bags_for_session(
         ).delete(synchronize_session=False)
         log_entries_deleted += deleted_count
     
-    # Recalculate allocated bags from remaining log entries (not set directly)
+    # Recalculate allocated bags and heads from remaining log entries (not set directly)
     for allocation in allocations:
         updated = False
         
@@ -151,6 +151,16 @@ def reset_allocated_bags_for_session(
                 TallyLogEntry.role == TallyLogEntryRole.DISPATCHER
             ).count()
             allocation.allocated_bags_dispatcher = float(dispatcher_count)
+            updated = True
+        
+        # Recalculate heads from remaining log entries
+        if reset_tally or reset_dispatcher:
+            remaining_entries = db.query(TallyLogEntry).filter(
+                TallyLogEntry.tally_session_id == allocation.tally_session_id,
+                TallyLogEntry.weight_classification_id == allocation.weight_classification_id
+            ).all()
+            total_heads = sum(entry.heads if entry.heads is not None else 15.0 for entry in remaining_entries)
+            allocation.heads = float(total_heads)
             updated = True
         
         if updated:

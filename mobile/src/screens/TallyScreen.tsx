@@ -12,6 +12,7 @@ import {
 import type { AllocationDetails, WeightClassification, TallySession, Customer, Plant, TallyLogEntry } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
+import { getDefaultHeadsAmount } from '../utils/settings';
 
 function TallyScreen() {
   const route = useRoute();
@@ -31,6 +32,14 @@ function TallyScreen() {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [selectedByproductId, setSelectedByproductId] = useState<number | null>(null);
   const [quantityInput, setQuantityInput] = useState('1');
+  
+  // Manual input state for dressed mode
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [selectedWeightClassId, setSelectedWeightClassId] = useState<number | null>(null);
+  const [manualHeadsInput, setManualHeadsInput] = useState('15');
+  const [manualWeightInput, setManualWeightInput] = useState('0');
+  const [activeInputField, setActiveInputField] = useState<'weight' | 'heads' | null>(null);
+  const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
 
   // Determine if we should use landscape layout (side by side)
   // Use landscape layout if width > height (landscape orientation) or if width >= 900 (large tablet)
@@ -153,31 +162,79 @@ function TallyScreen() {
   };
 
   const handleTallyNumberPress = (num: string) => {
-    setTallyInput((prev) => {
-      if (prev === '0') {
-        return num;
-      }
-      return prev + num;
-    });
+    if (activeInputField === 'heads') {
+      setManualHeadsInput((prev) => {
+        if (prev === '0' || prev === '') {
+          return num;
+        }
+        return prev + num;
+      });
+    } else if (activeInputField === 'weight') {
+      setManualWeightInput((prev) => {
+        if (prev === '0' || prev === '') {
+          return num;
+        }
+        return prev + num;
+      });
+    } else {
+      setTallyInput((prev) => {
+        if (prev === '0') {
+          return num;
+        }
+        return prev + num;
+      });
+    }
   };
 
   const handleTallyDecimal = () => {
-    if (tallyInput.indexOf('.') === -1) {
-      setTallyInput((prev) => prev + '.');
+    if (activeInputField === 'heads') {
+      if (manualHeadsInput.indexOf('.') === -1) {
+        setManualHeadsInput((prev) => prev + '.');
+      }
+    } else if (activeInputField === 'weight') {
+      if (manualWeightInput.indexOf('.') === -1) {
+        setManualWeightInput((prev) => prev + '.');
+      }
+    } else {
+      if (tallyInput.indexOf('.') === -1) {
+        setTallyInput((prev) => prev + '.');
+      }
     }
   };
 
   const handleTallyClear = () => {
-    setTallyInput('0');
+    if (activeInputField === 'heads') {
+      setManualHeadsInput('0');
+    } else if (activeInputField === 'weight') {
+      setManualWeightInput('0');
+    } else {
+      setTallyInput('0');
+    }
   };
 
   const handleTallyBackspace = () => {
-    setTallyInput((prev) => {
-      if (prev.length > 1) {
-        return prev.slice(0, -1);
-      }
-      return '0';
-    });
+    if (activeInputField === 'heads') {
+      setManualHeadsInput((prev) => {
+        if (prev.length > 1) {
+          return prev.slice(0, -1);
+        }
+        return '0';
+      });
+    } else if (activeInputField === 'weight') {
+      setManualWeightInput((prev) => {
+        if (prev.length > 1) {
+          return prev.slice(0, -1);
+        }
+        return '0';
+      });
+    } else {
+      setTallyInput((prev) => {
+        if (prev.length > 1) {
+          return prev.slice(0, -1);
+        }
+        return '0';
+      });
+    }
   };
 
   const handleTallyEnter = async () => {
@@ -270,10 +327,13 @@ function TallyScreen() {
         });
 
         // Create log entry - this will also increment the allocation
+        // Default heads to 15 when using numpad
+        const defaultHeads = await getDefaultHeadsAmount();
         const response = await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: matchedWC.id,
           role: tallyRole as TallyLogEntryRole,
           weight: weight,
+          heads: defaultHeads,
           notes: null,
         });
 
@@ -540,6 +600,133 @@ function TallyScreen() {
     }
   };
 
+  // Handle manual entry for dressed mode
+  const handleManualEntry = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!selectedWeightClassId) {
+      Alert.alert('Error', 'Please select a weight classification');
+      return;
+    }
+
+    const heads = parseFloat(manualHeadsInput);
+    const weight = parseFloat(manualWeightInput);
+
+    if (isNaN(heads) || heads < 0) {
+      Alert.alert('Error', 'Please enter a valid heads amount');
+      return;
+    }
+
+    if (isNaN(weight) || weight <= 0) {
+      Alert.alert('Error', 'Please enter a valid weight');
+      return;
+    }
+
+    if (!sessionId) {
+      Alert.alert('Error', 'Session ID is missing');
+      return;
+    }
+
+    // Check for over-allocation
+    const allocation = getCurrentAllocation(selectedWeightClassId);
+    
+    if (!allocation || allocation.required_bags === 0) {
+      const wc = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+      const wcName = wc?.classification || 'this classification';
+      Alert.alert(
+        'No Required Allocation',
+        `There is no required allocation for ${wcName}.\n\n` +
+        `Are you sure you want to add this tally entry?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes, Add It',
+            onPress: () => createManualLogEntry(),
+          },
+        ]
+      );
+      return;
+    }
+    
+    if (allocation.required_bags > 0) {
+      const currentAllocated = tallyRole === 'tally' 
+        ? allocation.allocated_bags_tally 
+        : allocation.allocated_bags_dispatcher;
+      const newAllocated = currentAllocated + 1;
+      
+      if (newAllocated > allocation.required_bags) {
+        const wc = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+        const wcName = wc?.classification || 'this classification';
+        Alert.alert(
+          'Over-Allocation Warning',
+          `This entry would cause over-allocation for ${wcName}.\n\n` +
+          `Required: ${allocation.required_bags}\n` +
+          `Current: ${currentAllocated}\n` +
+          `After this entry: ${newAllocated}\n\n` +
+          `Do you want to proceed?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Proceed',
+              onPress: () => createManualLogEntry(),
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    createManualLogEntry();
+
+    async function createManualLogEntry() {
+      setIsSubmitting(true);
+      try {
+        await tallyLogEntriesApi.create(sessionId, {
+          weight_classification_id: selectedWeightClassId,
+          role: tallyRole as TallyLogEntryRole,
+          weight: weight,
+          heads: heads,
+          notes: null,
+        });
+
+        // Reset manual inputs
+        setSelectedWeightClassId(null);
+        setManualHeadsInput('15');
+        setManualWeightInput('0');
+        setActiveInputField(null);
+
+        // Refresh allocations and log entries
+        const [allocationsRes, logEntriesRes] = await Promise.all([
+          allocationDetailsApi.getBySession(sessionId),
+          tallyLogEntriesApi.getBySession(sessionId),
+        ]);
+        setAllocations(allocationsRes.data);
+        setLogEntries(logEntriesRes.data);
+      } catch (error: any) {
+        console.error('Error creating manual log entry:', error);
+        const errorMessage = error.response?.data?.detail
+          || error.message
+          || 'Failed to log tally entry. Please try again.';
+        Alert.alert('Error', errorMessage);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  // Filter weight classifications to only Dressed category for manual input
+  const dressedWeightClassifications = useMemo(() => {
+    return weightClassifications.filter((wc) => wc.category === 'Dressed');
+  }, [weightClassifications]);
+
   const dynamicStyles = {
     container: {
       ...styles.container,
@@ -719,12 +906,129 @@ function TallyScreen() {
   );
 
   // Render dressed mode UI (existing)
-  const renderDressedMode = () => (
-    <View style={dynamicStyles.contentContainer}>
-        {/* Calculator Section */}
-        <View style={dynamicStyles.calculatorSection}>
-          {/* Three display fields in a row */}
-            <View style={dynamicStyles.displayRow}>
+  const renderDressedMode = () => {
+    const calculatorContent = (
+      <>
+        {/* Toggle Button */}
+        <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#ecf0f1',
+              borderRadius: 8,
+              padding: responsive.padding.small,
+              borderWidth: 1,
+              borderColor: '#bdc3c7',
+            }}
+            onPress={() => setShowManualInput(!showManualInput)}
+          >
+            <Text style={{ marginRight: responsive.spacing.sm, fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600' }}>
+              Manual Input
+            </Text>
+            <View
+              style={{
+                width: 50,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: showManualInput ? '#27ae60' : '#95a5a6',
+                justifyContent: 'center',
+                alignItems: showManualInput ? 'flex-end' : 'flex-start',
+                paddingHorizontal: 4,
+              }}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#fff',
+                }}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {showManualInput ? (
+          /* Manual Input Form */
+          <View style={{ marginBottom: responsive.spacing.md, padding: responsive.padding.medium, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#bdc3c7' }}>
+            {/* Weight Classification Dropdown */}
+            <View style={{ marginBottom: responsive.spacing.sm }}>
+              <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Weight Classification</Text>
+              <TouchableOpacity
+                style={[styles.modalInput, { padding: responsive.padding.small, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#ddd', borderRadius: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                onPress={() => setShowWeightClassDropdown(true)}
+              >
+                <Text style={{ color: selectedWeightClassId ? '#2c3e50' : '#999', flex: 1 }} numberOfLines={1}>
+                  {selectedWeightClassId
+                    ? dressedWeightClassifications.find((wc) => wc.id === selectedWeightClassId)?.classification || 'Select...'
+                    : 'Select weight classification...'}
+                </Text>
+                <Text style={{ color: '#2c3e50', fontSize: 10, marginLeft: responsive.spacing.xs }}>▼</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Heads and Weight Input Row */}
+            <View style={{ flexDirection: 'row', gap: responsive.spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Heads</Text>
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    {
+                      padding: responsive.padding.small,
+                      backgroundColor: activeInputField === 'heads' ? '#fff' : '#f9f9f9',
+                      borderWidth: 2,
+                      borderColor: activeInputField === 'heads' ? '#3498db' : '#ddd',
+                      borderRadius: 4,
+                      fontSize: responsive.fontSize.medium,
+                    },
+                  ]}
+                  value={manualHeadsInput}
+                  onChangeText={setManualHeadsInput}
+                  onFocus={() => setActiveInputField('heads')}
+                  onBlur={() => {
+                    if (activeInputField === 'heads') {
+                      setActiveInputField(null);
+                    }
+                  }}
+                  keyboardType="numeric"
+                  placeholder="15"
+                  placeholderTextColor="#999"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[dynamicStyles.displayLabel, { marginBottom: 4 }]}>Weight</Text>
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    {
+                      padding: responsive.padding.small,
+                      backgroundColor: activeInputField === 'weight' ? '#fff' : '#f9f9f9',
+                      borderWidth: 2,
+                      borderColor: activeInputField === 'weight' ? '#3498db' : '#ddd',
+                      borderRadius: 4,
+                      fontSize: responsive.fontSize.medium,
+                    },
+                  ]}
+                  value={manualWeightInput}
+                  onChangeText={setManualWeightInput}
+                  onFocus={() => setActiveInputField('weight')}
+                  onBlur={() => {
+                    if (activeInputField === 'weight') {
+                      setActiveInputField(null);
+                    }
+                  }}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* Three display fields in a row */
+          <View style={dynamicStyles.displayRow}>
             <View style={[dynamicStyles.displayField, { flex: 2 }]}>
               <Text style={dynamicStyles.displayLabel}>Classification</Text>
               <Text style={dynamicStyles.displayValue} numberOfLines={1}>
@@ -755,80 +1059,121 @@ function TallyScreen() {
               </Text>
             </View>
           </View>
+        )}
 
-          {/* Calculator buttons */}
-          <View style={dynamicStyles.buttonsContainer}>
-            {/* Number pad */}
-            <View style={dynamicStyles.numberPad}>
-              <View style={dynamicStyles.buttonRow}>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('7')}>
-                  <Text style={dynamicStyles.buttonText}>7</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('8')}>
-                  <Text style={dynamicStyles.buttonText}>8</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('9')}>
-                  <Text style={dynamicStyles.buttonText}>9</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={dynamicStyles.buttonRow}>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('4')}>
-                  <Text style={dynamicStyles.buttonText}>4</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('5')}>
-                  <Text style={dynamicStyles.buttonText}>5</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('6')}>
-                  <Text style={dynamicStyles.buttonText}>6</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={dynamicStyles.buttonRow}>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('1')}>
-                  <Text style={dynamicStyles.buttonText}>1</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('2')}>
-                  <Text style={dynamicStyles.buttonText}>2</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('3')}>
-                  <Text style={dynamicStyles.buttonText}>3</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={dynamicStyles.buttonRow}>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('0')}>
-                  <Text style={dynamicStyles.buttonText}>0</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyDecimal}>
-                  <Text style={dynamicStyles.buttonText}>.</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyBackspace}>
-                  <Text style={dynamicStyles.buttonText}>⌫</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Action buttons */}
-            <View style={dynamicStyles.actionButtons}>
-              <TouchableOpacity
-                style={[dynamicStyles.actionButton, styles.clearButton]}
-                onPress={handleTallyClear}
-              >
-                <Text style={dynamicStyles.actionButtonText}>Clear</Text>
+        {/* Calculator buttons - Always visible */}
+        <View style={dynamicStyles.buttonsContainer}>
+          {/* Number pad */}
+          <View style={dynamicStyles.numberPad}>
+            <View style={dynamicStyles.buttonRow}>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('7')}>
+                <Text style={dynamicStyles.buttonText}>7</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.actionButton,
-                  styles.enterButton,
-                  isSubmitting && { opacity: 0.6 }
-                ]}
-                onPress={handleTallyEnter}
-                disabled={isSubmitting}
-              >
-                <Text style={dynamicStyles.actionButtonText}>
-                  {isSubmitting ? 'Saving...' : 'Enter'}
-                </Text>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('8')}>
+                <Text style={dynamicStyles.buttonText}>8</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('9')}>
+                <Text style={dynamicStyles.buttonText}>9</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={dynamicStyles.buttonRow}>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('4')}>
+                <Text style={dynamicStyles.buttonText}>4</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('5')}>
+                <Text style={dynamicStyles.buttonText}>5</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('6')}>
+                <Text style={dynamicStyles.buttonText}>6</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={dynamicStyles.buttonRow}>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('1')}>
+                <Text style={dynamicStyles.buttonText}>1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('2')}>
+                <Text style={dynamicStyles.buttonText}>2</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('3')}>
+                <Text style={dynamicStyles.buttonText}>3</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={dynamicStyles.buttonRow}>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={() => handleTallyNumberPress('0')}>
+                <Text style={dynamicStyles.buttonText}>0</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyDecimal}>
+                <Text style={dynamicStyles.buttonText}>.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.numberButton} onPress={handleTallyBackspace}>
+                <Text style={dynamicStyles.buttonText}>⌫</Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Action buttons */}
+          <View style={dynamicStyles.actionButtons}>
+            <TouchableOpacity
+              style={[dynamicStyles.actionButton, styles.clearButton]}
+              onPress={handleTallyClear}
+            >
+              <Text style={dynamicStyles.actionButtonText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                dynamicStyles.actionButton,
+                styles.enterButton,
+                isSubmitting && { opacity: 0.6 }
+              ]}
+              onPress={handleTallyEnter}
+              disabled={isSubmitting}
+            >
+              <Text style={dynamicStyles.actionButtonText}>
+                {isSubmitting ? 'Saving...' : 'Enter'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Submit Button for Manual Input - Only show when manual input is active */}
+        {showManualInput && (
+          <TouchableOpacity
+            style={[
+              styles.modalSubmitButton,
+              {
+                padding: responsive.padding.medium,
+                borderRadius: 4,
+                alignItems: 'center',
+                opacity: isSubmitting ? 0.6 : 1,
+                marginTop: responsive.spacing.md,
+              },
+            ]}
+            onPress={handleManualEntry}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.medium }]}>
+              {isSubmitting ? 'Submitting...' : 'Submit Manual Entry'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </>
+    );
+
+    return (
+      <View style={dynamicStyles.contentContainer}>
+        {/* Calculator Section */}
+        <View style={dynamicStyles.calculatorSection}>
+          {isLandscape ? (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ flexGrow: 1 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {calculatorContent}
+            </ScrollView>
+          ) : (
+            calculatorContent
+          )}
         </View>
 
         {/* Summary table */}
@@ -885,7 +1230,8 @@ function TallyScreen() {
           </View>
         </View>
       </View>
-  );
+    );
+  };
 
   const content = tallyMode === 'byproduct' ? renderByproductMode() : renderDressedMode();
 
@@ -989,6 +1335,67 @@ function TallyScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Weight Classification Dropdown Modal */}
+      {showWeightClassDropdown && (
+        <Modal
+          transparent
+          visible={showWeightClassDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowWeightClassDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowWeightClassDropdown(false)}
+          >
+            <View 
+              style={[styles.dropdownMenu, { width: responsive.isTablet ? Math.min(responsive.width * 0.6, 500) : '90%' }]}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={[styles.dropdownHeader, { padding: responsive.padding.medium }]}>
+                <Text style={[styles.dropdownTitle, { fontSize: responsive.fontSize.large }]}>Select Weight Classification</Text>
+                <TouchableOpacity
+                  onPress={() => setShowWeightClassDropdown(false)}
+                  style={{ padding: responsive.spacing.xs }}
+                >
+                  <Text style={[styles.dropdownCloseText, { fontSize: responsive.fontSize.large }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                style={{ maxHeight: responsive.isTablet ? 400 : 300 }}
+                contentContainerStyle={{ paddingBottom: responsive.spacing.md }}
+              >
+                {dressedWeightClassifications.map((wc, index) => (
+                  <TouchableOpacity
+                    key={wc.id}
+                    style={[
+                      styles.dropdownOption,
+                      index === dressedWeightClassifications.length - 1 && styles.dropdownOptionLast,
+                      selectedWeightClassId === wc.id && styles.dropdownOptionSelected,
+                      { padding: responsive.padding.medium }
+                    ]}
+                    onPress={() => {
+                      setSelectedWeightClassId(wc.id);
+                      setShowWeightClassDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        selectedWeightClassId === wc.id && styles.dropdownOptionTextSelected,
+                        { fontSize: responsive.fontSize.small }
+                      ]}
+                    >
+                      {wc.classification} ({formatWeightRange(wc)})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1166,6 +1573,59 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownMenu: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxWidth: 500,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownTitle: {
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  dropdownCloseText: {
+    fontSize: 20,
+    color: '#7f8c8d',
+    fontWeight: 'bold',
+  },
+  dropdownOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownOptionLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#3498db',
+  },
+  dropdownOptionText: {
+    color: '#2c3e50',
+  },
+  dropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 

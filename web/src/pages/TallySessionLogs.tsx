@@ -351,6 +351,7 @@ function TallySessionLogs() {
                 <th>Description</th>
                 <th>Weight Range</th>
                 <th>Weight</th>
+                <th>Heads</th>
                 <th>Notes</th>
                 <th>Timestamp</th>
               </tr>
@@ -379,6 +380,7 @@ function TallySessionLogs() {
                       <td>{wc?.description || '-'}</td>
                       <td>{wc ? formatWeightRange(wc) : '-'}</td>
                       <td>{entry.weight.toFixed(2)}</td>
+                      <td>{entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}</td>
                       <td>{entry.notes || '-'}</td>
                       <td>{new Date(entry.created_at).toLocaleString()}</td>
                     </tr>
@@ -386,7 +388,7 @@ function TallySessionLogs() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center' }}>
+                  <td colSpan={9} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>

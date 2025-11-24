@@ -430,6 +430,14 @@ function TallySessionDetailScreen() {
             {matchStatus}
           </Text>
         </View>
+        {allocation.heads !== undefined && allocation.heads !== null && (
+          <View style={styles.allocationRow}>
+            <Text style={dynamicStyles.allocationLabel}>Heads:</Text>
+            <Text style={dynamicStyles.allocationValue}>
+              {allocation.heads.toFixed(0)}
+            </Text>
+          </View>
+        )}
       </View>
     );
   };

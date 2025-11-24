@@ -47,6 +47,7 @@ export interface AllocationDetails {
   required_bags: number;
   allocated_bags_tally: number;
   allocated_bags_dispatcher: number;
+  heads?: number;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +63,7 @@ export interface TallyLogEntry {
   weight_classification_id: number;
   role: TallyLogEntryRole;
   weight: number;
+  heads?: number;
   notes: string | null;
   created_at: string;
   updated_at: string;

@@ -18,6 +18,7 @@ class TallyLogEntry(Base):
     weight_classification_id = Column(Integer, ForeignKey("weight_classifications.id"), nullable=False, index=True)
     role = Column(SQLEnum(TallyLogEntryRole), nullable=False, index=True)
     weight = Column(Float, nullable=False)
+    heads = Column(Float, nullable=True, default=15.0)
     notes = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
 

@@ -7,12 +7,20 @@ class AllocationDetailsBase(BaseModel):
     required_bags: float = 0.0
     allocated_bags_tally: float = 0.0
     allocated_bags_dispatcher: float = 0.0
+    heads: Optional[float] = 0.0
 
     @field_validator('required_bags', 'allocated_bags_tally', 'allocated_bags_dispatcher')
     @classmethod
     def validate_bags(cls, v):
         if v < 0:
             raise ValueError('bags must be non-negative')
+        return v
+
+    @field_validator('heads')
+    @classmethod
+    def validate_heads(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('heads must be non-negative')
         return v
 
 

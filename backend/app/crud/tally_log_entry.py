@@ -51,12 +51,19 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
     elif log_entry.role == TallyLogEntryRole.DISPATCHER:
         allocation.allocated_bags_dispatcher += 1
     
+    # Aggregate heads: add the heads from this log entry to the allocation
+    heads_value = log_entry.heads if log_entry.heads is not None else 15.0
+    if allocation.heads is None:
+        allocation.heads = 0.0
+    allocation.heads += heads_value
+    
     # Create the log entry
     db_log_entry = TallyLogEntry(
         tally_session_id=log_entry.tally_session_id,
         weight_classification_id=log_entry.weight_classification_id,
         role=log_entry.role,
         weight=log_entry.weight,
+        heads=log_entry.heads if log_entry.heads is not None else 15.0,
         notes=log_entry.notes
     )
     db.add(db_log_entry)
@@ -114,6 +121,12 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
             allocation.allocated_bags_tally = max(0.0, allocation.allocated_bags_tally - 1)
         elif log_entry.role == TallyLogEntryRole.DISPATCHER:
             allocation.allocated_bags_dispatcher = max(0.0, allocation.allocated_bags_dispatcher - 1)
+        
+        # Decrement heads: subtract the heads from this log entry
+        heads_value = log_entry.heads if log_entry.heads is not None else 15.0
+        if allocation.heads is None:
+            allocation.heads = 0.0
+        allocation.heads = max(0.0, allocation.heads - heads_value)
 
     db.delete(log_entry)
     db.commit()
