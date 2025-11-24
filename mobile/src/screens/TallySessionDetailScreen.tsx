@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, RefreshControl, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, RefreshControl, Modal, ActivityIndicator, Platform } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
@@ -20,6 +20,7 @@ import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
@@ -29,6 +30,7 @@ function TallySessionDetailScreen() {
   const threshold = useAcceptableDifference();
   const { hasPermission } = usePermissions();
   const sessionId = (route.params as any)?.sessionId;
+  const insets = useSafeAreaInsets();
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -661,6 +663,7 @@ function TallySessionDetailScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
+      paddingTop: Platform.OS === 'android' ? insets.top : 0,
     },
     contentContainer: {
       ...styles.scrollContent,

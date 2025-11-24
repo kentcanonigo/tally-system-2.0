@@ -15,6 +15,7 @@ import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function TallySessionLogsScreen() {
   const route = useRoute();
@@ -23,6 +24,7 @@ function TallySessionLogsScreen() {
   const { timezone } = useTimezone();
   const threshold = useAcceptableDifference();
   const { hasPermission } = usePermissions();
+  const insets = useSafeAreaInsets();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -362,7 +364,9 @@ function TallySessionLogsScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
-      padding: responsive.padding.medium,
+      paddingTop: Platform.OS === 'android' ? insets.top : 0,
+      paddingHorizontal: responsive.padding.medium,
+      paddingBottom: responsive.padding.medium,
     },
     header: {
       ...styles.header,
