@@ -57,7 +57,7 @@ export const tallySessionsApi = {
   getAll: (params?: { customer_id?: number; plant_id?: number; status?: string }) =>
     api.get<TallySession[]>('/tally-sessions', { params }),
   getById: (id: number) => api.get<TallySession>(`/tally-sessions/${id}`),
-  create: (data: Omit<TallySession, 'id' | 'created_at' | 'updated_at'>) =>
+  create: (data: Omit<TallySession, 'id' | 'session_number' | 'created_at' | 'updated_at'>) =>
     api.post<TallySession>('/tally-sessions', data),
   update: (id: number, data: Partial<TallySession>) =>
     api.put<TallySession>(`/tally-sessions/${id}`, data),

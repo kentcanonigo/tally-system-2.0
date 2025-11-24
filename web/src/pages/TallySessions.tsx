@@ -5,6 +5,9 @@ import 'react-calendar/dist/Calendar.css';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import type { Customer, Plant, TallySession } from '../types';
 
+// Type for react-calendar's onChange value
+type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
+
 function TallySessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
@@ -133,9 +136,15 @@ function TallySessions() {
     return null;
   };
 
-  const handleDateChange = (value: Date | [Date, Date] | null) => {
+  const handleDateChange = (value: CalendarValue, _event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     if (!value || Array.isArray(value)) {
       // Handle null or date range (we only support single date selection)
+      setSelectedDate(null);
+      return;
+    }
+    
+    // Value should be Date at this point
+    if (!(value instanceof Date)) {
       setSelectedDate(null);
       return;
     }
