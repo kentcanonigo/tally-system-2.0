@@ -193,12 +193,19 @@ function TallySessionsScreen() {
     // Update hasMorePages based on filtered results
     const hasFilters = showActiveOnly || selectedDate;
     if (hasFilters) {
-      // With filters: disable next button if:
-      // 1. We got fewer than page size from server (no more pages available), OR
-      // 2. Filtered results are less than page size (all matching results fit on this page)
-      const hasFewerUnfiltered = allSessions.length < SESSIONS_PER_PAGE;
-      const hasFewerFiltered = filtered.length < SESSIONS_PER_PAGE;
-      setHasMorePages(hasMoreUnfilteredPages && !hasFewerUnfiltered && !hasFewerFiltered);
+      // Special case: If filtering by active sessions only, max is 10 active sessions
+      // Since max is 10 and page size is 10, there can only be 1 page of active sessions
+      if (showActiveOnly && !selectedDate) {
+        // With active sessions filter only, max is 10, so if we have 10 or fewer, they all fit on one page
+        setHasMorePages(false);
+      } else {
+        // With other filters: disable next button if:
+        // 1. We got fewer than page size from server (no more pages available), OR
+        // 2. Filtered results are less than page size (all matching results fit on this page)
+        const hasFewerUnfiltered = allSessions.length < SESSIONS_PER_PAGE;
+        const hasFewerFiltered = filtered.length < SESSIONS_PER_PAGE;
+        setHasMorePages(hasMoreUnfilteredPages && !hasFewerUnfiltered && !hasFewerFiltered);
+      }
     } else {
       // Without filters, use the server-side pagination indicator
       setHasMorePages(hasMoreUnfilteredPages);
