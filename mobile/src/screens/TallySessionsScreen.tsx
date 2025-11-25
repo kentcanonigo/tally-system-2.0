@@ -10,7 +10,7 @@ import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
-import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions } from '../utils/activeSessions';
+import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions, setActiveSessions } from '../utils/activeSessions';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -236,6 +236,34 @@ function TallySessionsScreen() {
     }
   };
 
+  const handleResetActiveSessions = () => {
+    Alert.alert(
+      'Reset Active Sessions',
+      'Are you sure you want to clear all active sessions? This will remove all sessions marked as active.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await setActiveSessions([]);
+              await loadActiveSessions();
+              // Refresh the sessions list to update the active status
+              fetchData(false, currentPage);
+            } catch (error) {
+              console.error('Error resetting active sessions:', error);
+              Alert.alert('Error', 'Failed to reset active sessions');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Create marked dates object for calendar highlighting
   const markedDates = useMemo(() => {
     const marked: { [key: string]: { marked: boolean; dotColor: string } } = {};
@@ -424,18 +452,30 @@ function TallySessionsScreen() {
               ? `Showing sessions for ${formatDate(selectedDate, timezone)}`
               : 'Showing all sessions'}
           </Text>
-          {(showActiveOnly || selectedDate) && (
-            <TouchableOpacity
-              style={styles.clearFiltersButton}
-              onPress={() => {
-                setShowActiveOnly(false);
-                setSelectedDate(null);
-              }}
-              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-            >
-              <MaterialIcons name="close" size={16} color="#7f8c8d" />
-            </TouchableOpacity>
-          )}
+          <View style={styles.filterStatusActions}>
+            {showActiveOnly && activeSessionIds.length > 0 && (
+              <TouchableOpacity
+                style={styles.resetActiveButton}
+                onPress={handleResetActiveSessions}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <MaterialIcons name="refresh" size={16} color="#e74c3c" />
+                <Text style={styles.resetActiveText}>Reset Active</Text>
+              </TouchableOpacity>
+            )}
+            {(showActiveOnly || selectedDate) && (
+              <TouchableOpacity
+                style={styles.clearFiltersButton}
+                onPress={() => {
+                  setShowActiveOnly(false);
+                  setSelectedDate(null);
+                }}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <MaterialIcons name="close" size={16} color="#7f8c8d" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -820,6 +860,25 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     fontSize: 13,
     fontWeight: '500',
+  },
+  filterStatusActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resetActiveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#fee',
+  },
+  resetActiveText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: '600',
   },
   clearFiltersButton: {
     padding: 4,
