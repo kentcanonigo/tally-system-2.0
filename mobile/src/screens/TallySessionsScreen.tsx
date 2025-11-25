@@ -31,9 +31,14 @@ function TallySessionsScreen() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [hasMoreUnfilteredPages, setHasMoreUnfilteredPages] = useState(false);
+  const SESSIONS_PER_PAGE = 10;
   const hasInitiallyLoaded = useRef(false);
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to page 1 when plant changes
     fetchData().then(() => {
       hasInitiallyLoaded.current = true;
     });
@@ -64,7 +69,7 @@ function TallySessionsScreen() {
     }, [loading, refreshing, activePlantId])
   );
 
-  const fetchData = async (showLoading = true) => {
+  const fetchData = async (showLoading = true, page: number = currentPage) => {
     if (showLoading) {
       setLoading(true);
     }
@@ -73,6 +78,12 @@ function TallySessionsScreen() {
       if (activePlantId) {
         params.plant_id = activePlantId;
       }
+      
+      // Add pagination parameters
+      const skip = (page - 1) * SESSIONS_PER_PAGE;
+      const limit = SESSIONS_PER_PAGE;
+      params.skip = skip;
+      params.limit = limit + 1; // Fetch one extra to check if there are more pages
 
       const [sessionsRes, customersRes, plantsRes] = await Promise.all([
         tallySessionsApi.getAll(params),
@@ -80,10 +91,18 @@ function TallySessionsScreen() {
         plantsApi.getAll(),
       ]);
 
-      setAllSessions(sessionsRes.data);
-      setSessions(sessionsRes.data);
+      // Check if there are more pages
+      const sessions = sessionsRes.data;
+      const hasMore = sessions.length > SESSIONS_PER_PAGE;
+      if (hasMore) {
+        sessions.pop(); // Remove the extra item
+      }
+      setHasMoreUnfilteredPages(hasMore);
+
+      setAllSessions(sessions);
       setCustomers(customersRes.data);
       setPlants(plantsRes.data);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -94,7 +113,7 @@ function TallySessionsScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchData();
+    fetchData(false, currentPage);
   };
 
   const getCustomerName = (customerId: number) => {
@@ -170,7 +189,45 @@ function TallySessionsScreen() {
     }
     
     setSessions(filtered);
-  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds]);
+    
+    // Update hasMorePages based on filtered results
+    const hasFilters = showActiveOnly || selectedDate;
+    if (hasFilters) {
+      // With filters: disable next button if:
+      // 1. We got fewer than page size from server (no more pages available), OR
+      // 2. Filtered results are less than page size (all matching results fit on this page)
+      const hasFewerUnfiltered = allSessions.length < SESSIONS_PER_PAGE;
+      const hasFewerFiltered = filtered.length < SESSIONS_PER_PAGE;
+      setHasMorePages(hasMoreUnfilteredPages && !hasFewerUnfiltered && !hasFewerFiltered);
+    } else {
+      // Without filters, use the server-side pagination indicator
+      setHasMorePages(hasMoreUnfilteredPages);
+    }
+  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages]);
+
+  // Reset to page 1 when filters change (but not on initial load)
+  useEffect(() => {
+    if (hasInitiallyLoaded.current) {
+      setCurrentPage(1);
+      fetchData(false, 1);
+    }
+  }, [selectedDate, showActiveOnly]);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      fetchData(true, newPage);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (hasMorePages) {
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      fetchData(true, newPage);
+    }
+  };
 
   // Create marked dates object for calendar highlighting
   const markedDates = useMemo(() => {
@@ -433,6 +490,43 @@ function TallySessionsScreen() {
           </View>
         }
       />
+
+      {/* Pagination Controls */}
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={handlePreviousPage}
+          disabled={currentPage === 1}
+        >
+          <MaterialIcons 
+            name="chevron-left" 
+            size={24} 
+            color={currentPage === 1 ? '#bdc3c7' : '#2c3e50'} 
+          />
+          <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+            Previous
+          </Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.paginationInfo}>
+          Page {currentPage}
+        </Text>
+        
+        <TouchableOpacity
+          style={[styles.paginationButton, !hasMorePages && styles.paginationButtonDisabled]}
+          onPress={handleNextPage}
+          disabled={!hasMorePages}
+        >
+          <Text style={[styles.paginationButtonText, !hasMorePages && styles.paginationButtonTextDisabled]}>
+            Next
+          </Text>
+          <MaterialIcons 
+            name="chevron-right" 
+            size={24} 
+            color={!hasMorePages ? '#bdc3c7' : '#2c3e50'} 
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Calendar Modal */}
       <Modal
@@ -889,6 +983,41 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ecf0f1',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+  },
+  paginationButtonText: {
+    color: '#2c3e50',
+    fontWeight: '600',
+    fontSize: 14,
+    marginHorizontal: 4,
+  },
+  paginationButtonTextDisabled: {
+    color: '#bdc3c7',
+  },
+  paginationInfo: {
+    color: '#7f8c8d',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
