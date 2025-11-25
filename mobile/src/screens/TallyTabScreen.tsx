@@ -1,19 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { tallySessionsApi, customersApi } from '../services/api';
+import { printToFileAsync } from 'expo-print';
+import { shareAsync } from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import { tallySessionsApi, customersApi, exportApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getActiveSessions } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
 import { usePlant } from '../contexts/PlantContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { usePermissions } from '../utils/usePermissions';
+import { generateSessionReportHTML } from '../utils/pdfGenerator';
 
 function TallyTabScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
   const navigation = useNavigation<any>();
+  const { hasPermission } = usePermissions();
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -21,6 +27,8 @@ function TallyTabScreen() {
   const [loading, setLoading] = useState(true);
   const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct'>('dressed');
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Load active sessions and their data
   const loadActiveSessions = async () => {
@@ -92,6 +100,61 @@ function TallyTabScreen() {
 
   const handleSessionSelect = (sessionId: number) => {
     setSelectedSessionId(sessionId);
+  };
+
+  const formatDateForFilename = (date: Date): string => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  };
+
+  const handleExportActiveAllocationSummary = async () => {
+    if (activeSessionIds.length === 0) {
+      Alert.alert('No Active Sessions', 'There are no active sessions to export.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      const response = await exportApi.exportSessions({
+        session_ids: activeSessionIds,
+      });
+
+      const html = generateSessionReportHTML(response.data);
+
+      const { uri } = await printToFileAsync({
+        html,
+        base64: false,
+      });
+
+      const currentDate = new Date();
+      const dateString = formatDateForFilename(currentDate);
+      const filename = `Allocation Report (${dateString}).pdf`;
+
+      const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+      const newUri = fileDir + filename;
+
+      const fileInfo = await FileSystem.getInfoAsync(newUri);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(newUri, { idempotent: true });
+      }
+
+      await FileSystem.moveAsync({
+        from: uri,
+        to: newUri,
+      });
+
+      await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export PDF');
+    } finally {
+      setIsExporting(false);
+      setShowExportModal(false);
+    }
   };
 
   const dynamicStyles = {
@@ -226,52 +289,87 @@ function TallyTabScreen() {
     <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Active Sessions</Text>
-        <View style={dynamicStyles.modeToggleContainer}>
-          <TouchableOpacity
-            style={[
-              dynamicStyles.modeButton,
-              tallyMode === 'dressed' && dynamicStyles.modeButtonActive,
-            ]}
-            onPress={() => setTallyMode('dressed')}
-          >
-            <Text
-              style={[
-                dynamicStyles.modeButtonText,
-                tallyMode === 'dressed' && dynamicStyles.modeButtonTextActive,
-              ]}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {hasPermission('can_export_reports') && (
+            <TouchableOpacity
+              style={{
+                marginRight: responsive.spacing.sm,
+                paddingHorizontal: responsive.padding.small,
+                paddingVertical: responsive.spacing.xs,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: '#ecf0f1',
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+              onPress={() => setShowExportModal(true)}
+              disabled={activeSessionIds.length === 0 || isExporting}
             >
-              Dressed
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              dynamicStyles.modeButton,
-              tallyMode === 'byproduct' && dynamicStyles.modeButtonActive,
-            ]}
-            onPress={() => setTallyMode('byproduct')}
-          >
-            <Text
+              <MaterialIcons
+                name="picture-as-pdf"
+                size={responsive.isTablet ? 18 : 16}
+                color="#ecf0f1"
+              />
+              <Text
+                style={{
+                  color: '#ecf0f1',
+                  marginLeft: 6,
+                  fontSize: responsive.fontSize.small,
+                  fontWeight: '600',
+                }}
+              >
+                Export
+              </Text>
+            </TouchableOpacity>
+          )}
+          <View style={dynamicStyles.modeToggleContainer}>
+            <TouchableOpacity
               style={[
-                dynamicStyles.modeButtonText,
-                tallyMode === 'byproduct' && dynamicStyles.modeButtonTextActive,
+                dynamicStyles.modeButton,
+                tallyMode === 'dressed' && dynamicStyles.modeButtonActive,
               ]}
+              onPress={() => setTallyMode('dressed')}
             >
-              Byproduct
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              dynamicStyles.focusButton,
-              isFocusMode && dynamicStyles.focusButtonActive,
-            ]}
-            onPress={() => setIsFocusMode((prev) => !prev)}
-          >
-            <MaterialIcons
-              name={isFocusMode ? 'lock-open' : 'lock'}
-              size={responsive.isTablet ? 20 : 18}
-              color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
-            />
-          </TouchableOpacity>
+              <Text
+                style={[
+                  dynamicStyles.modeButtonText,
+                  tallyMode === 'dressed' && dynamicStyles.modeButtonTextActive,
+                ]}
+              >
+                Dressed
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                dynamicStyles.modeButton,
+                tallyMode === 'byproduct' && dynamicStyles.modeButtonActive,
+              ]}
+              onPress={() => setTallyMode('byproduct')}
+            >
+              <Text
+                style={[
+                  dynamicStyles.modeButtonText,
+                  tallyMode === 'byproduct' && dynamicStyles.modeButtonTextActive,
+                ]}
+              >
+                Byproduct
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                dynamicStyles.focusButton,
+                isFocusMode && dynamicStyles.focusButtonActive,
+              ]}
+              onPress={() => setIsFocusMode((prev) => !prev)}
+            >
+              <MaterialIcons
+                name={isFocusMode ? 'lock-open' : 'lock'}
+                size={responsive.isTablet ? 20 : 18}
+                color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       
@@ -322,6 +420,126 @@ function TallyTabScreen() {
           </View>
         )}
       </View>
+
+      {/* Export selection modal */}
+      {hasPermission('can_export_reports') && (
+        <Modal
+          transparent
+          visible={showExportModal}
+          animationType="fade"
+          onRequestClose={() => setShowExportModal(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: responsive.padding.medium,
+                width: responsive.isTablet ? 360 : '85%',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: responsive.fontSize.medium,
+                  fontWeight: '700',
+                  color: '#2c3e50',
+                  marginBottom: responsive.spacing.sm,
+                }}
+              >
+                Export Options
+              </Text>
+              <Text
+                style={{
+                  fontSize: responsive.fontSize.small,
+                  color: '#7f8c8d',
+                  marginBottom: responsive.spacing.md,
+                }}
+              >
+                Choose what you want to export for the currently active sessions.
+              </Text>
+
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: responsive.spacing.sm,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 8,
+                  backgroundColor: '#ecf0f1',
+                  marginBottom: responsive.spacing.sm,
+                  opacity: activeSessionIds.length === 0 || isExporting ? 0.6 : 1,
+                }}
+                onPress={handleExportActiveAllocationSummary}
+                disabled={activeSessionIds.length === 0 || isExporting}
+              >
+                <MaterialIcons
+                  name="description"
+                  size={20}
+                  color="#2c3e50"
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                    }}
+                  >
+                    Allocation Summary (Active Sessions)
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.xs,
+                      color: '#7f8c8d',
+                      marginTop: 2,
+                    }}
+                  >
+                    Generate the same allocation summary PDF used in the Export tab,
+                    but for all currently active sessions.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'flex-end',
+                  marginTop: responsive.spacing.md,
+                }}
+              >
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: responsive.spacing.xs,
+                    paddingHorizontal: responsive.padding.small,
+                    borderRadius: 6,
+                    backgroundColor: '#ecf0f1',
+                  }}
+                  onPress={() => setShowExportModal(false)}
+                  disabled={isExporting}
+                >
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      color: '#2c3e50',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Close
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
