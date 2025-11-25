@@ -1029,12 +1029,15 @@ function TallyScreen(props?: TallyScreenProps) {
     },
     actionButtons: {
       flex: 1,
-      gap: responsive.spacing.sm,
+      justifyContent: 'space-between' as const,
     },
     actionButton: {
       ...styles.actionButton,
-      padding: responsive.isTablet ? 24 : 20,
-      minHeight: responsive.isTablet ? 70 : 60,
+      flex: 1,
+      marginBottom: responsive.spacing.sm,
+    },
+    actionButtonLast: {
+      marginBottom: 0,
     },
     actionButtonText: {
       ...styles.actionButtonText,
@@ -1422,8 +1425,8 @@ function TallyScreen(props?: TallyScreenProps) {
         <View style={dynamicStyles.buttonsContainer}>
           {/* Number pad */}
           <View style={dynamicStyles.numberPad}>
-            {[['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '.', '⌫']].map((row, rowIndex) => (
-              <View key={rowIndex} style={dynamicStyles.buttonRow}>
+            {[['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '.', '⌫']].map((row, rowIndex, arr) => (
+              <View key={rowIndex} style={[dynamicStyles.buttonRow, rowIndex === arr.length - 1 && { marginBottom: 0 }]}>
                 {row.map((key) => (
                   <TouchableOpacity
                     key={key}
@@ -1455,6 +1458,7 @@ function TallyScreen(props?: TallyScreenProps) {
             <TouchableOpacity
               style={[
                 dynamicStyles.actionButton,
+                dynamicStyles.actionButtonLast,
                 !canStartTally 
                   ? { backgroundColor: '#e74c3c' } 
                   : (showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton),
