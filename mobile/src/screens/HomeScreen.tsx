@@ -5,11 +5,13 @@ import { useNavigation } from '@react-navigation/native';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
+import { usePlant } from '../contexts/PlantContext';
 
 function HomeScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { hasPermission } = usePermissions();
+  const { activePlantId, isLoading: isPlantLoading } = usePlant();
   const canStartTally = hasPermission('can_start_tally');
   const [stats, setStats] = useState({
     customers: 0,
@@ -21,8 +23,10 @@ function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (!isPlantLoading) {
+      fetchStats();
+    }
+  }, [activePlantId, isPlantLoading]);
 
   const fetchStats = async (isRefresh = false) => {
     if (isRefresh) {
@@ -32,18 +36,29 @@ function HomeScreen() {
     }
     
     try {
-      const [customersRes, plantsRes, sessionsRes] = await Promise.all([
-        customersApi.getAll(),
-        plantsApi.getAll(),
-        tallySessionsApi.getAll(),
-      ]);
+      // If no active plant is set, show zero stats
+      if (!activePlantId) {
+        setStats({
+          customers: 0,
+          plants: 0,
+          sessions: 0,
+          ongoingSessions: 0,
+        });
+        return;
+      }
 
+      // Fetch sessions filtered by active plant
+      const sessionsRes = await tallySessionsApi.getAll({ plant_id: activePlantId });
       const sessions = sessionsRes.data;
       const ongoingSessions = sessions.filter((s) => s.status === 'ongoing').length;
 
+      // Get unique customer IDs from sessions
+      const customerIds = new Set(sessions.map((s) => s.customer_id));
+      const uniqueCustomerCount = customerIds.size;
+
       setStats({
-        customers: customersRes.data.length,
-        plants: plantsRes.data.length,
+        customers: uniqueCustomerCount,
+        plants: 1, // Only showing the active plant
         sessions: sessions.length,
         ongoingSessions,
       });
@@ -59,7 +74,7 @@ function HomeScreen() {
     fetchStats(true);
   };
 
-  if (loading) {
+  if (loading || isPlantLoading) {
     return (
       <View style={styles.container}>
         <Text>Loading...</Text>
