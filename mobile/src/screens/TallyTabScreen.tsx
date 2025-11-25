@@ -8,7 +8,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { tallySessionsApi, customersApi, exportApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
-import { getActiveSessions } from '../utils/activeSessions';
+import { getActiveSessions, removeActiveSession } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
 import { usePlant } from '../contexts/PlantContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -32,6 +32,10 @@ function TallyTabScreen() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportTypeModal, setShowExportTypeModal] = useState(false);
+  const [exportSessionIds, setExportSessionIds] = useState<number[]>([]);
+  const [exportTitle, setExportTitle] = useState('');
+  const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
 
   // Calculate sidebar width and determine layout mode
   const sidebarWidth = responsive.isTablet ? 200 : 150;
@@ -110,6 +114,39 @@ function TallyTabScreen() {
     setSelectedSessionId(sessionId);
   };
 
+  const handleRemoveCurrentSession = async () => {
+    if (!selectedSessionId) return;
+
+    try {
+      await removeActiveSession(selectedSessionId);
+      
+      // Find the next available session
+      const remainingSessions = sessions.filter(s => s.id !== selectedSessionId);
+      
+      if (remainingSessions.length > 0) {
+        // Select the first remaining session
+        setSelectedSessionId(remainingSessions[0].id);
+      } else {
+        setSelectedSessionId(null);
+      }
+      
+      // Update local state
+      setActiveSessionIds(prev => prev.filter(id => id !== selectedSessionId));
+      setSessions(remainingSessions);
+      setShowRemoveConfirmModal(false);
+    } catch (error) {
+      console.error('Error removing session:', error);
+      Alert.alert('Error', 'Failed to remove session from active list');
+    }
+  };
+
+  const getSelectedCustomerName = () => {
+    if (!selectedSessionId) return '';
+    const session = sessions.find(s => s.id === selectedSessionId);
+    if (!session) return '';
+    return getCustomerName(session.customer_id);
+  };
+
   const formatDateForFilename = (date: Date): string => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const month = months[date.getMonth()];
@@ -118,9 +155,27 @@ function TallyTabScreen() {
     return `${month}-${day}-${year}`;
   };
 
-  const handleExportActiveAllocationSummary = async () => {
-    if (activeSessionIds.length === 0) {
-      Alert.alert('No Active Sessions', 'There are no active sessions to export.');
+  // Step 1: Select which sessions to export, then move to type selection
+  const handleSelectExportScope = (scope: 'current' | 'all') => {
+    if (scope === 'current') {
+      if (!selectedSessionId) {
+        Alert.alert('No Session Selected', 'Please select a session to export.');
+        return;
+      }
+      setExportSessionIds([selectedSessionId]);
+      setExportTitle(getSelectedCustomerName());
+    } else {
+      setExportSessionIds(activeSessionIds);
+      setExportTitle(`All Active Sessions (${activeSessionIds.length})`);
+    }
+    setShowExportModal(false);
+    setShowExportTypeModal(true);
+  };
+
+  // Step 2: Export with the selected type
+  const handleExportAllocationSummary = async () => {
+    if (exportSessionIds.length === 0) {
+      Alert.alert('No Sessions', 'There are no sessions to export.');
       return;
     }
 
@@ -128,7 +183,7 @@ function TallyTabScreen() {
       setIsExporting(true);
 
       const response = await exportApi.exportSessions({
-        session_ids: activeSessionIds,
+        session_ids: exportSessionIds,
       });
 
       const html = generateSessionReportHTML(response.data);
@@ -140,7 +195,8 @@ function TallyTabScreen() {
 
       const currentDate = new Date();
       const dateString = formatDateForFilename(currentDate);
-      const filename = `Allocation Report (${dateString}).pdf`;
+      const filenamePrefix = exportSessionIds.length === 1 ? `${exportTitle} Allocation` : 'Allocation Report';
+      const filename = `${filenamePrefix} (${dateString}).pdf`;
 
       const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
       const newUri = fileDir + filename;
@@ -161,8 +217,18 @@ function TallyTabScreen() {
       Alert.alert('Error', 'Failed to export PDF');
     } finally {
       setIsExporting(false);
-      setShowExportModal(false);
+      setShowExportTypeModal(false);
     }
+  };
+
+  const handleExportTallySheet = () => {
+    // Placeholder for future implementation
+    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
+  };
+
+  const handleBackToScopeSelection = () => {
+    setShowExportTypeModal(false);
+    setShowExportModal(true);
   };
 
   const dynamicStyles = {
@@ -324,6 +390,41 @@ function TallyTabScreen() {
       <View style={dynamicStyles.header}>
         {!useVerticalLayout && <Text style={dynamicStyles.title}>Active Sessions</Text>}
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* Remove current session button */}
+          {selectedSessionId && (
+            <TouchableOpacity
+              style={{
+                marginRight: responsive.spacing.sm,
+                paddingHorizontal: responsive.padding.small,
+                paddingVertical: responsive.spacing.xs,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231,76,60,0.15)',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+              onPress={() => setShowRemoveConfirmModal(true)}
+            >
+              <MaterialIcons
+                name="remove-circle-outline"
+                size={responsive.isTablet ? 18 : 16}
+                color="#e74c3c"
+              />
+              {!useVerticalLayout && (
+                <Text
+                  style={{
+                    color: '#e74c3c',
+                    marginLeft: 6,
+                    fontSize: responsive.fontSize.small,
+                    fontWeight: '600',
+                  }}
+                >
+                  Remove
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
           {hasPermission('can_export_data') && (
             <TouchableOpacity
               style={{
@@ -345,16 +446,18 @@ function TallyTabScreen() {
                 size={responsive.isTablet ? 18 : 16}
                 color="#ecf0f1"
               />
-              <Text
-                style={{
-                  color: '#ecf0f1',
-                  marginLeft: 6,
-                  fontSize: responsive.fontSize.small,
-                  fontWeight: '600',
-                }}
-              >
-                Export
-              </Text>
+              {!useVerticalLayout && (
+                <Text
+                  style={{
+                    color: '#ecf0f1',
+                    marginLeft: 6,
+                    fontSize: responsive.fontSize.small,
+                    fontWeight: '600',
+                  }}
+                >
+                  Export
+                </Text>
+              )}
             </TouchableOpacity>
           )}
           <View style={dynamicStyles.modeToggleContainer}>
@@ -522,7 +625,7 @@ function TallyTabScreen() {
                   marginBottom: responsive.spacing.sm,
                 }}
               >
-                Export Options
+                Select Sessions to Export
               </Text>
               <Text
                 style={{
@@ -531,9 +634,58 @@ function TallyTabScreen() {
                   marginBottom: responsive.spacing.md,
                 }}
               >
-                Choose what you want to export for the currently active sessions.
+                Choose which sessions you want to include in the export.
               </Text>
 
+              {/* Export current session */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: responsive.spacing.sm,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 8,
+                  backgroundColor: '#3498db',
+                  marginBottom: responsive.spacing.sm,
+                  opacity: !selectedSessionId ? 0.6 : 1,
+                }}
+                onPress={() => handleSelectExportScope('current')}
+                disabled={!selectedSessionId}
+              >
+                <MaterialIcons
+                  name="person"
+                  size={20}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      fontWeight: '600',
+                      color: '#fff',
+                    }}
+                  >
+                    Current Session
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small - 2,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginTop: 2,
+                    }}
+                  >
+                    Export only "{getSelectedCustomerName() || 'No session selected'}"
+                  </Text>
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={24}
+                  color="rgba(255,255,255,0.8)"
+                />
+              </TouchableOpacity>
+
+              {/* Export all active sessions */}
               <TouchableOpacity
                 style={{
                   flexDirection: 'row',
@@ -543,13 +695,13 @@ function TallyTabScreen() {
                   borderRadius: 8,
                   backgroundColor: '#ecf0f1',
                   marginBottom: responsive.spacing.sm,
-                  opacity: activeSessionIds.length === 0 || isExporting ? 0.6 : 1,
+                  opacity: activeSessionIds.length === 0 ? 0.6 : 1,
                 }}
-                onPress={handleExportActiveAllocationSummary}
-                disabled={activeSessionIds.length === 0 || isExporting}
+                onPress={() => handleSelectExportScope('all')}
+                disabled={activeSessionIds.length === 0}
               >
                 <MaterialIcons
-                  name="description"
+                  name="groups"
                   size={20}
                   color="#2c3e50"
                   style={{ marginRight: 8 }}
@@ -562,7 +714,7 @@ function TallyTabScreen() {
                       color: '#2c3e50',
                     }}
                   >
-                    Allocation Summary (Active Sessions)
+                    All Active Sessions ({activeSessionIds.length})
                   </Text>
                   <Text
                     style={{
@@ -571,10 +723,14 @@ function TallyTabScreen() {
                       marginTop: 2,
                     }}
                   >
-                    Generate the same allocation summary PDF used in the Export tab,
-                    but for all currently active sessions.
+                    Export all currently active sessions
                   </Text>
                 </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={24}
+                  color="#7f8c8d"
+                />
               </TouchableOpacity>
 
               <View
@@ -609,6 +765,311 @@ function TallyTabScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Export type selection modal */}
+      {hasPermission('can_export_data') && (
+        <Modal
+          transparent
+          visible={showExportTypeModal}
+          animationType="fade"
+          onRequestClose={() => setShowExportTypeModal(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: responsive.padding.medium,
+                width: responsive.isTablet ? 360 : '85%',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: responsive.fontSize.medium,
+                  fontWeight: '700',
+                  color: '#2c3e50',
+                  marginBottom: responsive.spacing.xs,
+                }}
+              >
+                Choose Export Type
+              </Text>
+              <Text
+                style={{
+                  fontSize: responsive.fontSize.small - 2,
+                  color: '#3498db',
+                  marginBottom: responsive.spacing.md,
+                  fontWeight: '500',
+                }}
+              >
+                Exporting: {exportTitle}
+              </Text>
+
+              {/* Allocation Summary */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: responsive.spacing.sm,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 8,
+                  backgroundColor: '#27ae60',
+                  marginBottom: responsive.spacing.sm,
+                  opacity: isExporting ? 0.6 : 1,
+                }}
+                onPress={handleExportAllocationSummary}
+                disabled={isExporting}
+              >
+                <MaterialIcons
+                  name="description"
+                  size={20}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      fontWeight: '600',
+                      color: '#fff',
+                    }}
+                  >
+                    Allocation Summary
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small - 2,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginTop: 2,
+                    }}
+                  >
+                    Weight classifications and bag allocations
+                  </Text>
+                </View>
+                {isExporting && (
+                  <ActivityIndicator size="small" color="#fff" />
+                )}
+              </TouchableOpacity>
+
+              {/* Tally Sheet Report (Placeholder) */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: responsive.spacing.sm,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 8,
+                  backgroundColor: '#ecf0f1',
+                  marginBottom: responsive.spacing.sm,
+                  opacity: 0.6,
+                }}
+                onPress={handleExportTallySheet}
+                disabled={true}
+              >
+                <MaterialIcons
+                  name="list-alt"
+                  size={20}
+                  color="#2c3e50"
+                  style={{ marginRight: 8 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                    }}
+                  >
+                    Tally Sheet Report
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small - 2,
+                      color: '#7f8c8d',
+                      marginTop: 2,
+                    }}
+                  >
+                    Coming soon
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: '#f39c12',
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: '#fff',
+                      fontWeight: '600',
+                    }}
+                  >
+                    SOON
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginTop: responsive.spacing.md,
+                }}
+              >
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: responsive.spacing.xs,
+                    paddingHorizontal: responsive.padding.small,
+                    borderRadius: 6,
+                    backgroundColor: '#ecf0f1',
+                  }}
+                  onPress={handleBackToScopeSelection}
+                  disabled={isExporting}
+                >
+                  <MaterialIcons
+                    name="chevron-left"
+                    size={18}
+                    color="#2c3e50"
+                  />
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      color: '#2c3e50',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Back
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: responsive.spacing.xs,
+                    paddingHorizontal: responsive.padding.small,
+                    borderRadius: 6,
+                    backgroundColor: '#ecf0f1',
+                  }}
+                  onPress={() => setShowExportTypeModal(false)}
+                  disabled={isExporting}
+                >
+                  <Text
+                    style={{
+                      fontSize: responsive.fontSize.small,
+                      color: '#2c3e50',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Remove session confirmation modal */}
+      <Modal
+        transparent
+        visible={showRemoveConfirmModal}
+        animationType="fade"
+        onRequestClose={() => setShowRemoveConfirmModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              padding: responsive.padding.medium,
+              width: responsive.isTablet ? 360 : '85%',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: responsive.fontSize.medium,
+                fontWeight: '700',
+                color: '#2c3e50',
+                marginBottom: responsive.spacing.sm,
+              }}
+            >
+              Remove from Active Sessions?
+            </Text>
+            <Text
+              style={{
+                fontSize: responsive.fontSize.small,
+                color: '#7f8c8d',
+                marginBottom: responsive.spacing.md,
+              }}
+            >
+              Are you sure you want to remove "{getSelectedCustomerName()}" from active sessions? You can re-add it later from the Sessions tab.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                gap: responsive.spacing.sm,
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  paddingVertical: responsive.spacing.xs,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 6,
+                  backgroundColor: '#ecf0f1',
+                }}
+                onPress={() => setShowRemoveConfirmModal(false)}
+              >
+                <Text
+                  style={{
+                    fontSize: responsive.fontSize.small,
+                    color: '#2c3e50',
+                    fontWeight: '600',
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  paddingVertical: responsive.spacing.xs,
+                  paddingHorizontal: responsive.padding.small,
+                  borderRadius: 6,
+                  backgroundColor: '#e74c3c',
+                }}
+                onPress={handleRemoveCurrentSession}
+              >
+                <Text
+                  style={{
+                    fontSize: responsive.fontSize.small,
+                    color: '#fff',
+                    fontWeight: '600',
+                  }}
+                >
+                  Remove
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
