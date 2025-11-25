@@ -1532,13 +1532,15 @@ function TallyScreen(props?: TallyScreenProps) {
             <TouchableOpacity
               style={[
                 dynamicStyles.actionButton,
-                showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton,
-                (isSubmitting || !canStartTally) && { opacity: 0.6 }
+                !canStartTally 
+                  ? { backgroundColor: '#c0392b', opacity: 0.7 } 
+                  : (showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton),
+                isSubmitting && { opacity: 0.6 }
               ]}
               onPress={handleTallyEnter}
               disabled={isSubmitting || !canStartTally}
             >
-              <Text style={dynamicStyles.actionButtonText}>
+              <Text style={[dynamicStyles.actionButtonText, { textAlign: 'center' }]}>
                 {!canStartTally ? 'No Permission' : (isSubmitting ? 'Saving...' : (showManualInput ? 'Enter (Manual)' : 'Enter'))}
               </Text>
             </TouchableOpacity>
