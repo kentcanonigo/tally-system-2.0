@@ -22,10 +22,13 @@ import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import { TallySession, Customer } from '../types';
 import { usePlant } from '../contexts/PlantContext';
 import { usePermissions } from '../utils/usePermissions';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 const ExportScreen = () => {
   const { activePlantId } = usePlant();
   const { hasPermission } = usePermissions();
+  const { timezone } = useTimezone();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -306,8 +309,10 @@ const ExportScreen = () => {
           </View>
           <View style={styles.itemDetails}>
             <View style={styles.itemHeader}>
-              <Text style={styles.itemCustomer}>{getCustomerName(item.customer_id)}</Text>
-              <Text style={styles.itemDate}>{new Date(item.date).toLocaleDateString()}</Text>
+              <Text style={styles.itemCustomer}>
+                {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.date, timezone)}
+              </Text>
+              <Text style={styles.itemDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
             </View>
             <View style={styles.statusContainer}>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
