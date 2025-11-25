@@ -30,6 +30,7 @@ function TallySessionsScreen() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
   const hasInitiallyLoaded = useRef(false);
 
   useEffect(() => {
@@ -147,18 +148,29 @@ function TallySessionsScreen() {
     }
   };
 
-  // Filter sessions by selected date
+  const toggleActiveFilter = () => {
+    setShowActiveOnly(!showActiveOnly);
+  };
+
+  // Filter sessions by selected date and active status
   useEffect(() => {
+    let filtered = allSessions;
+    
+    // Filter by active status if enabled
+    if (showActiveOnly) {
+      filtered = filtered.filter((session) => activeSessionIds.includes(session.id));
+    }
+    
+    // Filter by selected date if set
     if (selectedDate) {
-      const filtered = allSessions.filter((session) => {
+      filtered = filtered.filter((session) => {
         const sessionDate = new Date(session.created_at).toISOString().split('T')[0];
         return sessionDate === selectedDate;
       });
-      setSessions(filtered);
-    } else {
-      setSessions(allSessions);
     }
-  }, [selectedDate, allSessions]);
+    
+    setSessions(filtered);
+  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds]);
 
   // Create marked dates object for calendar highlighting
   const markedDates = useMemo(() => {
@@ -317,10 +329,20 @@ function TallySessionsScreen() {
             <MaterialIcons name="calendar-today" size={responsive.fontSize.large} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={dynamicStyles.addButton}
+            style={[dynamicStyles.calendarButton, showActiveOnly && styles.calendarButtonActive]}
+            onPress={toggleActiveFilter}
+          >
+            <MaterialIcons 
+              name={showActiveOnly ? 'star' : 'star-border'} 
+              size={responsive.fontSize.large} 
+              color={showActiveOnly ? '#f39c12' : '#fff'} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={dynamicStyles.calendarButton}
             onPress={() => navigation.navigate('CreateTallySession' as never)}
           >
-            <Text style={dynamicStyles.addButtonText}>+ New</Text>
+            <MaterialIcons name="add" size={responsive.fontSize.large} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -372,8 +394,12 @@ function TallySessionsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {selectedDate 
-                ? `No sessions found for ${formatDate(selectedDate, timezone)}.` 
+              {showActiveOnly && selectedDate
+                ? `No active sessions found for ${formatDate(selectedDate, timezone)}.`
+                : showActiveOnly
+                ? 'No active sessions found for this plant.'
+                : selectedDate
+                ? `No sessions found for ${formatDate(selectedDate, timezone)}.`
                 : 'No sessions found for this plant.'}
             </Text>
           </View>
