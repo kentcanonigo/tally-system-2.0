@@ -503,7 +503,7 @@ function TallySessionsScreen() {
             onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
           >
                     <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
-                {getCustomerName(item.customer_id)} - {formatDate(item.created_at, timezone)}
+                {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.created_at, timezone)}
               </Text>
                   </TouchableOpacity>
                 </View>
