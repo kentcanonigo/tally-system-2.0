@@ -290,7 +290,7 @@ function TallyTabScreen() {
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Active Sessions</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {hasPermission('can_export_reports') && (
+          {hasPermission('can_export_data') && (
             <TouchableOpacity
               style={{
                 marginRight: responsive.spacing.sm,
@@ -422,7 +422,7 @@ function TallyTabScreen() {
       </View>
 
       {/* Export selection modal */}
-      {hasPermission('can_export_reports') && (
+      {hasPermission('can_export_data') && (
         <Modal
           transparent
           visible={showExportModal}

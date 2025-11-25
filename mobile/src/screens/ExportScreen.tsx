@@ -392,7 +392,7 @@ const ExportScreen = () => {
       <View style={styles.footer}>
         <Text style={styles.selectionCount}>{selectedSessionIds.length} selected</Text>
         {/* Only show export button if user has permission */}
-        {hasPermission('can_export_reports') ? (
+        {hasPermission('can_export_data') ? (
           <TouchableOpacity 
             style={[styles.exportButton, (selectedSessionIds.length === 0 || exporting) && styles.disabledButton]} 
             onPress={handleExport}

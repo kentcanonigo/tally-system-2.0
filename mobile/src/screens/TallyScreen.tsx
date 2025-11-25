@@ -37,6 +37,10 @@ function TallyScreen(props?: TallyScreenProps) {
   // Check if user has permission to start/add tally entries
   const canStartTally = hasPermission('can_start_tally');
   
+  // Consistent disabled styling for input elements
+  const disabledInputStyle = !canStartTally ? { opacity: 0.5, backgroundColor: '#d5d8dc' } : {};
+  const disabledButtonStyle = !canStartTally ? { opacity: 0.5 } : {};
+  
   // Use props if provided, otherwise fall back to route params
   const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
   const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
@@ -1076,7 +1080,7 @@ function TallyScreen(props?: TallyScreenProps) {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: responsive.spacing.md }}>
             <Text style={dynamicStyles.summaryTitle}>Byproducts</Text>
             <TouchableOpacity
-              style={[styles.addQuantityButton, { padding: responsive.padding.small }, !canStartTally && { opacity: 0.5 }]}
+              style={[styles.addQuantityButton, { padding: responsive.padding.small }, disabledButtonStyle]}
               onPress={() => setShowQuantityModal(true)}
               disabled={!canStartTally}
             >
@@ -1130,7 +1134,7 @@ function TallyScreen(props?: TallyScreenProps) {
                     </Text>
                     <View style={{ flex: 1, alignItems: 'center' }}>
                       <TouchableOpacity
-                        style={[styles.incrementButton, (isSubmitting || !canStartTally) && { opacity: 0.6 }]}
+                        style={[styles.incrementButton, disabledButtonStyle, isSubmitting && { opacity: 0.6 }]}
                         onPress={() => handleByproductIncrement(wc.id)}
                         disabled={isSubmitting || !canStartTally}
                       >
@@ -1160,18 +1164,20 @@ function TallyScreen(props?: TallyScreenProps) {
         {/* Toggle Button and Allocated/Required Field */}
         <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'stretch', gap: responsive.spacing.sm }}>
           <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: '#ecf0f1',
-              borderRadius: 8,
-              padding: responsive.padding.small,
-              borderWidth: 1,
-              borderColor: '#bdc3c7',
-              flex: 1,
-              justifyContent: 'space-between',
-              opacity: canStartTally ? 1 : 0.5,
-            }}
+            style={[
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#ecf0f1',
+                borderRadius: 8,
+                padding: responsive.padding.small,
+                borderWidth: 1,
+                borderColor: '#bdc3c7',
+                flex: 1,
+                justifyContent: 'space-between',
+              },
+              disabledInputStyle
+            ]}
             onPress={() => canStartTally && setShowManualInput(!showManualInput)}
             disabled={!canStartTally}
           >
@@ -1210,7 +1216,8 @@ function TallyScreen(props?: TallyScreenProps) {
               padding: responsive.padding.small,
               flex: 1.5,
               justifyContent: 'center',
-            }
+            },
+            disabledInputStyle
           ]}>
             <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>
               {hasPermission('can_view_tally_logs') ? 'Alloc / Req' : 'Required'}
@@ -1387,21 +1394,22 @@ function TallyScreen(props?: TallyScreenProps) {
               { 
                 flex: 1.5,
                 borderLeftWidth: 3,
-                borderLeftColor: '#27ae60',
-              }
+                borderLeftColor: canStartTally ? '#27ae60' : '#95a5a6',
+              },
+              disabledInputStyle
             ]}>
               <Text style={dynamicStyles.displayLabel}>Weight</Text>
               <Text style={dynamicStyles.weightDisplayValue}>
                 {tallyInput}
               </Text>
             </View>
-            <View style={[dynamicStyles.displayField, { flex: 2 }]}>
+            <View style={[dynamicStyles.displayField, { flex: 2 }, disabledInputStyle]}>
               <Text style={dynamicStyles.displayLabel}>Classification</Text>
               <Text style={dynamicStyles.displayValue} numberOfLines={1}>
                 {matchedWC ? matchedWC.classification : '-'}
               </Text>
             </View>
-            <View style={[dynamicStyles.displayField, { flex: 1 }]}>
+            <View style={[dynamicStyles.displayField, { flex: 1 }, disabledInputStyle]}>
               <Text style={dynamicStyles.displayLabel}>Heads</Text>
               <Text style={dynamicStyles.displayValue}>
                 {defaultHeadsAmount}
@@ -1414,116 +1422,31 @@ function TallyScreen(props?: TallyScreenProps) {
         <View style={dynamicStyles.buttonsContainer}>
           {/* Number pad */}
           <View style={dynamicStyles.numberPad}>
-            <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('7')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>7</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('8')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>8</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('9')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>9</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('4')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>4</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('5')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>5</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('6')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>6</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('1')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>1</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('2')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>2</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('3')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>3</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={dynamicStyles.buttonRow}>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={() => handleTallyNumberPress('0')}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>0</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={handleTallyDecimal}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>.</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[dynamicStyles.numberButton, !canStartTally && { opacity: 0.5 }]} 
-                onPress={handleTallyBackspace}
-                activeOpacity={0.7}
-                disabled={!canStartTally}
-              >
-                <Text style={dynamicStyles.buttonText}>⌫</Text>
-              </TouchableOpacity>
-            </View>
+            {[['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '.', '⌫']].map((row, rowIndex) => (
+              <View key={rowIndex} style={dynamicStyles.buttonRow}>
+                {row.map((key) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[dynamicStyles.numberButton, disabledButtonStyle]}
+                    onPress={() => {
+                      if (key === '.') handleTallyDecimal();
+                      else if (key === '⌫') handleTallyBackspace();
+                      else handleTallyNumberPress(key);
+                    }}
+                    activeOpacity={0.7}
+                    disabled={!canStartTally}
+                  >
+                    <Text style={dynamicStyles.buttonText}>{key}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
           </View>
 
           {/* Action buttons */}
           <View style={dynamicStyles.actionButtons}>
             <TouchableOpacity
-              style={[dynamicStyles.actionButton, styles.clearButton, !canStartTally && { opacity: 0.5 }]}
+              style={[dynamicStyles.actionButton, styles.clearButton, disabledButtonStyle]}
               onPress={handleTallyClear}
               disabled={!canStartTally}
             >
