@@ -1184,25 +1184,27 @@ function TallyScreen(props?: TallyScreenProps) {
             onPress={() => canStartTally && setShowManualInput(!showManualInput)}
             disabled={!canStartTally}
           >
-            <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600' }}>
+            <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', flexShrink: 1 }}>
               Manual Input
             </Text>
             <View
               style={{
-                width: 50,
-                height: 28,
-                borderRadius: 14,
+                width: responsive.isTablet ? 50 : 40,
+                height: responsive.isTablet ? 28 : 22,
+                borderRadius: responsive.isTablet ? 14 : 11,
                 backgroundColor: showManualInput ? '#27ae60' : '#95a5a6',
                 justifyContent: 'center',
                 alignItems: showManualInput ? 'flex-end' : 'flex-start',
-                paddingHorizontal: 4,
+                paddingHorizontal: 3,
+                marginLeft: responsive.spacing.xs,
+                flexShrink: 0,
               }}
             >
               <View
                 style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
+                  width: responsive.isTablet ? 20 : 16,
+                  height: responsive.isTablet ? 20 : 16,
+                  borderRadius: responsive.isTablet ? 10 : 8,
                   backgroundColor: '#fff',
                 }}
               />
