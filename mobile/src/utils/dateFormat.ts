@@ -93,7 +93,33 @@ export function formatTime(dateString: string, timezone: string): string {
  */
 export function formatDateTime(dateString: string, timezone: string): string {
   try {
-    const date = new Date(dateString);
+    let date: Date;
+    
+    // Check if it's a date-only string (YYYY-MM-DD format with no time component)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Date-only string - treat as UTC midnight
+      date = new Date(dateString + 'T00:00:00Z');
+    } else if (dateString.includes('Z')) {
+      // Has UTC timezone indicator - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('+') || /-\d{2}:\d{2}$/.test(dateString)) {
+      // Has timezone offset (e.g., +08:00 or -05:00) - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('T')) {
+      // ISO datetime without timezone indicator - backend stores in UTC, so treat as UTC
+      date = new Date(dateString + 'Z');
+    } else {
+      // Fallback: try parsing as-is
+      date = new Date(dateString);
+    }
+    
+    // Verify date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return new Date(dateString).toLocaleString();
+    }
+    
+    // Use Intl.DateTimeFormat to convert to the specified timezone
     return new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       year: 'numeric',
@@ -104,7 +130,7 @@ export function formatDateTime(dateString: string, timezone: string): string {
       hour12: true,
     }).format(date);
   } catch (error) {
-    console.error('Error formatting datetime:', error);
+    console.error('Error formatting datetime:', error, 'dateString:', dateString, 'timezone:', timezone);
     return new Date(dateString).toLocaleString();
   }
 }
