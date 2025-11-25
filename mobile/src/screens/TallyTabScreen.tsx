@@ -15,6 +15,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 
+// Minimum width for the numpad area before switching to vertical layout
+const MIN_NUMPAD_WIDTH = 600;
+
 function TallyTabScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
@@ -29,6 +32,11 @@ function TallyTabScreen() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // Calculate sidebar width and determine layout mode
+  const sidebarWidth = responsive.isTablet ? 200 : 150;
+  const availableNumpadWidth = responsive.width - sidebarWidth;
+  const useVerticalLayout = availableNumpadWidth < MIN_NUMPAD_WIDTH;
 
   // Load active sessions and their data
   const loadActiveSessions = async () => {
@@ -166,7 +174,7 @@ function TallyTabScreen() {
       padding: responsive.padding.medium,
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
-      justifyContent: 'space-between' as const,
+      justifyContent: useVerticalLayout ? 'flex-start' as const : 'space-between' as const,
     },
     title: {
       ...styles.title,
@@ -222,10 +230,36 @@ function TallyTabScreen() {
     },
     contentRow: {
       flex: 1,
-      flexDirection: 'row',
+      flexDirection: useVerticalLayout ? 'column' as const : 'row' as const,
     },
+    // Vertical layout: horizontal session bar at top
+    sessionsTopBar: {
+      backgroundColor: '#ecf0f1',
+      borderBottomWidth: 1,
+      borderBottomColor: '#bdc3c7',
+    },
+    sessionsTopBarContainer: {
+      paddingHorizontal: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+    },
+    sessionTopBarButton: {
+      ...styles.sessionButton,
+      paddingHorizontal: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
+      minWidth: undefined,
+      width: 'auto' as const,
+      marginRight: responsive.spacing.sm,
+      marginBottom: 0,
+    },
+    sessionTopBarButtonText: {
+      ...styles.sessionButtonText,
+      fontSize: responsive.fontSize.small,
+    },
+    // Horizontal layout: vertical sidebar on left
     sessionsSidebar: {
-      width: responsive.isTablet ? 200 : 150,
+      width: sidebarWidth,
       backgroundColor: '#ecf0f1',
       borderRightWidth: 1,
       borderRightColor: '#bdc3c7',
@@ -288,7 +322,7 @@ function TallyTabScreen() {
   return (
     <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
-        <Text style={dynamicStyles.title}>Active Sessions</Text>
+        {!useVerticalLayout && <Text style={dynamicStyles.title}>Active Sessions</Text>}
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {hasPermission('can_export_data') && (
             <TouchableOpacity
@@ -374,40 +408,75 @@ function TallyTabScreen() {
       </View>
       
       <View style={dynamicStyles.contentRow}>
-        {/* Left side: Active sessions buttons */}
-        <View style={dynamicStyles.sessionsSidebar}>
-          <ScrollView 
-            showsVerticalScrollIndicator={true}
-            style={styles.sessionsScrollView}
-            contentContainerStyle={dynamicStyles.sessionsContainer}
-          >
-            {sessions.map((session) => {
-              const isSelected = selectedSessionId === session.id;
-              return (
-                <TouchableOpacity
-                  key={session.id}
-                  style={[
-                    dynamicStyles.sessionButton,
-                    isSelected && dynamicStyles.sessionButtonSelected,
-                  ]}
-                  onPress={() => handleSessionSelect(session.id)}
-                >
-                  <Text
+        {/* Vertical layout: Horizontal session bar at top */}
+        {useVerticalLayout ? (
+          <View style={dynamicStyles.sessionsTopBar}>
+            <ScrollView 
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={dynamicStyles.sessionsTopBarContainer}
+            >
+              {sessions.map((session) => {
+                const isSelected = selectedSessionId === session.id;
+                return (
+                  <TouchableOpacity
+                    key={session.id}
                     style={[
-                      dynamicStyles.sessionButtonText,
-                      isSelected && dynamicStyles.sessionButtonTextSelected,
+                      dynamicStyles.sessionTopBarButton,
+                      isSelected && dynamicStyles.sessionButtonSelected,
                     ]}
-                    numberOfLines={2}
+                    onPress={() => handleSessionSelect(session.id)}
                   >
-                    {getCustomerName(session.customer_id)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+                    <Text
+                      style={[
+                        dynamicStyles.sessionTopBarButtonText,
+                        isSelected && dynamicStyles.sessionButtonTextSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {getCustomerName(session.customer_id)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : (
+          /* Horizontal layout: Vertical sidebar on left */
+          <View style={dynamicStyles.sessionsSidebar}>
+            <ScrollView 
+              showsVerticalScrollIndicator={true}
+              style={styles.sessionsScrollView}
+              contentContainerStyle={dynamicStyles.sessionsContainer}
+            >
+              {sessions.map((session) => {
+                const isSelected = selectedSessionId === session.id;
+                return (
+                  <TouchableOpacity
+                    key={session.id}
+                    style={[
+                      dynamicStyles.sessionButton,
+                      isSelected && dynamicStyles.sessionButtonSelected,
+                    ]}
+                    onPress={() => handleSessionSelect(session.id)}
+                  >
+                    <Text
+                      style={[
+                        dynamicStyles.sessionButtonText,
+                        isSelected && dynamicStyles.sessionButtonTextSelected,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {getCustomerName(session.customer_id)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
-        {/* Right side: Tally UI */}
+        {/* Tally UI: Takes remaining space */}
         {selectedSessionId && (
           <View style={dynamicStyles.tallyContainer}>
             <TallyScreen
@@ -497,7 +566,7 @@ function TallyTabScreen() {
                   </Text>
                   <Text
                     style={{
-                      fontSize: responsive.fontSize.xs,
+                      fontSize: responsive.fontSize.small - 2,
                       color: '#7f8c8d',
                       marginTop: 2,
                     }}
