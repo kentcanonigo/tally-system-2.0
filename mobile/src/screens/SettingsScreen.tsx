@@ -22,6 +22,12 @@ const AVAILABLE_TABS = [
   // Settings is always visible, so we don't include it here
 ];
 
+// Filter out 'Export' if it exists (legacy from when Export was a separate tab)
+const getFilteredVisibleTabs = (tabs: string[] | null | undefined) => {
+  const filtered = tabs?.filter(tab => tab !== 'Export') || [];
+  return filtered.length > 0 ? filtered : AVAILABLE_TABS.map(tab => tab.key);
+};
+
 function SettingsScreen() {
   const { user, logout, updatePreferences, refetchUser } = useAuth();
   const { timezone, setTimezone, availableTimezones } = useTimezone();
@@ -33,8 +39,9 @@ function SettingsScreen() {
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [threshold, setThreshold] = useState<string>((user?.acceptable_difference_threshold || 0).toString());
   const [selectedActivePlant, setSelectedActivePlant] = useState<number | null>(user?.active_plant_id || activePlantId);
+  
   const [visibleTabs, setVisibleTabs] = useState<string[]>(
-    user?.visible_tabs || AVAILABLE_TABS.map(tab => tab.key)
+    getFilteredVisibleTabs(user?.visible_tabs)
   );
   
   // Plants state
@@ -51,7 +58,7 @@ function SettingsScreen() {
       setSelectedTimezone(user.timezone || timezone);
       setThreshold((user.acceptable_difference_threshold || 0).toString());
       setSelectedActivePlant(user.active_plant_id || activePlantId);
-      setVisibleTabs(user.visible_tabs || AVAILABLE_TABS.map(tab => tab.key));
+      setVisibleTabs(getFilteredVisibleTabs(user.visible_tabs));
     }
   }, [user, timezone, activePlantId]);
 

@@ -37,7 +37,9 @@ function MainTabs() {
   const { user } = useAuth();
   
   // Get visible tabs from user preferences, default to all tabs
-  const visibleTabs = user?.visible_tabs || [
+  // Filter out 'Export' if it exists (legacy from when Export was a separate tab)
+  const userVisibleTabs = user?.visible_tabs?.filter(tab => tab !== 'Export') || [];
+  const visibleTabs = userVisibleTabs.length > 0 ? userVisibleTabs : [
     'Home',
     'Sessions',
     'Tally',
