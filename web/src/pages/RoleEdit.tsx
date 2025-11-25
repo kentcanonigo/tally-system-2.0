@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { rolesApi, permissionsApi } from '../services/api';
-import { RoleWithPermissions, Permission, RoleCreateRequest, RoleUpdateRequest } from '../types';
+import { RoleWithPermissions, Permission } from '../types';
 
 export default function RoleEdit() {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +17,6 @@ export default function RoleEdit() {
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [isSystem, setIsSystem] = useState(false);
 
-  const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [permissionsByCategory, setPermissionsByCategory] = useState<Record<string, Permission[]>>({});
 
   useEffect(() => {
@@ -31,7 +30,6 @@ export default function RoleEdit() {
       // Fetch all permissions
       const permsResponse = await permissionsApi.getAll();
       const permissions = permsResponse.data;
-      setAllPermissions(permissions);
 
       // Group by category
       const grouped = permissions.reduce((acc, perm) => {
