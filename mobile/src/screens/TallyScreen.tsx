@@ -1456,8 +1456,9 @@ function TallyScreen(props?: TallyScreenProps) {
               style={[
                 dynamicStyles.actionButton,
                 !canStartTally 
-                  ? { backgroundColor: '#c0392b', opacity: 0.7 } 
+                  ? { backgroundColor: '#e74c3c' } 
                   : (showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton),
+                disabledButtonStyle,
                 isSubmitting && { opacity: 0.6 }
               ]}
               onPress={handleTallyEnter}
