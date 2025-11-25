@@ -37,6 +37,7 @@ const ExportScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showExportTypeModal, setShowExportTypeModal] = useState(false);
 
   // Filters state
   const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
@@ -138,12 +139,15 @@ const ExportScreen = () => {
     return `${month}-${day}-${year}`;
   };
 
-  const handleExport = async () => {
+  const handleExportButtonPress = () => {
     if (selectedSessionIds.length === 0) {
       Alert.alert('No Selection', 'Please select at least one session to export.');
       return;
     }
+    setShowExportTypeModal(true);
+  };
 
+  const handleExportAllocationSummary = async () => {
     try {
       setExporting(true);
       
@@ -186,7 +190,13 @@ const ExportScreen = () => {
       Alert.alert('Error', 'Failed to export PDF');
     } finally {
       setExporting(false);
+      setShowExportTypeModal(false);
     }
+  };
+
+  const handleExportTallySheet = () => {
+    // Placeholder for future implementation
+    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
   };
 
   const getCustomerName = (customerId: number) => {
@@ -395,7 +405,7 @@ const ExportScreen = () => {
         {hasPermission('can_export_data') ? (
           <TouchableOpacity 
             style={[styles.exportButton, (selectedSessionIds.length === 0 || exporting) && styles.disabledButton]} 
-            onPress={handleExport}
+            onPress={handleExportButtonPress}
             disabled={selectedSessionIds.length === 0 || exporting}
           >
             {exporting ? (
@@ -412,6 +422,73 @@ const ExportScreen = () => {
       </View>
 
       {renderFilterModal()}
+
+      {/* Export Type Selection Modal */}
+      <Modal
+        transparent
+        visible={showExportTypeModal}
+        animationType="fade"
+        onRequestClose={() => setShowExportTypeModal(false)}
+      >
+        <View style={styles.exportTypeModalOverlay}>
+          <View style={styles.exportTypeModalContent}>
+            <Text style={styles.exportTypeModalTitle}>Choose Export Type</Text>
+            <Text style={styles.exportTypeModalSubtitle}>
+              Exporting {selectedSessionIds.length} session{selectedSessionIds.length !== 1 ? 's' : ''}
+            </Text>
+
+            {/* Allocation Summary */}
+            <TouchableOpacity
+              style={[styles.exportTypeOption, styles.exportTypeOptionPrimary]}
+              onPress={handleExportAllocationSummary}
+              disabled={exporting}
+            >
+              <MaterialIcons
+                name="description"
+                size={24}
+                color="#fff"
+                style={styles.exportTypeOptionIcon}
+              />
+              <View style={styles.exportTypeOptionContent}>
+                <Text style={styles.exportTypeOptionTitleLight}>Allocation Summary</Text>
+                <Text style={styles.exportTypeOptionDescLight}>
+                  Weight classifications and bag allocations
+                </Text>
+              </View>
+              {exporting && <ActivityIndicator size="small" color="#fff" />}
+            </TouchableOpacity>
+
+            {/* Tally Sheet Report (Placeholder) */}
+            <TouchableOpacity
+              style={[styles.exportTypeOption, styles.exportTypeOptionDisabled]}
+              onPress={handleExportTallySheet}
+              disabled={true}
+            >
+              <MaterialIcons
+                name="list-alt"
+                size={24}
+                color="#2c3e50"
+                style={styles.exportTypeOptionIcon}
+              />
+              <View style={styles.exportTypeOptionContent}>
+                <Text style={styles.exportTypeOptionTitle}>Tally Sheet Report</Text>
+                <Text style={styles.exportTypeOptionDesc}>Coming soon</Text>
+              </View>
+              <View style={styles.soonBadge}>
+                <Text style={styles.soonBadgeText}>SOON</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.exportTypeCancelButton}
+              onPress={() => setShowExportTypeModal(false)}
+              disabled={exporting}
+            >
+              <Text style={styles.exportTypeCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -688,6 +765,94 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     fontStyle: 'italic',
+  },
+  // Export Type Modal Styles
+  exportTypeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exportTypeModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '85%',
+    maxWidth: 360,
+  },
+  exportTypeModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  exportTypeModalSubtitle: {
+    fontSize: 13,
+    color: '#3498db',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  exportTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  exportTypeOptionPrimary: {
+    backgroundColor: '#27ae60',
+  },
+  exportTypeOptionDisabled: {
+    backgroundColor: '#ecf0f1',
+    opacity: 0.7,
+  },
+  exportTypeOptionIcon: {
+    marginRight: 12,
+  },
+  exportTypeOptionContent: {
+    flex: 1,
+  },
+  exportTypeOptionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  exportTypeOptionTitleLight: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  exportTypeOptionDesc: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 2,
+  },
+  exportTypeOptionDescLight: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  soonBadge: {
+    backgroundColor: '#f39c12',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  soonBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  exportTypeCancelButton: {
+    marginTop: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  exportTypeCancelButtonText: {
+    fontSize: 15,
+    color: '#7f8c8d',
+    fontWeight: '600',
   },
 });
 
