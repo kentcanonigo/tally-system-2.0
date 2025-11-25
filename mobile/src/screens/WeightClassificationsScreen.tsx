@@ -287,7 +287,7 @@ function WeightClassificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Weight Classifications</Text>
         {/* Only show add button if user has permission */}

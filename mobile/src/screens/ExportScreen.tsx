@@ -351,7 +351,7 @@ const ExportScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={Platform.OS === 'android' ? ['top', 'bottom'] : ['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>Export Sessions</Text>
         <View style={styles.headerActions}>

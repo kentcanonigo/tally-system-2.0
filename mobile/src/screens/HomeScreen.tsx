@@ -124,7 +124,7 @@ function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={dynamicStyles.contentContainer}

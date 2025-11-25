@@ -1812,7 +1812,7 @@ function TallyScreen(props?: TallyScreenProps) {
   }
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       {mainContent}
     </SafeAreaView>
   );

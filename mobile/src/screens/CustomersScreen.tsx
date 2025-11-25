@@ -164,7 +164,7 @@ function CustomersScreen() {
   };
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Customers</Text>
         {/* Only show add button if user has permission */}

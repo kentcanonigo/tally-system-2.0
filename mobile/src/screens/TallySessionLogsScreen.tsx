@@ -16,7 +16,7 @@ import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 function TallySessionLogsScreen() {
   const route = useRoute();
@@ -25,7 +25,6 @@ function TallySessionLogsScreen() {
   const { timezone } = useTimezone();
   const threshold = useAcceptableDifference();
   const { hasPermission } = usePermissions();
-  const insets = useSafeAreaInsets();
   const sessionId = (route.params as any)?.sessionId;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -365,7 +364,6 @@ function TallySessionLogsScreen() {
   const dynamicStyles = {
     container: {
       ...styles.container,
-      paddingTop: Platform.OS === 'android' ? insets.top : 0,
       paddingHorizontal: responsive.padding.medium,
       paddingBottom: responsive.padding.medium,
     },
@@ -565,11 +563,12 @@ function TallySessionLogsScreen() {
   };
 
   return (
-    <ScrollView
-      style={dynamicStyles.container}
-      contentContainerStyle={{ paddingBottom: 100 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
       <View style={dynamicStyles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
@@ -1311,7 +1310,8 @@ function TallySessionLogsScreen() {
           </TouchableOpacity>
         </Modal>
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

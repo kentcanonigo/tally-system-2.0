@@ -266,7 +266,7 @@ function TallyTabScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={Platform.OS === 'android' ? ['top'] : []}>
+      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={['top']}>
         <ActivityIndicator size="large" color="#3498db" />
       </SafeAreaView>
     );
@@ -274,7 +274,7 @@ function TallyTabScreen() {
 
   if (activeSessionIds.length === 0 || sessions.length === 0) {
     return (
-      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={Platform.OS === 'android' ? ['top'] : []}>
+      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={['top']}>
         <View style={dynamicStyles.emptyContainer}>
           <Text style={dynamicStyles.emptyText}>
             No active sessions found.{'\n\n'}
@@ -286,7 +286,7 @@ function TallyTabScreen() {
   }
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>Active Sessions</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>

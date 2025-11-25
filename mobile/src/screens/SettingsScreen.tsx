@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Switch } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
@@ -28,7 +28,6 @@ function SettingsScreen() {
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
   const defaultHeadsAmount = useDefaultHeadsAmount();
-  const insets = useSafeAreaInsets();
   
   const [selectedTimezone, setSelectedTimezone] = useState(user?.timezone || timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
@@ -334,13 +333,12 @@ function SettingsScreen() {
   }
 
   return (
-    <View style={dynamicStyles.container}>
-      <View style={{ paddingTop: Platform.OS === 'android' ? insets.top : 0, flex: 1 }}>
-        <ScrollView 
-          style={{ flex: 1 }} 
-          contentContainerStyle={{ paddingBottom: responsive.spacing.md }}
-          showsVerticalScrollIndicator={true}
-        >
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ paddingBottom: responsive.spacing.md }}
+        showsVerticalScrollIndicator={true}
+      >
       <Text style={dynamicStyles.title}>Settings</Text>
 
       <View style={dynamicStyles.section}>
@@ -635,9 +633,8 @@ function SettingsScreen() {
           </TouchableOpacity>
         </Modal>
       )}
-        </ScrollView>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -232,7 +232,7 @@ function CreateTallySessionScreen() {
   };
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.contentContainer}>
         <View style={dynamicStyles.form}>
           {/* Active Plant Display */}

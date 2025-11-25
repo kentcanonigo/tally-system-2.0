@@ -413,7 +413,7 @@ function TallySessionsScreen() {
   const activePlantName = activePlantId ? getPlantName(activePlantId) : '';
 
   return (
-    <SafeAreaView style={dynamicStyles.container} edges={Platform.OS === 'android' ? ['top'] : []}>
+    <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>{activePlantName || 'Tally Sessions'}</Text>
         <View style={styles.headerButtons}>
