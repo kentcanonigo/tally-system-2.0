@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -11,6 +11,7 @@ import {
   ScrollView,
   Modal
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
@@ -24,12 +25,14 @@ import { usePlant } from '../contexts/PlantContext';
 import { usePermissions } from '../utils/usePermissions';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
+import { getActiveSessions } from '../utils/activeSessions';
 
 const ExportScreen = () => {
   const { activePlantId } = usePlant();
   const { hasPermission } = usePermissions();
   const { timezone } = useTimezone();
   const [sessions, setSessions] = useState<TallySession[]>([]);
+  const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
   const [filteredSessions, setFilteredSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
@@ -38,6 +41,13 @@ const ExportScreen = () => {
   const [exporting, setExporting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExportTypeModal, setShowExportTypeModal] = useState(false);
+  const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [hasMoreUnfilteredPages, setHasMoreUnfilteredPages] = useState(false);
+  const SESSIONS_PER_PAGE = 10;
+  const hasInitiallyLoaded = useRef(false);
 
   // Filters state
   const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
@@ -47,18 +57,47 @@ const ExportScreen = () => {
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const fetchData = useCallback(async () => {
+  const loadActiveSessions = async () => {
+    try {
+      const activeIds = await getActiveSessions();
+      setActiveSessionIds(activeIds);
+    } catch (error) {
+      console.error('Error loading active sessions:', error);
+    }
+  };
+
+  const fetchData = useCallback(async (showLoading = true, page: number = currentPage) => {
     if (!activePlantId) return;
     
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
+      
+      const params: any = { plant_id: activePlantId };
+      
+      // Add pagination parameters
+      const skip = (page - 1) * SESSIONS_PER_PAGE;
+      const limit = SESSIONS_PER_PAGE;
+      params.skip = skip;
+      params.limit = limit + 1; // Fetch one extra to check if there are more pages
+
       const [sessionsRes, customersRes] = await Promise.all([
-        tallySessionsApi.getAll({ plant_id: activePlantId }),
+        tallySessionsApi.getAll(params),
         customersApi.getAll(),
       ]);
       
-      setSessions(sessionsRes.data);
+      // Check if there are more pages
+      const sessions = sessionsRes.data;
+      const hasMore = sessions.length > SESSIONS_PER_PAGE;
+      if (hasMore) {
+        sessions.pop(); // Remove the extra item
+      }
+      setHasMoreUnfilteredPages(hasMore);
+
+      setAllSessions(sessions);
       setCustomers(customersRes.data);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching data:', error);
       Alert.alert('Error', 'Failed to fetch sessions');
@@ -70,17 +109,48 @@ const ExportScreen = () => {
 
   useEffect(() => {
     if (activePlantId) {
-      fetchData();
+      setCurrentPage(1); // Reset to page 1 when plant changes
+      fetchData().then(() => {
+        hasInitiallyLoaded.current = true;
+      });
+      loadActiveSessions();
     } else {
       setSessions([]);
+      setAllSessions([]);
       setCustomers([]);
       setLoading(false);
     }
-  }, [activePlantId, fetchData]);
+  }, [activePlantId]); // Remove fetchData from dependencies to avoid infinite loop
+
+  // Refresh active sessions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we've already loaded data initially (not on first mount)
+      if (hasInitiallyLoaded.current && !loading && !refreshing) {
+        loadActiveSessions();
+      }
+    }, [loading, refreshing])
+  );
+
+  const toggleActiveFilter = () => {
+    const newValue = !showActiveOnly;
+    setShowActiveOnly(newValue);
+    
+    // Clear all filters when toggling active sessions
+    if (newValue) {
+      setFilterCustomerId(null);
+      setFilterStatus('');
+    }
+  };
 
   // Apply filters and sorting
   useEffect(() => {
-    let result = [...sessions];
+    let result = [...allSessions];
+
+    // Filter by active status if enabled
+    if (showActiveOnly) {
+      result = result.filter((session) => activeSessionIds.includes(session.id));
+    }
 
     // Filter by Status
     if (filterStatus) {
@@ -104,13 +174,59 @@ const ExportScreen = () => {
     });
 
     setFilteredSessions(result);
+    
+    // Update hasMorePages based on filtered results
+    const hasFilters = showActiveOnly || filterStatus || filterCustomerId;
+    if (hasFilters) {
+      // Special case: If filtering by active sessions only, max is 10 active sessions
+      // Since max is 10 and page size is 10, there can only be 1 page of active sessions
+      if (showActiveOnly && !filterStatus && !filterCustomerId) {
+        setHasMorePages(false);
+      } else {
+        // With other filters: disable next button if:
+        // 1. We got fewer than page size from server (no more pages available), OR
+        // 2. Filtered results are less than page size (all matching results fit on this page)
+        const hasFewerUnfiltered = allSessions.length < SESSIONS_PER_PAGE;
+        const hasFewerFiltered = result.length < SESSIONS_PER_PAGE;
+        setHasMorePages(hasMoreUnfilteredPages && !hasFewerUnfiltered && !hasFewerFiltered);
+      }
+    } else {
+      // Without filters, use the server-side pagination indicator
+      setHasMorePages(hasMoreUnfilteredPages);
+    }
+    
     // Reset selection when filters change
     setSelectedSessionIds([]);
-  }, [sessions, filterCustomerId, filterStatus, sortBy, sortOrder]);
+  }, [allSessions, filterCustomerId, filterStatus, sortBy, sortOrder, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages, SESSIONS_PER_PAGE]);
+
+  // Reset to page 1 when filters change (but not on initial load)
+  useEffect(() => {
+    if (hasInitiallyLoaded.current) {
+      setCurrentPage(1);
+      fetchData(false, 1);
+    }
+  }, [filterStatus, filterCustomerId, showActiveOnly]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchData();
+    fetchData(false, currentPage);
+    loadActiveSessions();
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      fetchData(true, newPage);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (hasMorePages) {
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      fetchData(true, newPage);
+    }
   };
 
   const toggleSessionSelection = (sessionId: number) => {
@@ -304,6 +420,7 @@ const ExportScreen = () => {
 
   const renderItem = ({ item }: { item: TallySession }) => {
     const isSelected = selectedSessionIds.includes(item.id);
+    const isActive = activeSessionIds.includes(item.id);
     return (
       <TouchableOpacity 
         style={[styles.item, isSelected && styles.selectedItem]} 
@@ -319,9 +436,19 @@ const ExportScreen = () => {
           </View>
           <View style={styles.itemDetails}>
             <View style={styles.itemHeader}>
-              <Text style={styles.itemCustomer}>
-                {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.date, timezone)}
-              </Text>
+              <View style={styles.itemTitleRow}>
+                {isActive && (
+                  <MaterialIcons 
+                    name="star" 
+                    size={18} 
+                    color="#f39c12" 
+                    style={styles.activeStarIcon}
+                  />
+                )}
+                <Text style={styles.itemCustomer}>
+                  {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.date, timezone)}
+                </Text>
+              </View>
               <Text style={styles.itemDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
             </View>
             <View style={styles.statusContainer}>
@@ -365,6 +492,16 @@ const ExportScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Export Sessions</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.filterButton, showActiveOnly && styles.activeFilterButton]} 
+            onPress={toggleActiveFilter}
+          >
+            <MaterialIcons 
+              name={showActiveOnly ? 'star' : 'star-border'} 
+              size={24} 
+              color={showActiveOnly ? '#f39c12' : '#3498db'} 
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
             <MaterialIcons name="filter-list" size={24} color="#3498db" />
           </TouchableOpacity>
@@ -380,13 +517,19 @@ const ExportScreen = () => {
         <View style={styles.emptyState}>
           <MaterialIcons name="search-off" size={64} color="#ccc" />
           <Text style={styles.emptyStateText}>No sessions found</Text>
-          <Text style={styles.emptyStateSubtext}>Try adjusting your filters to see more results.</Text>
-          <TouchableOpacity 
-            style={styles.adjustFiltersButton}
-            onPress={() => setShowFilters(true)}
-          >
-            <Text style={styles.adjustFiltersButtonText}>Adjust Filters</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyStateSubtext}>
+            {showActiveOnly 
+              ? 'No active sessions found. Mark sessions as active in the Sessions tab.' 
+              : 'Try adjusting your filters to see more results.'}
+          </Text>
+          {!showActiveOnly && (
+            <TouchableOpacity 
+              style={styles.adjustFiltersButton}
+              onPress={() => setShowFilters(true)}
+            >
+              <Text style={styles.adjustFiltersButtonText}>Adjust Filters</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
@@ -398,6 +541,43 @@ const ExportScreen = () => {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {/* Pagination Controls */}
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={handlePreviousPage}
+          disabled={currentPage === 1}
+        >
+          <MaterialIcons 
+            name="chevron-left" 
+            size={24} 
+            color={currentPage === 1 ? '#bdc3c7' : '#2c3e50'} 
+          />
+          <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+            Previous
+          </Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.paginationInfo}>
+          Page {currentPage}
+        </Text>
+        
+        <TouchableOpacity
+          style={[styles.paginationButton, !hasMorePages && styles.paginationButtonDisabled]}
+          onPress={handleNextPage}
+          disabled={!hasMorePages}
+        >
+          <Text style={[styles.paginationButtonText, !hasMorePages && styles.paginationButtonTextDisabled]}>
+            Next
+          </Text>
+          <MaterialIcons 
+            name="chevron-right" 
+            size={24} 
+            color={!hasMorePages ? '#bdc3c7' : '#2c3e50'} 
+          />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.footer}>
         <Text style={styles.selectionCount}>{selectedSessionIds.length} selected</Text>
@@ -535,7 +715,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 8,
-    paddingBottom: 80,
+    paddingBottom: 140, // Space for pagination (~60px) + footer (~60px) + extra padding
   },
   item: {
     backgroundColor: '#fff',
@@ -570,10 +750,19 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     marginBottom: 4,
   },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  activeStarIcon: {
+    marginRight: 6,
+  },
   itemCustomer: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
   },
   itemDate: {
     fontSize: 12,
@@ -612,6 +801,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     elevation: 5,
+    zIndex: 2,
   },
   selectionCount: {
     fontSize: 16,
@@ -853,6 +1043,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#7f8c8d',
     fontWeight: '600',
+  },
+  activeFilterButton: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 4,
+  },
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 70, // Position above footer (footer is ~60px tall)
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    zIndex: 1,
+  },
+  paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ecf0f1',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+  },
+  paginationButtonText: {
+    color: '#2c3e50',
+    fontWeight: '600',
+    fontSize: 14,
+    marginHorizontal: 4,
+  },
+  paginationButtonTextDisabled: {
+    color: '#bdc3c7',
+  },
+  paginationInfo: {
+    color: '#7f8c8d',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
