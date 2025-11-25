@@ -347,6 +347,34 @@ function TallySessionsScreen() {
         </View>
       </View>
 
+      {/* Filter Status Subheader */}
+      <View style={styles.filterStatusBar}>
+        <View style={styles.filterStatusContent}>
+          <MaterialIcons name="filter-list" size={16} color="#7f8c8d" />
+          <Text style={styles.filterStatusText}>
+            {showActiveOnly && selectedDate
+              ? `Active sessions for ${formatDate(selectedDate, timezone)}`
+              : showActiveOnly
+              ? 'Showing active sessions only'
+              : selectedDate
+              ? `Showing sessions for ${formatDate(selectedDate, timezone)}`
+              : 'Showing all sessions'}
+          </Text>
+          {(showActiveOnly || selectedDate) && (
+            <TouchableOpacity
+              style={styles.clearFiltersButton}
+              onPress={() => {
+                setShowActiveOnly(false);
+                setSelectedDate(null);
+              }}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <MaterialIcons name="close" size={16} color="#7f8c8d" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <FlatList
         data={sessions}
         renderItem={({ item }) => {
@@ -673,6 +701,27 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  filterStatusBar: {
+    backgroundColor: '#ecf0f1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  filterStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterStatusText: {
+    flex: 1,
+    color: '#7f8c8d',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  clearFiltersButton: {
+    padding: 4,
   },
   calendarButton: {
     backgroundColor: '#34495e',

@@ -76,6 +76,49 @@ function CreateTallySessionScreen() {
       return;
     }
 
+    // Check for existing session with same customer, date, and plant
+    try {
+      const existingSessionsRes = await tallySessionsApi.getAll({
+        customer_id: formData.customer_id,
+        plant_id: activePlantId,
+      });
+      
+      const existingSession = existingSessionsRes.data.find(
+        (session) => session.date === formData.date
+      );
+
+      if (existingSession) {
+        const customerName = getCustomerName(formData.customer_id);
+        const formattedDate = formatDate(formData.date, timezone);
+        
+        Alert.alert(
+          'Session Already Exists',
+          `A session already exists for ${customerName} on ${formattedDate}. Do you want to create another session?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Create Anyway',
+              onPress: () => createSession(),
+            },
+          ]
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking for existing sessions:', error);
+      // Continue with creation if check fails
+    }
+
+    // No existing session found, proceed with creation
+    createSession();
+  };
+
+  const createSession = async () => {
+    if (!activePlantId) return;
+
     setSubmitting(true);
     try {
       await tallySessionsApi.create({
