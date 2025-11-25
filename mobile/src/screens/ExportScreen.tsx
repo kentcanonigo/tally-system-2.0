@@ -490,20 +490,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     marginBottom: 4,
   },
   itemCustomer: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    flex: 1,
   },
   itemDate: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    marginTop: 2,
   },
   itemSubtext: {
     fontSize: 14,
