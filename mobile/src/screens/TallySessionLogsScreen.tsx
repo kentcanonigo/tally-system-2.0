@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatTime } from '../utils/dateFormat';
 import { useAcceptableDifference } from '../utils/settings';
@@ -733,7 +734,7 @@ function TallySessionLogsScreen() {
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                 onPress={handleDeleteSelected}
               >
-                <Text style={{ fontSize: 16 }}>🗑️</Text>
+                <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useLayoutEffect, useMemo, useRef } from 're
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 import {
   allocationDetailsApi,
   weightClassificationsApi,
@@ -1075,7 +1076,17 @@ function TallyScreen(props?: TallyScreenProps) {
               style={[styles.addQuantityButton, { padding: responsive.padding.small }]}
               onPress={() => setShowQuantityModal(true)}
             >
-              <Text style={[styles.addQuantityButtonText, { fontSize: responsive.fontSize.small }]}>+ Add Quantity</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialIcons
+                  name="add"
+                  size={responsive.fontSize.small}
+                  color="#fff"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.addQuantityButtonText, { fontSize: responsive.fontSize.small }]}>
+                  Add Quantity
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
           <View style={dynamicStyles.summaryTable}>

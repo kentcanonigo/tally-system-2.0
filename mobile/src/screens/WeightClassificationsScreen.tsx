@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
+import { MaterialIcons } from '@expo/vector-icons';
 import { weightClassificationsApi } from '../services/api';
 import type { WeightClassification } from '../types';
 import { useResponsive } from '../utils/responsive';
@@ -292,7 +293,7 @@ function WeightClassificationsScreen() {
         {/* Only show add button if user has permission */}
         {hasPermission('can_manage_weight_classes') && (
           <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
-            <Text style={dynamicStyles.addButtonText}>+ Add</Text>
+            <MaterialIcons name="add" size={responsive.fontSize.medium} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -322,10 +323,10 @@ function WeightClassificationsScreen() {
                   {hasPermission('can_manage_weight_classes') && (
                     <View style={styles.actions}>
                       <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>✏️</Text>
+                        <MaterialIcons name="edit" size={20} color="#3498db" />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>🗑️</Text>
+                        <MaterialIcons name="delete" size={20} color="#e74c3c" />
                       </TouchableOpacity>
                     </View>
                   )}
@@ -356,10 +357,10 @@ function WeightClassificationsScreen() {
                   {hasPermission('can_manage_weight_classes') && (
                     <View style={styles.actions}>
                       <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>✏️</Text>
+                        <MaterialIcons name="edit" size={20} color="#3498db" />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>🗑️</Text>
+                        <MaterialIcons name="delete" size={20} color="#e74c3c" />
                       </TouchableOpacity>
                     </View>
                   )}

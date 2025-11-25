@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { customersApi } from '../services/api';
 import type { Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
@@ -169,7 +170,7 @@ function CustomersScreen() {
         {/* Only show add button if user has permission */}
         {hasPermission('can_manage_customers') && (
           <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
-            <Text style={dynamicStyles.addButtonText}>+ Add</Text>
+            <MaterialIcons name="add" size={responsive.fontSize.medium} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -184,10 +185,10 @@ function CustomersScreen() {
               {hasPermission('can_manage_customers') && (
                 <View style={styles.actions}>
                   <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                    <Text style={styles.actionText}>✏️</Text>
+                    <MaterialIcons name="edit" size={20} color="#3498db" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
-                    <Text style={styles.actionText}>🗑️</Text>
+                    <MaterialIcons name="delete" size={20} color="#e74c3c" />
                   </TouchableOpacity>
                 </View>
               )}

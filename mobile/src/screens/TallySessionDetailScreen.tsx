@@ -4,6 +4,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate } from '../utils/dateFormat';
 import { useAcceptableDifference } from '../utils/settings';
@@ -431,13 +432,13 @@ function TallySessionDetailScreen() {
                 style={styles.editButton}
                 onPress={() => handleEditAllocation(allocation)}
               >
-                <Text style={styles.editButtonText}>✏️</Text>
+                <MaterialIcons name="edit" size={18} color="#3498db" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteAllocationButton}
                 onPress={() => handleDeleteAllocation(allocation.id)}
               >
-                <Text style={styles.deleteAllocationButtonText}>🗑️</Text>
+                <MaterialIcons name="delete" size={18} color="#e74c3c" />
               </TouchableOpacity>
             </View>
           )}
@@ -976,7 +977,7 @@ function TallySessionDetailScreen() {
               style={styles.addAllocationButton}
               onPress={() => setShowAddModal(true)}
             >
-              <Text style={styles.addAllocationButtonText}>+</Text>
+              <MaterialIcons name="add" size={20} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
