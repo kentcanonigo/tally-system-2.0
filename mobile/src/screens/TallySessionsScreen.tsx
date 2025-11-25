@@ -818,7 +818,7 @@ function TallySessionsScreen() {
             >
               <View style={styles.sessionHeader}>
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                  {isSelectionMode ? (
+                  {isSelectionMode && (
                     <View style={styles.checkboxContainer}>
                       <MaterialIcons
                         name={isSelected ? "check-box" : "check-box-outline-blank"}
@@ -826,19 +826,19 @@ function TallySessionsScreen() {
                         color={isSelected ? "#3498db" : "#757575"}
                       />
                     </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.activeToggleButton}
-                      onPress={() => handleToggleActive(item.id)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <MaterialIcons
-                        name={isActive ? 'star' : 'star-border'}
-                        size={24}
-                        color={isActive ? '#f39c12' : '#95a5a6'}
-                      />
-                    </TouchableOpacity>
                   )}
+                  <TouchableOpacity
+                    style={styles.activeToggleButton}
+                    onPress={() => handleToggleActive(item.id)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={isSelectionMode}
+                  >
+                    <MaterialIcons
+                      name={isActive ? 'star' : 'star-border'}
+                      size={24}
+                      color={isActive ? '#f39c12' : '#95a5a6'}
+                    />
+                  </TouchableOpacity>
                   <View style={{ flex: 1 }}>
                     <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
                       {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.created_at, timezone)}
