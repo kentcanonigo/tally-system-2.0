@@ -18,7 +18,7 @@ const AVAILABLE_TABS = [
   { key: 'Customers', label: 'Customers' },
   { key: 'WeightClassifications', label: 'Weight Classifications' },
   { key: 'Calculator', label: 'Calculator' },
-  { key: 'Export', label: 'Export' },
+  // Export functionality is now in Sessions screen
   // Settings is always visible, so we don't include it here
 ];
 

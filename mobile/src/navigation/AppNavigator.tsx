@@ -17,7 +17,6 @@ import CalculatorScreen from '../screens/CalculatorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CustomersScreen from '../screens/CustomersScreen';
 import WeightClassificationsScreen from '../screens/WeightClassificationsScreen';
-import ExportScreen from '../screens/ExportScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -45,7 +44,6 @@ function MainTabs() {
     'Customers',
     'WeightClassifications',
     'Calculator',
-    'Export',
   ];
 
   // Helper to check if a tab should be visible
@@ -73,8 +71,6 @@ function MainTabs() {
             iconName = 'calculate';
           } else if (route.name === 'Settings') {
             iconName = 'settings';
-          } else if (route.name === 'Export') {
-            iconName = 'file-download';
           } else {
             iconName = 'help';
           }
@@ -102,9 +98,6 @@ function MainTabs() {
       )}
       {isTabVisible('Calculator') && (
         <Tab.Screen name="Calculator" component={CalculatorScreen} options={{ headerShown: false }} />
-      )}
-      {isTabVisible('Export') && (
-        <Tab.Screen name="Export" component={ExportScreen} options={{ headerShown: false }} />
       )}
       {/* Settings is always visible */}
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />

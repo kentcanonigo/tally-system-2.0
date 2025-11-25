@@ -1,10 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Alert, Platform, ScrollView } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Calendar } from 'react-native-calendars';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { tallySessionsApi, customersApi, plantsApi } from '../services/api';
+import { Picker } from '@react-native-picker/picker';
+import { printToFileAsync } from 'expo-print';
+import { shareAsync } from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import { tallySessionsApi, customersApi, plantsApi, exportApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -12,6 +16,7 @@ import { usePlant } from '../contexts/PlantContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions, setActiveSessions } from '../utils/activeSessions';
 import { usePermissions } from '../utils/usePermissions';
+import { generateSessionReportHTML } from '../utils/pdfGenerator';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -39,6 +44,21 @@ function TallySessionsScreen() {
   const [hasMoreUnfilteredPages, setHasMoreUnfilteredPages] = useState(false);
   const SESSIONS_PER_PAGE = 10;
   const hasInitiallyLoaded = useRef(false);
+
+  // Filter state
+  const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Selection mode state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
+
+  // Export state
+  const [exporting, setExporting] = useState(false);
+  const [showExportTypeModal, setShowExportTypeModal] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to page 1 when plant changes
@@ -171,10 +191,116 @@ function TallySessionsScreen() {
   };
 
   const toggleActiveFilter = () => {
-    setShowActiveOnly(!showActiveOnly);
+    const newValue = !showActiveOnly;
+    setShowActiveOnly(newValue);
+    
+    // Clear all filters when toggling active sessions
+    if (newValue) {
+      setFilterCustomerId(null);
+      setFilterStatus('');
+      setSelectedDate(null);
+    }
   };
 
-  // Filter sessions by selected date and active status
+  // Selection mode handlers
+  const handleLongPress = (sessionId: number) => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      setSelectedSessionIds([sessionId]);
+    }
+  };
+
+  const toggleSessionSelection = (sessionId: number) => {
+    if (!isSelectionMode) return;
+    
+    setSelectedSessionIds(prev => {
+      if (prev.includes(sessionId)) {
+        return prev.filter(id => id !== sessionId);
+      } else {
+        return [...prev, sessionId];
+      }
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedSessionIds.length === sessions.length) {
+      setSelectedSessionIds([]);
+    } else {
+      setSelectedSessionIds(sessions.map(s => s.id));
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedSessionIds([]);
+  };
+
+  // Export handlers
+  const formatDateForFilename = (date: Date): string => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  };
+
+  const handleExportButtonPress = () => {
+    if (selectedSessionIds.length === 0) {
+      Alert.alert('No Selection', 'Please select at least one session to export.');
+      return;
+    }
+    setShowExportTypeModal(true);
+  };
+
+  const handleExportAllocationSummary = async () => {
+    try {
+      setExporting(true);
+      
+      const response = await exportApi.exportSessions({
+        session_ids: selectedSessionIds
+      });
+
+      const html = generateSessionReportHTML(response.data);
+
+      const { uri } = await printToFileAsync({
+        html,
+        base64: false
+      });
+
+      const currentDate = new Date();
+      const dateString = formatDateForFilename(currentDate);
+      const filename = `Allocation Report (${dateString}).pdf`;
+      
+      const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+      const newUri = fileDir + filename;
+      
+      const fileInfo = await FileSystem.getInfoAsync(newUri);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(newUri, { idempotent: true });
+      }
+      
+      await FileSystem.moveAsync({
+        from: uri,
+        to: newUri,
+      });
+
+      await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'Failed to export PDF');
+    } finally {
+      setExporting(false);
+      setShowExportTypeModal(false);
+      exitSelectionMode();
+    }
+  };
+
+  const handleExportTallySheet = () => {
+    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
+  };
+
+  // Filter sessions by all filters and apply sorting
   useEffect(() => {
     let filtered = allSessions;
     
@@ -190,16 +316,36 @@ function TallySessionsScreen() {
         return sessionDate === selectedDate;
       });
     }
+
+    // Filter by Status
+    if (filterStatus) {
+      filtered = filtered.filter(s => s.status === filterStatus);
+    }
+
+    // Filter by Customer
+    if (filterCustomerId) {
+      filtered = filtered.filter(s => s.customer_id === filterCustomerId);
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'date') {
+        comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else if (sortBy === 'status') {
+        comparison = a.status.localeCompare(b.status);
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
     
     setSessions(filtered);
     
     // Update hasMorePages based on filtered results
-    const hasFilters = showActiveOnly || selectedDate;
+    const hasFilters = showActiveOnly || selectedDate || filterStatus || filterCustomerId;
     if (hasFilters) {
       // Special case: If filtering by active sessions only, max is 10 active sessions
       // Since max is 10 and page size is 10, there can only be 1 page of active sessions
-      if (showActiveOnly && !selectedDate) {
-        // With active sessions filter only, max is 10, so if we have 10 or fewer, they all fit on one page
+      if (showActiveOnly && !selectedDate && !filterStatus && !filterCustomerId) {
         setHasMorePages(false);
       } else {
         // With other filters: disable next button if:
@@ -213,7 +359,7 @@ function TallySessionsScreen() {
       // Without filters, use the server-side pagination indicator
       setHasMorePages(hasMoreUnfilteredPages);
     }
-  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages]);
+  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages, filterStatus, filterCustomerId, sortBy, sortOrder, SESSIONS_PER_PAGE]);
 
   // Reset to page 1 when filters change (but not on initial load)
   useEffect(() => {
@@ -221,7 +367,7 @@ function TallySessionsScreen() {
       setCurrentPage(1);
       fetchData(false, 1);
     }
-  }, [selectedDate, showActiveOnly]);
+  }, [selectedDate, showActiveOnly, filterStatus, filterCustomerId]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -320,6 +466,130 @@ function TallySessionsScreen() {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Render filter modal
+  const renderFilterModal = () => (
+    <Modal
+      visible={showFilters}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowFilters(false)}
+    >
+      <View style={styles.filterModalOverlay}>
+        <View style={styles.filterModalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filters & Sort</Text>
+            <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <MaterialIcons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent}>
+            <Text style={styles.filterLabel}>Date</Text>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => {
+                setShowFilters(false);
+                setShowCalendar(true);
+              }}
+            >
+              <Text style={styles.datePickerButtonText}>
+                {selectedDate ? formatDate(selectedDate, timezone) : 'Select Date'}
+              </Text>
+              <MaterialIcons name="calendar-today" size={20} color="#3498db" />
+            </TouchableOpacity>
+            {selectedDate && (
+              <TouchableOpacity
+                style={styles.clearDateButton}
+                onPress={() => setSelectedDate(null)}
+              >
+                <Text style={styles.clearDateButtonText}>Clear Date</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.filterLabel}>Status</Text>
+            <View style={styles.filterPickerContainer}>
+              <Picker
+                selectedValue={filterStatus}
+                onValueChange={(itemValue) => setFilterStatus(itemValue)}
+              >
+                <Picker.Item label="All Statuses" value="" />
+                <Picker.Item label="Completed" value="completed" />
+                <Picker.Item label="Ongoing" value="ongoing" />
+                <Picker.Item label="Cancelled" value="cancelled" />
+              </Picker>
+            </View>
+
+            <Text style={styles.filterLabel}>Customer</Text>
+            <View style={styles.filterPickerContainer}>
+              <Picker
+                selectedValue={filterCustomerId}
+                onValueChange={(itemValue) => setFilterCustomerId(itemValue)}
+              >
+                <Picker.Item label="All Customers" value={null} />
+                {customers.map(c => (
+                  <Picker.Item key={c.id} label={c.name} value={c.id} />
+                ))}
+              </Picker>
+            </View>
+
+            <Text style={styles.filterLabel}>Sort By</Text>
+            <View style={styles.row}>
+              <TouchableOpacity 
+                style={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
+                onPress={() => setSortBy('date')}
+              >
+                <Text style={[styles.sortButtonText, sortBy === 'date' && styles.activeSortButtonText]}>Date</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortButton, sortBy === 'status' && styles.activeSortButton]}
+                onPress={() => setSortBy('status')}
+              >
+                <Text style={[styles.sortButtonText, sortBy === 'status' && styles.activeSortButtonText]}>Status</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.filterLabel}>Sort Order</Text>
+            <View style={styles.row}>
+              <TouchableOpacity 
+                style={[styles.sortButton, sortOrder === 'asc' && styles.activeSortButton]}
+                onPress={() => setSortOrder('asc')}
+              >
+                <Text style={[styles.sortButtonText, sortOrder === 'asc' && styles.activeSortButtonText]}>Ascending</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortButton, sortOrder === 'desc' && styles.activeSortButton]}
+                onPress={() => setSortOrder('desc')}
+              >
+                <Text style={[styles.sortButtonText, sortOrder === 'desc' && styles.activeSortButtonText]}>Descending</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View style={styles.filterModalActions}>
+            <TouchableOpacity 
+              style={styles.resetButtonBottom}
+              onPress={() => {
+                setFilterCustomerId(null);
+                setFilterStatus('');
+                setSelectedDate(null);
+                setSortBy('date');
+                setSortOrder('desc');
+              }}
+            >
+              <Text style={styles.resetButtonText}>Reset filters</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.applyButton}
+              onPress={() => setShowFilters(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
 
   if (loading && sessions.length === 0) {
     return (
@@ -417,111 +687,173 @@ function TallySessionsScreen() {
       <View style={dynamicStyles.header}>
         <Text style={dynamicStyles.title}>{activePlantName || 'Tally Sessions'}</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[dynamicStyles.calendarButton, selectedDate && styles.calendarButtonActive]}
-            onPress={() => setShowCalendar(true)}
-          >
-            <MaterialIcons name="calendar-today" size={responsive.fontSize.large} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[dynamicStyles.calendarButton, showActiveOnly && styles.calendarButtonActive]}
-            onPress={toggleActiveFilter}
-          >
-            <MaterialIcons 
-              name={showActiveOnly ? 'star' : 'star-border'} 
-              size={responsive.fontSize.large} 
-              color={showActiveOnly ? '#f39c12' : '#fff'} 
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[dynamicStyles.calendarButton, !canStartTally && { opacity: 0.5 }]}
-            onPress={() => navigation.navigate('CreateTallySession' as never)}
-            disabled={!canStartTally}
-          >
-            <MaterialIcons name="add" size={responsive.fontSize.large} color="#fff" />
-          </TouchableOpacity>
+          {isSelectionMode ? (
+            <>
+              {hasPermission('can_export_data') && selectedSessionIds.length > 0 && (
+                <TouchableOpacity
+                  style={[dynamicStyles.calendarButton, { backgroundColor: '#27ae60' }]}
+                  onPress={handleExportButtonPress}
+                  disabled={exporting}
+                >
+                  {exporting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <MaterialIcons name="picture-as-pdf" size={responsive.fontSize.large} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[dynamicStyles.calendarButton]}
+                onPress={selectAll}
+              >
+                <Text style={{ color: '#fff', fontSize: responsive.fontSize.small, fontWeight: '600' }}>
+                  {selectedSessionIds.length === sessions.length ? 'Deselect All' : 'Select All'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.calendarButton]}
+                onPress={exitSelectionMode}
+              >
+                <MaterialIcons name="close" size={responsive.fontSize.large} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[dynamicStyles.calendarButton, (selectedDate || filterStatus || filterCustomerId) && styles.calendarButtonActive]}
+                onPress={() => setShowFilters(true)}
+              >
+                <MaterialIcons name="filter-list" size={responsive.fontSize.large} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.calendarButton, showActiveOnly && styles.calendarButtonActive]}
+                onPress={toggleActiveFilter}
+              >
+                <MaterialIcons 
+                  name={showActiveOnly ? 'star' : 'star-border'} 
+                  size={responsive.fontSize.large} 
+                  color={showActiveOnly ? '#f39c12' : '#fff'} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.calendarButton, !canStartTally && { opacity: 0.5 }]}
+                onPress={() => navigation.navigate('CreateTallySession' as never)}
+                disabled={!canStartTally}
+              >
+                <MaterialIcons name="add" size={responsive.fontSize.large} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
       {/* Filter Status Subheader */}
-      <View style={styles.filterStatusBar}>
-        <View style={styles.filterStatusContent}>
-          <MaterialIcons name="filter-list" size={16} color="#7f8c8d" />
-          <Text style={styles.filterStatusText}>
-            {showActiveOnly && selectedDate
-              ? `Active sessions for ${formatDate(selectedDate, timezone)}`
-              : showActiveOnly
-              ? 'Showing active sessions only'
-              : selectedDate
-              ? `Showing sessions for ${formatDate(selectedDate, timezone)}`
-              : 'Showing all sessions'}
-          </Text>
-          <View style={styles.filterStatusActions}>
-            {showActiveOnly && activeSessionIds.length > 0 && (
-              <TouchableOpacity
-                style={styles.resetActiveButton}
-                onPress={handleResetActiveSessions}
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-              >
-                <MaterialIcons name="refresh" size={16} color="#e74c3c" />
-                <Text style={styles.resetActiveText}>Reset Active</Text>
-              </TouchableOpacity>
-            )}
-            {(showActiveOnly || selectedDate) && (
-              <TouchableOpacity
-                style={styles.clearFiltersButton}
-                onPress={() => {
-                  setShowActiveOnly(false);
-                  setSelectedDate(null);
-                }}
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-              >
-                <MaterialIcons name="close" size={16} color="#7f8c8d" />
-              </TouchableOpacity>
-            )}
+      {(showActiveOnly || selectedDate || filterStatus || filterCustomerId || isSelectionMode) && (
+        <View style={styles.filterStatusBar}>
+          <View style={styles.filterStatusContent}>
+            <MaterialIcons name="filter-list" size={16} color="#7f8c8d" />
+            <Text style={styles.filterStatusText}>
+              {isSelectionMode
+                ? `${selectedSessionIds.length} session${selectedSessionIds.length !== 1 ? 's' : ''} selected`
+                : showActiveOnly && selectedDate
+                ? `Active sessions for ${formatDate(selectedDate, timezone)}`
+                : showActiveOnly
+                ? 'Showing active sessions only'
+                : selectedDate
+                ? `Showing sessions for ${formatDate(selectedDate, timezone)}`
+                : filterStatus || filterCustomerId
+                ? 'Filters applied'
+                : 'Showing all sessions'}
+            </Text>
+            <View style={styles.filterStatusActions}>
+              {!isSelectionMode && showActiveOnly && activeSessionIds.length > 0 && (
+                <TouchableOpacity
+                  style={styles.resetActiveButton}
+                  onPress={handleResetActiveSessions}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                >
+                  <MaterialIcons name="refresh" size={16} color="#e74c3c" />
+                  <Text style={styles.resetActiveText}>Reset Active</Text>
+                </TouchableOpacity>
+              )}
+              {!isSelectionMode && (showActiveOnly || selectedDate || filterStatus || filterCustomerId) && (
+                <TouchableOpacity
+                  style={styles.clearFiltersButton}
+                  onPress={() => {
+                    setShowActiveOnly(false);
+                    setSelectedDate(null);
+                    setFilterStatus('');
+                    setFilterCustomerId(null);
+                  }}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                >
+                  <MaterialIcons name="close" size={16} color="#7f8c8d" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      )}
 
       <FlatList
         data={sessions}
         renderItem={({ item }) => {
           const isActive = activeSessionIds.includes(item.id);
+          const isSelected = selectedSessionIds.includes(item.id);
           return (
-            <View style={dynamicStyles.sessionCard}>
+            <TouchableOpacity
+              style={[
+                dynamicStyles.sessionCard,
+                isSelectionMode && isSelected && styles.selectedCard
+              ]}
+              onLongPress={() => handleLongPress(item.id)}
+              onPress={() => {
+                if (isSelectionMode) {
+                  toggleSessionSelection(item.id);
+                } else {
+                  navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never);
+                }
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.sessionHeader}>
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                  <TouchableOpacity
-                    style={styles.activeToggleButton}
-                    onPress={() => handleToggleActive(item.id)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <MaterialIcons
-                      name={isActive ? 'star' : 'star-border'}
-                      size={24}
-                      color={isActive ? '#f39c12' : '#95a5a6'}
-                    />
-                  </TouchableOpacity>
-          <TouchableOpacity
-                    style={{ flex: 1 }}
-            onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
-          >
+                  {isSelectionMode ? (
+                    <View style={styles.checkboxContainer}>
+                      <MaterialIcons
+                        name={isSelected ? "check-box" : "check-box-outline-blank"}
+                        size={24}
+                        color={isSelected ? "#3498db" : "#757575"}
+                      />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.activeToggleButton}
+                      onPress={() => handleToggleActive(item.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialIcons
+                        name={isActive ? 'star' : 'star-border'}
+                        size={24}
+                        color={isActive ? '#f39c12' : '#95a5a6'}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <View style={{ flex: 1 }}>
                     <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
-                {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.created_at, timezone)}
-              </Text>
-                  </TouchableOpacity>
+                      {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.created_at, timezone)}
+                    </Text>
+                  </View>
                 </View>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                <Text style={styles.statusText}>{item.status}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
               </View>
-            </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('TallySessionDetail' as never, { sessionId: item.id } as never)}
-              >
-            <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
-            <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
-          </TouchableOpacity>
-            </View>
+              <View>
+                <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
+                <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
+              </View>
+            </TouchableOpacity>
           );
         }}
         keyExtractor={(item) => item.id.toString()}
@@ -534,8 +866,8 @@ function TallySessionsScreen() {
                 ? `No active sessions found for ${formatDate(selectedDate, timezone)}.`
                 : showActiveOnly
                 ? 'No active sessions found for this plant.'
-                : selectedDate
-                ? `No sessions found for ${formatDate(selectedDate, timezone)}.`
+                : selectedDate || filterStatus || filterCustomerId
+                ? 'No sessions found matching the current filters.'
                 : 'No sessions found for this plant.'}
             </Text>
           </View>
@@ -757,6 +1089,78 @@ function TallySessionsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Filter Modal */}
+      {renderFilterModal()}
+
+      {/* Export Type Selection Modal */}
+      {hasPermission('can_export_data') && (
+        <Modal
+          transparent
+          visible={showExportTypeModal}
+          animationType="fade"
+          onRequestClose={() => setShowExportTypeModal(false)}
+        >
+          <View style={styles.exportTypeModalOverlay}>
+            <View style={styles.exportTypeModalContent}>
+              <Text style={styles.exportTypeModalTitle}>Choose Export Type</Text>
+              <Text style={styles.exportTypeModalSubtitle}>
+                Exporting {selectedSessionIds.length} session{selectedSessionIds.length !== 1 ? 's' : ''}
+              </Text>
+
+              {/* Allocation Summary */}
+              <TouchableOpacity
+                style={[styles.exportTypeOption, styles.exportTypeOptionPrimary]}
+                onPress={handleExportAllocationSummary}
+                disabled={exporting}
+              >
+                <MaterialIcons
+                  name="description"
+                  size={24}
+                  color="#fff"
+                  style={styles.exportTypeOptionIcon}
+                />
+                <View style={styles.exportTypeOptionContent}>
+                  <Text style={styles.exportTypeOptionTitleLight}>Allocation Summary</Text>
+                  <Text style={styles.exportTypeOptionDescLight}>
+                    Weight classifications and bag allocations
+                  </Text>
+                </View>
+                {exporting && <ActivityIndicator size="small" color="#fff" />}
+              </TouchableOpacity>
+
+              {/* Tally Sheet Report (Placeholder) */}
+              <TouchableOpacity
+                style={[styles.exportTypeOption, styles.exportTypeOptionDisabled]}
+                onPress={handleExportTallySheet}
+                disabled={true}
+              >
+                <MaterialIcons
+                  name="list-alt"
+                  size={24}
+                  color="#2c3e50"
+                  style={styles.exportTypeOptionIcon}
+                />
+                <View style={styles.exportTypeOptionContent}>
+                  <Text style={styles.exportTypeOptionTitle}>Tally Sheet Report</Text>
+                  <Text style={styles.exportTypeOptionDesc}>Coming soon</Text>
+                </View>
+                <View style={styles.soonBadge}>
+                  <Text style={styles.soonBadgeText}>SOON</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.exportTypeCancelButton}
+                onPress={() => setShowExportTypeModal(false)}
+                disabled={exporting}
+              >
+                <Text style={styles.exportTypeCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -905,6 +1309,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   calendarModal: {
     backgroundColor: '#fff',
@@ -1088,6 +1497,222 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     fontSize: 14,
     fontWeight: '500',
+  },
+  // Filter Modal Styles
+  filterModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalBody: {
+    padding: 16,
+  },
+  modalBodyContent: {
+    paddingBottom: 20,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  filterPickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fafafa',
+    marginBottom: 8,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fafafa',
+    padding: 12,
+    marginBottom: 8,
+  },
+  datePickerButtonText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  clearDateButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  clearDateButtonText: {
+    color: '#e74c3c',
+    fontSize: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  sortButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+  },
+  activeSortButton: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  sortButtonText: {
+    color: '#666',
+  },
+  activeSortButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  filterModalActions: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  resetButtonBottom: {
+    flex: 1,
+    backgroundColor: '#ecf0f1',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#e74c3c',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#3498db',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Selection Mode Styles
+  selectedCard: {
+    borderColor: '#3498db',
+    borderWidth: 2,
+    backgroundColor: '#f0f8ff',
+  },
+  checkboxContainer: {
+    marginRight: 8,
+  },
+  // Export Type Modal Styles
+  exportTypeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exportTypeModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '85%',
+    maxWidth: 360,
+  },
+  exportTypeModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  exportTypeModalSubtitle: {
+    fontSize: 13,
+    color: '#3498db',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  exportTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  exportTypeOptionPrimary: {
+    backgroundColor: '#27ae60',
+  },
+  exportTypeOptionDisabled: {
+    backgroundColor: '#ecf0f1',
+    opacity: 0.7,
+  },
+  exportTypeOptionIcon: {
+    marginRight: 12,
+  },
+  exportTypeOptionContent: {
+    flex: 1,
+  },
+  exportTypeOptionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  exportTypeOptionTitleLight: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  exportTypeOptionDesc: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 2,
+  },
+  exportTypeOptionDescLight: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  soonBadge: {
+    backgroundColor: '#f39c12',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  soonBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  exportTypeCancelButton: {
+    marginTop: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  exportTypeCancelButtonText: {
+    fontSize: 15,
+    color: '#7f8c8d',
+    fontWeight: '600',
   },
 });
 
