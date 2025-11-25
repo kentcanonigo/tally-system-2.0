@@ -118,28 +118,23 @@ function TallyScreen(props?: TallyScreenProps) {
       // Check if user has permission to view log entries
       const canViewLogs = hasPermission('can_view_tally_logs');
       
-      // Build list of promises - only include log entries if user has permission
-      const promises = [
+      // Fetch all required data in parallel
+      const [customerRes, plantRes, allocationsRes, weightClassificationsRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
-      ];
+      ]);
       
+      setCustomer(customerRes.data);
+      setPlant(plantRes.data);
+      setAllocations(allocationsRes.data);
+      setWeightClassifications(weightClassificationsRes.data);
+      
+      // Only fetch log entries if user has permission
       if (canViewLogs) {
-        promises.push(tallyLogEntriesApi.getBySession(sessionId));
-      }
-      
-      const results = await Promise.all(promises);
-      
-      setCustomer(results[0].data);
-      setPlant(results[1].data);
-      setAllocations(results[2].data);
-      setWeightClassifications(results[3].data);
-      
-      // Only set log entries if we fetched them
-      if (canViewLogs && results[4]) {
-        setLogEntries(results[4].data);
+        const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+        setLogEntries(logEntriesRes.data);
       } else {
         setLogEntries([]); // Empty array if user can't view logs
       }
@@ -431,6 +426,10 @@ function TallyScreen(props?: TallyScreenProps) {
           // Force heads=1 for byproducts
           const finalHeads = isSelectedWCByproduct ? 1 : heads;
           
+          if (!selectedWeightClassId) {
+            throw new Error('Weight classification ID is missing');
+          }
+          
           await tallyLogEntriesApi.create(sessionId, {
             weight_classification_id: selectedWeightClassId,
             role: tallyRole as TallyLogEntryRole,
@@ -447,20 +446,14 @@ function TallyScreen(props?: TallyScreenProps) {
 
           // Refresh allocations and log entries
           const canViewLogs = hasPermission('can_view_tally_logs');
-          const promises = [allocationDetailsApi.getBySession(sessionId)];
+          const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+          setAllocations(allocationsRes.data);
           
           if (canViewLogs) {
-            promises.push(tallyLogEntriesApi.getBySession(sessionId));
-          }
-          
-          const results = await Promise.all(promises);
-          setAllocations(results[0].data);
-          
-          if (canViewLogs && results[1]) {
-            setLogEntries(results[1].data);
+            const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+            setLogEntries(logEntriesRes.data);
           }
         } catch (error: any) {
-          console.error('Error creating manual log entry:', error);
           const errorMessage = error.response?.data?.detail
             || error.message
             || 'Failed to log tally entry. Please try again.';
@@ -544,59 +537,40 @@ function TallyScreen(props?: TallyScreenProps) {
     }
 
     // No over-allocation, proceed directly
+    // Capture the ID to avoid null check issues in nested function
+    const matchedWCId = matchedWC.id;
     createLogEntry();
 
     async function createLogEntry() {
       setIsSubmitting(true);
       try {
-        console.log('Creating tally log entry:', {
-          sessionId,
-          weight_classification_id: matchedWC.id,
-          role: tallyRole,
-          weight,
-        });
-
         // Create log entry - this will also increment the allocation
         // Default heads to 15 when using numpad
         const defaultHeads = await getDefaultHeadsAmount();
-        const response = await tallyLogEntriesApi.create(sessionId, {
-          weight_classification_id: matchedWC.id,
+        await tallyLogEntriesApi.create(sessionId, {
+          weight_classification_id: matchedWCId,
           role: tallyRole as TallyLogEntryRole,
           weight: weight,
           heads: defaultHeads,
           notes: null,
         });
 
-        console.log('Tally log entry created successfully:', response.data);
-
         // Reset input
         setTallyInput('0');
 
         // Refresh allocations and log entries to show updated counts
         const canViewLogs = hasPermission('can_view_tally_logs');
-        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+        setAllocations(allocationsRes.data);
         
         if (canViewLogs) {
-          promises.push(tallyLogEntriesApi.getBySession(sessionId));
-        }
-        
-        const results = await Promise.all(promises);
-        setAllocations(results[0].data);
-        
-        if (canViewLogs && results[1]) {
-          setLogEntries(results[1].data);
+          const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+          setLogEntries(logEntriesRes.data);
         }
 
         // Show success feedback (optional - you can remove this if it's too much)
         // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
       } catch (error: any) {
-        console.error('Error creating tally log entry:', error);
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-        });
-        
         const errorMessage = error.response?.data?.detail 
           || error.message 
           || 'Failed to log tally entry. Please try again.';
@@ -609,7 +583,7 @@ function TallyScreen(props?: TallyScreenProps) {
   };
 
   // Filter allocations based on mode: byproduct mode shows only byproducts, dressed mode shows only dressed
-  const filteredAllocations = useMemo(() => {
+  const filteredAllocations = useMemo((): AllocationDetails[] => {
     if (tallyMode === 'byproduct') {
       return allocations.filter((allocation) => {
         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -710,20 +684,14 @@ function TallyScreen(props?: TallyScreenProps) {
 
         // Refresh allocations and log entries
         const canViewLogs = hasPermission('can_view_tally_logs');
-        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+        setAllocations(allocationsRes.data);
         
         if (canViewLogs) {
-          promises.push(tallyLogEntriesApi.getBySession(sessionId));
-        }
-        
-        const results = await Promise.all(promises);
-        setAllocations(results[0].data);
-        
-        if (canViewLogs && results[1]) {
-          setLogEntries(results[1].data);
+          const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+          setLogEntries(logEntriesRes.data);
         }
       } catch (error: any) {
-        console.error('Error creating byproduct log entry:', error);
         const errorMessage = error.response?.data?.detail
           || error.message
           || 'Failed to log tally entry. Please try again.';
@@ -813,6 +781,10 @@ function TallyScreen(props?: TallyScreenProps) {
     async function createQuantityLogEntries(quantity: number) {
       setIsSubmitting(true);
       try {
+        if (!selectedByproductId) {
+          throw new Error('Byproduct ID is missing');
+        }
+        
         // Create log entries sequentially to avoid race conditions
         // Each entry has weight = 1, and the backend counts each entry as 1 bag
         for (let i = 0; i < quantity; i++) {
@@ -826,19 +798,12 @@ function TallyScreen(props?: TallyScreenProps) {
 
         // Refresh allocations and log entries
         const canViewLogs = hasPermission('can_view_tally_logs');
-        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+        setAllocations(allocationsRes.data);
         
         if (canViewLogs) {
-          promises.push(tallyLogEntriesApi.getBySession(sessionId));
-        }
-        
-        const results = await Promise.all(promises);
-        
-        // Update state first
-        setAllocations(results[0].data);
-        
-        if (canViewLogs && results[1]) {
-          setLogEntries(results[1].data);
+          const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+          setLogEntries(logEntriesRes.data);
         }
 
         // Close modal and reset after state updates
@@ -849,7 +814,6 @@ function TallyScreen(props?: TallyScreenProps) {
           setQuantityInput('1');
         }, 0);
       } catch (error: any) {
-        console.error('Error creating byproduct log entries:', error);
         const errorMessage = error.response?.data?.detail
           || error.message
           || 'Failed to log tally entries. Please try again.';
@@ -949,6 +913,10 @@ function TallyScreen(props?: TallyScreenProps) {
     async function createManualLogEntry() {
       setIsSubmitting(true);
       try {
+        if (!selectedWeightClassId) {
+          throw new Error('Weight classification ID is missing');
+        }
+        
         await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: selectedWeightClassId,
           role: tallyRole as TallyLogEntryRole,
@@ -965,20 +933,14 @@ function TallyScreen(props?: TallyScreenProps) {
 
         // Refresh allocations and log entries
         const canViewLogs = hasPermission('can_view_tally_logs');
-        const promises = [allocationDetailsApi.getBySession(sessionId)];
+        const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+        setAllocations(allocationsRes.data);
         
         if (canViewLogs) {
-          promises.push(tallyLogEntriesApi.getBySession(sessionId));
-        }
-        
-        const results = await Promise.all(promises);
-        setAllocations(results[0].data);
-        
-        if (canViewLogs && results[1]) {
-          setLogEntries(results[1].data);
+          const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
+          setLogEntries(logEntriesRes.data);
         }
       } catch (error: any) {
-        console.error('Error creating manual log entry:', error);
         const errorMessage = error.response?.data?.detail
           || error.message
           || 'Failed to log tally entry. Please try again.';
@@ -1124,7 +1086,7 @@ function TallyScreen(props?: TallyScreenProps) {
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Action</Text>
             </View>
             {filteredAllocations.length > 0 ? (
-              filteredAllocations.map((allocation) => {
+              filteredAllocations.map((allocation: AllocationDetails) => {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                 if (!wc) return null;
 
@@ -1149,7 +1111,7 @@ function TallyScreen(props?: TallyScreenProps) {
                       { flex: 1.5 },
                       isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
                     ]}>
-                      {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
+                      {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
                     </Text>
                     <View style={{ flex: 1, alignItems: 'center' }}>
                       <TouchableOpacity
@@ -1239,7 +1201,7 @@ function TallyScreen(props?: TallyScreenProps) {
             <Text style={[
               dynamicStyles.displayValue,
               (() => {
-                const allocation = showManualInput && selectedWeightClassId
+                const allocation: AllocationDetails | null = showManualInput && selectedWeightClassId !== null
                   ? getCurrentAllocation(selectedWeightClassId)
                   : currentAllocation;
                 if (!allocation) return {};
@@ -1257,14 +1219,14 @@ function TallyScreen(props?: TallyScreenProps) {
               })()
             ]}>
               {(() => {
-                const allocation = showManualInput && selectedWeightClassId
+                const allocation: AllocationDetails | null = showManualInput && selectedWeightClassId !== null
                   ? getCurrentAllocation(selectedWeightClassId)
                   : currentAllocation;
                 if (!allocation) return '- / -';
                 
                 const hasProgressData = 'allocated_bags_tally' in allocation;
                 if (!hasProgressData) {
-                  return `${allocation.required_bags}`;
+                  return `${(allocation as AllocationDetails).required_bags}`;
                 }
                 
                 const allocatedBags = tallyRole === 'tally' 
@@ -1595,7 +1557,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total Weight</Text>
                       </View>
-                      {dressedAllocations.map((allocation) => {
+                      {dressedAllocations.map((allocation: AllocationDetails) => {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
@@ -1623,7 +1585,7 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
+                              {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
                               {hasProgressData ? totalHeads.toFixed(0) : '-'}
@@ -1659,7 +1621,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total Weight</Text>
                       </View>
-                      {byproductAllocations.map((allocation) => {
+                      {byproductAllocations.map((allocation: AllocationDetails) => {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
@@ -1687,7 +1649,7 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {hasProgressData ? `${allocatedBags} / ${allocation.required_bags}` : `${allocation.required_bags} req`}
+                              {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
                               {hasProgressData ? totalHeads.toFixed(0) : '-'}
