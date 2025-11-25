@@ -4,10 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import { useResponsive } from '../utils/responsive';
+import { usePermissions } from '../utils/usePermissions';
 
 function HomeScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
+  const { hasPermission } = usePermissions();
+  const canStartTally = hasPermission('can_start_tally');
   const [stats, setStats] = useState({
     customers: 0,
     plants: 0,
@@ -181,10 +184,13 @@ function HomeScreen() {
         )}
 
         <TouchableOpacity
-          style={dynamicStyles.button}
+          style={[dynamicStyles.button, !canStartTally && { backgroundColor: '#95a5a6' }]}
           onPress={() => navigation.navigate('Sessions' as never, { screen: 'CreateTallySession' } as never)}
+          disabled={!canStartTally}
         >
-          <Text style={dynamicStyles.buttonText}>Create New Session</Text>
+          <Text style={dynamicStyles.buttonText}>
+            {canStartTally ? 'Create New Session' : 'No Permission to Create Sessions'}
+          </Text>
         </TouchableOpacity>
       </View>
       </ScrollView>

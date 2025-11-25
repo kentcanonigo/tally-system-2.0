@@ -11,12 +11,15 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions, setActiveSessions } from '../utils/activeSessions';
+import { usePermissions } from '../utils/usePermissions';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
   const { timezone } = useTimezone();
   const { activePlantId } = usePlant();
+  const { hasPermission } = usePermissions();
+  const canStartTally = hasPermission('can_start_tally');
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -431,8 +434,9 @@ function TallySessionsScreen() {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={dynamicStyles.calendarButton}
+            style={[dynamicStyles.calendarButton, !canStartTally && { opacity: 0.5 }]}
             onPress={() => navigation.navigate('CreateTallySession' as never)}
+            disabled={!canStartTally}
           >
             <MaterialIcons name="add" size={responsive.fontSize.large} color="#fff" />
           </TouchableOpacity>

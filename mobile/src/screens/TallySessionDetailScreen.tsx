@@ -960,10 +960,16 @@ function TallySessionDetailScreen() {
           {session.status === 'ongoing' && (
             <>
               <TouchableOpacity
-                style={[dynamicStyles.actionButton, styles.startTallyButton]}
+                style={[
+                  dynamicStyles.actionButton, 
+                  hasPermission('can_start_tally') ? styles.startTallyButton : styles.disabledButton
+                ]}
                 onPress={handleStartTally}
+                disabled={!hasPermission('can_start_tally')}
               >
-                <Text style={dynamicStyles.actionButtonText}>Start Tally</Text>
+                <Text style={dynamicStyles.actionButtonText}>
+                  {hasPermission('can_start_tally') ? 'Start Tally' : 'No Tally Permission'}
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -1446,6 +1452,9 @@ const styles = StyleSheet.create({
   },
   startTallyButton: {
     backgroundColor: '#27ae60',
+  },
+  disabledButton: {
+    backgroundColor: '#95a5a6',
   },
   deleteButton: {
     backgroundColor: '#e74c3c',
