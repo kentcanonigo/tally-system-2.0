@@ -24,7 +24,7 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
 
 def get_all_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
     """Get all users (for superadmin)."""
-    return db.query(User).offset(skip).limit(limit).all()
+    return db.query(User).order_by(User.id).offset(skip).limit(limit).all()
 
 
 def create_user(db: Session, user_data: UserCreate) -> User:

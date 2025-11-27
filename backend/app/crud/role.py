@@ -9,7 +9,7 @@ from ..schemas.role import RoleCreate, RoleUpdate
 
 def get_all_roles(db: Session, skip: int = 0, limit: int = 100) -> List[Role]:
     """Get all roles with pagination."""
-    return db.query(Role).offset(skip).limit(limit).all()
+    return db.query(Role).order_by(Role.id).offset(skip).limit(limit).all()
 
 
 def get_role_by_id(db: Session, role_id: int) -> Optional[Role]:
