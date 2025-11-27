@@ -50,7 +50,6 @@ function SettingsScreen() {
   const [isLoadingPlants, setIsLoadingPlants] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Update state when user data changes
   useEffect(() => {
@@ -94,74 +93,59 @@ function SettingsScreen() {
     }
   };
 
-  const handleSaveAllPreferences = async () => {
+  const handleSelectPlant = async (plantId: number) => {
+    setSelectedActivePlant(plantId);
+    setShowPlantDropdown(false);
+    
+    // Auto-save plant selection immediately
     try {
-      setIsSaving(true);
-      
-      const thresholdValue = parseFloat(threshold);
-      if (isNaN(thresholdValue) || thresholdValue < 0) {
-        Alert.alert('Error', 'Please enter a valid number for threshold (≥ 0)');
-        return;
-      }
-
       await updatePreferences({
-        timezone: selectedTimezone,
-        active_plant_id: selectedActivePlant,
-        acceptable_difference_threshold: thresholdValue,
-        visible_tabs: visibleTabs,
+        active_plant_id: plantId,
       });
-
-      // Update contexts for backward compatibility
-      await setTimezone(selectedTimezone);
-      if (selectedActivePlant) {
-        await setActivePlantId(selectedActivePlant);
-      }
-
-      Alert.alert('Success', 'All preferences saved successfully!');
+      
+      // Update context for backward compatibility
+      await setActivePlantId(plantId);
     } catch (error: any) {
-      console.error('Error saving preferences:', error);
-      Alert.alert('Error', error.message || 'Failed to save preferences');
-    } finally {
-      setIsSaving(false);
+      console.error('Error saving plant preference:', error);
+      Alert.alert('Error', error.message || 'Failed to save plant preference');
+      // Revert on error
+      setSelectedActivePlant(user?.active_plant_id || activePlantId);
     }
   };
 
-  const handleSelectPlant = (plantId: number) => {
-    setSelectedActivePlant(plantId);
-    setShowPlantDropdown(false);
-  };
-
-  const toggleTabVisibility = (tabKey: string) => {
-    setVisibleTabs(prev => {
-      if (prev.includes(tabKey)) {
-        // Don't allow hiding all tabs - keep at least one
-        if (prev.length <= 1) {
-          Alert.alert('Notice', 'You must have at least one tab visible.');
-          return prev;
-        }
-        return prev.filter(key => key !== tabKey);
-      } else {
-        return [...prev, tabKey];
+  const toggleTabVisibility = async (tabKey: string) => {
+    let newVisibleTabs: string[];
+    
+    if (visibleTabs.includes(tabKey)) {
+      // Don't allow hiding all tabs - keep at least one
+      if (visibleTabs.length <= 1) {
+        Alert.alert('Notice', 'You must have at least one tab visible.');
+        return;
       }
-    });
+      newVisibleTabs = visibleTabs.filter(key => key !== tabKey);
+    } else {
+      newVisibleTabs = [...visibleTabs, tabKey];
+    }
+    
+    setVisibleTabs(newVisibleTabs);
+    
+    // Auto-save tab visibility immediately
+    try {
+      await updatePreferences({
+        visible_tabs: newVisibleTabs,
+      });
+    } catch (error: any) {
+      console.error('Error saving tab visibility preference:', error);
+      Alert.alert('Error', error.message || 'Failed to save tab visibility preference');
+      // Revert on error
+      setVisibleTabs(getFilteredVisibleTabs(user?.visible_tabs));
+    }
   };
 
   const getActivePlantName = () => {
     if (!selectedActivePlant) return 'None Selected';
     const plant = plants.find(p => p.id === selectedActivePlant);
     return plant ? plant.name : 'Unknown Plant';
-  };
-
-  const hasUnsavedChanges = () => {
-    if (!user) return false;
-    
-    const thresholdValue = parseFloat(threshold);
-    return (
-      selectedTimezone !== (user.timezone || timezone) ||
-      selectedActivePlant !== (user.active_plant_id || activePlantId) ||
-      thresholdValue !== (user.acceptable_difference_threshold || 0) ||
-      JSON.stringify(visibleTabs.sort()) !== JSON.stringify((user.visible_tabs || AVAILABLE_TABS.map(t => t.key)).sort())
-    );
   };
 
   const getUserRoleLabel = () => {
@@ -413,6 +397,26 @@ function SettingsScreen() {
             style={dynamicStyles.input}
             value={threshold}
             onChangeText={setThreshold}
+            onBlur={async () => {
+              // Auto-save threshold on blur (when user finishes editing)
+              const thresholdValue = parseFloat(threshold);
+              if (isNaN(thresholdValue) || thresholdValue < 0) {
+                Alert.alert('Error', 'Please enter a valid number for threshold (≥ 0)');
+                setThreshold((user?.acceptable_difference_threshold || 0).toString());
+                return;
+              }
+
+              try {
+                await updatePreferences({
+                  acceptable_difference_threshold: thresholdValue,
+                });
+              } catch (error: any) {
+                console.error('Error saving threshold preference:', error);
+                Alert.alert('Error', error.message || 'Failed to save threshold preference');
+                // Revert on error
+                setThreshold((user?.acceptable_difference_threshold || 0).toString());
+              }
+            }}
             placeholder="0"
             keyboardType="decimal-pad"
             placeholderTextColor="#999"
@@ -448,19 +452,6 @@ function SettingsScreen() {
         </Text>
       </View>
 
-      {hasUnsavedChanges() && (
-        <TouchableOpacity 
-          style={[dynamicStyles.saveButton, { backgroundColor: '#27ae60', marginBottom: responsive.spacing.lg }]} 
-          onPress={handleSaveAllPreferences}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={dynamicStyles.saveButtonText}>💾 Save All Settings</Text>
-          )}
-        </TouchableOpacity>
-      )}
 
       <View style={dynamicStyles.section}>
         <Text style={dynamicStyles.sectionTitle}>Default Heads Amount</Text>
@@ -620,9 +611,24 @@ function SettingsScreen() {
                       index === availableTimezones.length - 1 && dynamicStyles.dropdownOptionLast,
                       selectedTimezone === tz && dynamicStyles.dropdownOptionSelected,
                     ]}
-                    onPress={() => {
+                    onPress={async () => {
                       setSelectedTimezone(tz);
                       setShowTimezoneDropdown(false);
+                      
+                      // Auto-save timezone selection immediately
+                      try {
+                        await updatePreferences({
+                          timezone: tz,
+                        });
+                        
+                        // Update context for backward compatibility
+                        await setTimezone(tz);
+                      } catch (error: any) {
+                        console.error('Error saving timezone preference:', error);
+                        Alert.alert('Error', error.message || 'Failed to save timezone preference');
+                        // Revert on error
+                        setSelectedTimezone(user?.timezone || timezone);
+                      }
                     }}
                   >
                     <Text

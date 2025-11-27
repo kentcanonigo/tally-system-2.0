@@ -537,7 +537,7 @@ function TallyTabScreen() {
                       ]}
                       numberOfLines={1}
                     >
-                      {getCustomerName(session.customer_id)}
+                      {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -570,7 +570,7 @@ function TallyTabScreen() {
                       ]}
                       numberOfLines={2}
                     >
-                      {getCustomerName(session.customer_id)}
+                      {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
                     </Text>
                   </TouchableOpacity>
                 );

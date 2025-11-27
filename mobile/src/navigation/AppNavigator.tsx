@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -36,17 +36,19 @@ function SessionsStack() {
 function MainTabs() {
   const { user } = useAuth();
   
-  // Get visible tabs from user preferences, default to all tabs
-  // Filter out 'Export' if it exists (legacy from when Export was a separate tab)
-  const userVisibleTabs = user?.visible_tabs?.filter(tab => tab !== 'Export') || [];
-  const visibleTabs = userVisibleTabs.length > 0 ? userVisibleTabs : [
-    'Home',
-    'Sessions',
-    'Tally',
-    'Customers',
-    'WeightClassifications',
-    'Calculator',
-  ];
+  // Memoize visible tabs to prevent unnecessary re-renders when other preferences change
+  // Only re-compute when visible_tabs actually changes
+  const visibleTabs = useMemo(() => {
+    const userVisibleTabs = user?.visible_tabs?.filter(tab => tab !== 'Export') || [];
+    return userVisibleTabs.length > 0 ? userVisibleTabs : [
+      'Home',
+      'Sessions',
+      'Tally',
+      'Customers',
+      'WeightClassifications',
+      'Calculator',
+    ];
+  }, [user?.visible_tabs]);
 
   // Helper to check if a tab should be visible
   const isTabVisible = (tabName: string) => {

@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     }
     
     try {
-      setLoading(true);
+      // Don't set loading state for preference updates to avoid navigation resets
       const response = await axios.put<User>(
         `${apiBaseUrl}/auth/me/preferences`,
         preferences,
@@ -146,8 +146,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
       const errorMessage = err.response?.data?.detail || 'Failed to update preferences';
       setError(errorMessage);
       throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
