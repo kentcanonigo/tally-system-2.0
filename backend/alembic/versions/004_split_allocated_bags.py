@@ -7,6 +7,7 @@ Create Date: 2024-01-04 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '004_split_allocated_bags'
@@ -62,16 +63,27 @@ def upgrade() -> None:
         op.add_column('allocation_details', sa.Column('allocated_bags_dispatcher', sa.Float(), nullable=True))
         
         # Migrate existing data: copy allocated_bags to both new fields
-        op.execute("UPDATE allocation_details SET allocated_bags_tally = allocated_bags")
-        op.execute("UPDATE allocation_details SET allocated_bags_dispatcher = allocated_bags")
+        op.execute(text("UPDATE allocation_details SET allocated_bags_tally = allocated_bags"))
+        op.execute(text("UPDATE allocation_details SET allocated_bags_dispatcher = allocated_bags"))
         
         # Make the new columns non-nullable
-        op.alter_column('allocation_details', 'allocated_bags_tally', nullable=False, server_default='0.0')
-        op.alter_column('allocation_details', 'allocated_bags_dispatcher', nullable=False, server_default='0.0')
-        
-        # Remove the server default (we only needed it for the migration)
-        op.alter_column('allocation_details', 'allocated_bags_tally', server_default=None)
-        op.alter_column('allocation_details', 'allocated_bags_dispatcher', server_default=None)
+        # SQL Server requires explicit type when altering NULL/NOT NULL
+        if dialect_name == 'mssql':
+            # SQL Server syntax: must specify type
+            op.execute(text("ALTER TABLE allocation_details ALTER COLUMN allocated_bags_tally FLOAT NOT NULL"))
+            op.execute(text("ALTER TABLE allocation_details ALTER COLUMN allocated_bags_dispatcher FLOAT NOT NULL"))
+        else:
+            # PostgreSQL and other databases
+            op.alter_column('allocation_details', 'allocated_bags_tally', 
+                          existing_type=sa.Float(), nullable=False, server_default='0.0')
+            op.alter_column('allocation_details', 'allocated_bags_dispatcher', 
+                          existing_type=sa.Float(), nullable=False, server_default='0.0')
+            
+            # Remove the server default (we only needed it for the migration)
+            op.alter_column('allocation_details', 'allocated_bags_tally', 
+                          existing_type=sa.Float(), server_default=None)
+            op.alter_column('allocation_details', 'allocated_bags_dispatcher', 
+                          existing_type=sa.Float(), server_default=None)
         
         # Drop the old allocated_bags column
         op.drop_column('allocation_details', 'allocated_bags')
@@ -122,11 +134,19 @@ def downgrade() -> None:
         op.add_column('allocation_details', sa.Column('allocated_bags', sa.Float(), nullable=True))
         
         # Migrate data back: use tally value
-        op.execute("UPDATE allocation_details SET allocated_bags = COALESCE(allocated_bags_tally, 0.0)")
+        op.execute(text("UPDATE allocation_details SET allocated_bags = COALESCE(allocated_bags_tally, 0.0)"))
         
         # Make it non-nullable
-        op.alter_column('allocation_details', 'allocated_bags', nullable=False, server_default='0.0')
-        op.alter_column('allocation_details', 'allocated_bags', server_default=None)
+        # SQL Server requires explicit type when altering NULL/NOT NULL
+        if dialect_name == 'mssql':
+            # SQL Server syntax: must specify type
+            op.execute(text("ALTER TABLE allocation_details ALTER COLUMN allocated_bags FLOAT NOT NULL"))
+        else:
+            # PostgreSQL and other databases
+            op.alter_column('allocation_details', 'allocated_bags', 
+                          existing_type=sa.Float(), nullable=False, server_default='0.0')
+            op.alter_column('allocation_details', 'allocated_bags', 
+                          existing_type=sa.Float(), server_default=None)
         
         # Drop the new columns
         op.drop_column('allocation_details', 'allocated_bags_dispatcher')

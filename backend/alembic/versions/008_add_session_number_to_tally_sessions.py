@@ -117,7 +117,14 @@ def upgrade() -> None:
             op.create_index('idx_customer_session_number', 'tally_sessions', ['customer_id', 'session_number'], unique=False)
         else:
             # PostgreSQL and other databases: use ALTER COLUMN
-            op.alter_column('tally_sessions', 'session_number', nullable=False)
+            # SQL Server requires explicit type when altering NULL/NOT NULL
+            if dialect_name == 'mssql':
+                # SQL Server syntax: must specify type
+                op.execute(text("ALTER TABLE tally_sessions ALTER COLUMN session_number INT NOT NULL"))
+            else:
+                # PostgreSQL and other databases
+                op.alter_column('tally_sessions', 'session_number', 
+                              existing_type=sa.Integer(), nullable=False)
             
             # Add unique constraint on (customer_id, session_number)
             op.create_unique_constraint(
