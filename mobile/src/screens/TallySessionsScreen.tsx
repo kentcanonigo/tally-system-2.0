@@ -24,7 +24,7 @@ function TallySessionsScreen() {
   const { timezone } = useTimezone();
   const { activePlantId } = usePlant();
   const { hasPermission } = usePermissions();
-  const canStartTally = hasPermission('can_start_tally');
+  const canStartTally = hasPermission('can_tally');
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
   const [customers, setCustomers] = useState<Customer[]>([]);

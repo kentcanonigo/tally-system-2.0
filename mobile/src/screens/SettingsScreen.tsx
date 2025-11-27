@@ -77,7 +77,7 @@ function SettingsScreen() {
     
     try {
       const response = await plantsApi.getAll();
-      const fetchedPlants = response.data;
+      const fetchedPlants = response.data || [];
       setPlants(fetchedPlants);
       
       // If active plant ID is set but the plant doesn't exist in the fetched list (404 scenario),
@@ -114,6 +114,8 @@ function SettingsScreen() {
       }
     } catch (error: any) {
       console.error('Error fetching plants:', error);
+      // Set plants to empty array on error so UI can still render
+      setPlants([]);
       // If we get a 404 or the active plant doesn't exist, set it to null
       const currentActivePlantId = selectedActivePlant || activePlantId;
       if (error.response?.status === 404 || currentActivePlantId) {
@@ -128,7 +130,8 @@ function SettingsScreen() {
         }
       }
       if (!isRefresh) {
-        Alert.alert('Error', 'Failed to load plants');
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load plants';
+        Alert.alert('Error', errorMessage);
       }
     } finally {
       setIsLoadingPlants(false);
@@ -630,6 +633,13 @@ function SettingsScreen() {
                     None
                   </Text>
                 </TouchableOpacity>
+                {plants.length === 0 && !isLoadingPlants && (
+                  <View style={[dynamicStyles.dropdownOption, dynamicStyles.dropdownOptionLast]}>
+                    <Text style={[dynamicStyles.dropdownOptionText, { fontStyle: 'italic', color: '#7f8c8d' }]}>
+                      No plants available. Please contact your administrator.
+                    </Text>
+                  </View>
+                )}
                 {plants.map((plant, index) => (
                   <TouchableOpacity
                     key={plant.id}

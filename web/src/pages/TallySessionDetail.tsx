@@ -289,7 +289,7 @@ function TallySessionDetail() {
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        {hasPermission('can_edit_tally_entries') && (
+        {hasPermission('can_edit_tally_allocations') && (
           <button className="btn btn-primary" onClick={handleCreate}>
             Add Allocation
           </button>
@@ -308,7 +308,7 @@ function TallySessionDetail() {
             Export PDF
           </button>
         )}
-        {hasPermission('can_delete_tally_entries') && (
+        {hasPermission('can_delete_tally_allocations') && (
           <>
             <button 
               className="btn btn-warning" 
@@ -345,7 +345,7 @@ function TallySessionDetail() {
               ) : (
                 <th>Required</th>
               )}
-              {(hasPermission('can_edit_tally_entries') || hasPermission('can_delete_tally_entries')) && (
+              {(hasPermission('can_edit_tally_allocations') || hasPermission('can_delete_tally_allocations')) && (
                 <th>Actions</th>
               )}
             </tr>
@@ -382,9 +382,9 @@ function TallySessionDetail() {
                   ) : (
                     <td>{allocation.required_bags} req</td>
                   )}
-                  {(hasPermission('can_edit_tally_entries') || hasPermission('can_delete_tally_entries')) && (
+                  {(hasPermission('can_edit_tally_allocations') || hasPermission('can_delete_tally_allocations')) && (
                     <td>
-                      {hasPermission('can_edit_tally_entries') && (
+                      {hasPermission('can_edit_tally_allocations') && (
                         <button
                           className="btn btn-secondary"
                           onClick={() => handleEdit(allocation)}
@@ -393,7 +393,7 @@ function TallySessionDetail() {
                           Edit
                         </button>
                       )}
-                      {hasPermission('can_delete_tally_entries') && (
+                      {hasPermission('can_delete_tally_allocations') && (
                         <button className="btn btn-danger" onClick={() => handleDelete(allocation.id)}>
                           Delete
                         </button>

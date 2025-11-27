@@ -20,10 +20,10 @@ def create_tally_log_entry(
     session_id: int,
     log_entry: TallyLogEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_start_tally"))
+    current_user: User = Depends(require_permission("can_tally"))
 ):
     """
-    Create a new tally log entry for a session. Requires 'can_start_tally' permission.
+    Create a new tally log entry for a session. Requires 'can_tally' permission.
     This will also automatically increment the corresponding allocation detail.
     """
     # Verify session exists
@@ -94,9 +94,9 @@ def get_tally_log_entry(
 def delete_tally_log_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_start_tally"))
+    current_user: User = Depends(require_permission("can_tally"))
 ):
-    """Delete a tally log entry. Requires 'can_start_tally' permission."""
+    """Delete a tally log entry. Requires 'can_tally' permission."""
     entry = crud.delete_tally_log_entry(db, entry_id=entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")

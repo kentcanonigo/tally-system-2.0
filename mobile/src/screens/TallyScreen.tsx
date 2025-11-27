@@ -35,7 +35,7 @@ function TallyScreen(props?: TallyScreenProps) {
   const { hasPermission } = usePermissions();
   
   // Check if user has permission to start/add tally entries
-  const canStartTally = hasPermission('can_start_tally');
+  const canStartTally = hasPermission('can_tally');
   
   // Consistent disabled styling for input elements
   const disabledInputStyle = !canStartTally ? { opacity: 0.5, backgroundColor: '#d5d8dc' } : {};

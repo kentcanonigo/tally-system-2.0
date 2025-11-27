@@ -10,9 +10,9 @@ import { usePlant } from '../contexts/PlantContext';
 function HomeScreen() {
   const navigation = useNavigation();
   const responsive = useResponsive();
-  const { hasAllPermissions } = usePermissions();
+  const { hasPermission } = usePermissions();
   const { activePlantId, isLoading: isPlantLoading } = usePlant();
-  const canStartTally = hasAllPermissions(['can_start_tally', 'can_edit_tally_session', 'can_edit_tally_entries']);
+  const canStartTally = hasPermission('can_create_tally_sessions');
   const [stats, setStats] = useState({
     customers: 0,
     activePlantName: 'None',

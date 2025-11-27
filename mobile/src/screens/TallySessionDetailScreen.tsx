@@ -961,13 +961,13 @@ function TallySessionDetailScreen() {
               <TouchableOpacity
                 style={[
                   dynamicStyles.actionButton, 
-                  hasPermission('can_start_tally') ? styles.startTallyButton : styles.disabledButton
+                  hasPermission('can_tally') ? styles.startTallyButton : styles.disabledButton
                 ]}
                 onPress={handleStartTally}
-                disabled={!hasPermission('can_start_tally')}
+                disabled={!hasPermission('can_tally')}
               >
                 <Text style={dynamicStyles.actionButtonText}>
-                  {hasPermission('can_start_tally') ? 'Start Tally' : 'No Tally Permission'}
+                  {hasPermission('can_tally') ? 'Start Tally' : 'No Tally Permission'}
                 </Text>
               </TouchableOpacity>
             </>

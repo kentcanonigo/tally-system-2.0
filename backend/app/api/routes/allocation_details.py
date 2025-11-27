@@ -23,13 +23,13 @@ router = APIRouter()
 def read_allocation_details_by_session(
     session_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(["can_start_tally", "can_view_tally_logs"]))
+    current_user: User = Depends(require_any_permission(["can_tally", "can_view_tally_logs"]))
 ):
     """
     Get allocation details for a tally session.
     
     Permissions:
-    - 'can_start_tally': Returns minimal data (requirements only, no progress)
+    - 'can_tally': Returns minimal data (requirements only, no progress)
     - 'can_view_tally_logs': Returns full data (includes progress/completion)
     
     Response varies based on user permissions.
@@ -57,13 +57,13 @@ def read_allocation_details_by_session(
 def read_allocation_detail(
     allocation_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(["can_start_tally", "can_view_tally_logs"]))
+    current_user: User = Depends(require_any_permission(["can_tally", "can_view_tally_logs"]))
 ):
     """
     Get a specific allocation detail.
     
     Permissions:
-    - 'can_start_tally': Returns minimal data (requirements only, no progress)
+    - 'can_tally': Returns minimal data (requirements only, no progress)
     - 'can_view_tally_logs': Returns full data (includes progress/completion)
     
     Response varies based on user permissions.
@@ -89,9 +89,9 @@ def create_allocation_detail(
     session_id: int,
     allocation_detail: AllocationDetailsCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_edit_tally_entries"))
+    current_user: User = Depends(require_permission("can_edit_tally_allocations"))
 ):
-    """Create allocation detail. Requires 'can_edit_tally_entries' permission."""
+    """Create allocation detail. Requires 'can_edit_tally_allocations' permission."""
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -117,9 +117,9 @@ def update_allocation_detail(
     allocation_id: int,
     allocation_detail: AllocationDetailsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_edit_tally_entries"))
+    current_user: User = Depends(require_permission("can_edit_tally_allocations"))
 ):
-    """Update allocation detail. Requires 'can_edit_tally_entries' permission."""
+    """Update allocation detail. Requires 'can_edit_tally_allocations' permission."""
     # Verify weight classification exists if it's being updated
     if allocation_detail.weight_classification_id is not None:
         wc = wc_crud.get_weight_classification(db, wc_id=allocation_detail.weight_classification_id)
@@ -141,9 +141,9 @@ def update_allocation_detail(
 def delete_allocation_detail(
     allocation_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+    current_user: User = Depends(require_permission("can_delete_tally_allocations"))
 ):
-    """Delete allocation detail. Requires 'can_delete_tally_entries' permission."""
+    """Delete allocation detail. Requires 'can_delete_tally_allocations' permission."""
     success = crud.delete_allocation_detail(db, allocation_id=allocation_id)
     if not success:
         raise HTTPException(status_code=404, detail="Allocation detail not found")
@@ -154,11 +154,11 @@ def delete_allocation_detail(
 def reset_tally_allocations(
     session_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+    current_user: User = Depends(require_permission("can_delete_tally_allocations"))
 ):
     """
     Delete all TALLY role log entries for a session and recalculate allocated_bags_tally.
-    Requires 'can_delete_tally_entries' permission.
+    Requires 'can_delete_tally_allocations' permission.
     """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
@@ -177,11 +177,11 @@ def reset_tally_allocations(
 def reset_dispatcher_allocations(
     session_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_delete_tally_entries"))
+    current_user: User = Depends(require_permission("can_delete_tally_allocations"))
 ):
     """
     Delete all DISPATCHER role log entries for a session and recalculate allocated_bags_dispatcher.
-    Requires 'can_delete_tally_entries' permission.
+    Requires 'can_delete_tally_allocations' permission.
     """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)

@@ -55,7 +55,7 @@ class AllocationDetailsResponse(AllocationDetailsBase):
 
 class AllocationDetailsMinimalResponse(BaseModel):
     """
-    Minimal allocation details for tally operators with only can_start_tally permission.
+    Minimal allocation details for tally operators with only can_tally permission.
     Shows ONLY what needs to be tallied (requirements), without progress/completion data.
     """
     id: int

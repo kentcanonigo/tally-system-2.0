@@ -7,23 +7,19 @@ This document outlines all available permissions in the Tally System RBAC implem
 ### 1. Tally Management (`tally`)
 Core tally operations for daily use.
 
-| Permission Code | Name | Description | Typical Users |
-|----------------|------|-------------|---------------|
-| `can_start_tally` | Can Start Tally | Create new tally sessions | Tally Operators, Supervisors |
-| `can_view_tally_logs` | Can See Tally Logs | View tally log entries | All Staff |
-| `can_edit_tally_session` | Can Edit Tally Session | Edit tally session details | Supervisors, Managers |
-| `can_complete_tally` | Can Complete Tally | Mark tally sessions as completed | Supervisors, Managers |
-| `can_cancel_tally` | Can Cancel Tally | Cancel tally sessions | Supervisors, Managers |
-| `can_delete_tally_session` | Can Delete Tally Session | Delete tally sessions (dangerous!) | Managers only |
-| `can_edit_tally_entries` | Can Edit Tally Entries | Edit tally log entries | Supervisors, Managers |
-| `can_delete_tally_entries` | Can Delete Tally Entries | Delete tally log entries | Managers only |
+| Permission Code | Name | Description | Backend Enforced | Typical Users |
+|----------------|------|-------------|------------------|---------------|
+| `can_create_tally_sessions` | Can Create Tally Sessions | Create new tally sessions | ✅ Yes | Tally Operators, Supervisors |
+| `can_tally` | Can Tally | Add entries to tally logs (create and delete log entries). **Note:** This does NOT allow viewing logs - use `can_view_tally_logs` for that. | ✅ Yes | Tally Operators |
+| `can_view_tally_logs` | Can View Tally Logs | View tally log entries and full allocation details (with progress/completion data) | ✅ Yes | All Staff |
+| `can_edit_tally_session` | Can Edit Tally Session | Edit session details (customer, plant, date) | ✅ Yes | Supervisors, Managers |
+| `can_complete_tally` | Can Complete Tally | Mark tally sessions as completed | ✅ Yes | Supervisors, Managers |
+| `can_cancel_tally` | Can Cancel Tally | Cancel tally sessions | ✅ Yes | Supervisors, Managers |
+| `can_delete_tally_session` | Can Delete Tally Session | Delete tally sessions (dangerous!) | ✅ Yes | Managers only |
+| `can_edit_tally_allocations` | Can Edit Tally Allocations | Create and update allocation details | ✅ Yes | Supervisors, Managers |
+| `can_delete_tally_allocations` | Can Delete Tally Allocations | Delete allocation details and reset allocations | ✅ Yes | Managers only |
 
-**⚠️ Important:** To create tally sessions, users must have **all three** of these permissions:
-- `can_start_tally`
-- `can_edit_tally_session`
-- `can_edit_tally_entries`
-
-All three permissions are required. If a role is missing any of these permissions, users with that role will not be able to create new tally sessions.
+**Note:** All permissions listed above are now properly enforced in the backend API. The UI checks are in addition to backend enforcement for better user experience.
 
 ### 2. Management (`management`)
 Basic data management operations.
@@ -99,8 +95,9 @@ Data export and reporting capabilities.
 ### Tally Operator
 **Purpose:** Daily tally operations
 **Permissions:**
-- `can_start_tally`
-- `can_view_tally_logs`
+- `can_create_tally_sessions` - Create new sessions
+- `can_tally` - Add entries to tally logs (create and delete log entries)
+- `can_view_tally_logs` - View log entries and allocation details (optional - for viewing progress)
 - `can_view_weight_classes` (if implemented)
 - `can_view_customers` (if implemented)
 
@@ -126,9 +123,11 @@ Data export and reporting capabilities.
 - `can_manage_roles`
 - `can_manage_customers`
 - `can_manage_weight_classes`
-- `can_start_tally`
+- `can_create_tally_sessions` - Create new sessions
+- `can_tally` - Add entries to tally logs
 - `can_view_tally_logs`
 - `can_edit_tally_session`
+- `can_edit_tally_allocations`
 - `can_complete_tally`
 - `can_cancel_tally`
 - `can_export_data`
@@ -163,16 +162,16 @@ These permissions should be assigned carefully:
 - **`can_delete_users`** - Can remove user accounts
 - **`can_delete_roles`** - Could affect many users
 - **`can_delete_tally_session`** - Removes historical data
-- **`can_delete_tally_entries`** - Alters records
+- **`can_delete_tally_allocations`** - Alters records
 
 ### Combined with Plant Access
 
 Remember: Permissions control **what** users can do, but **plant permissions** control **where** they can do it.
 
 **Example:**
-- User has `can_start_tally` permission
+- User has `can_tally` permission
 - User has access to Plant A and Plant B
-- Result: User can start tallies in Plants A and B, but NOT Plant C
+- Result: User can add tally entries in Plants A and B, but NOT Plant C
 
 **Exception:**
 - Users with SUPERADMIN role have access to ALL plants automatically
@@ -218,9 +217,13 @@ The web dashboard automatically shows/hides or disables UI elements based on use
 - `POST /api/v1/roles/{id}/permissions` - Requires: `can_assign_permissions`
 
 ### Tally Operations
-- `POST /api/v1/tally-sessions` - Requires: `can_start_tally`
-- `POST /api/v1/tally-log-entries` - Requires: `can_start_tally`
+- `POST /api/v1/tally-sessions` - Requires: `can_create_tally_sessions`
+- `POST /api/v1/tally-log-entries` - Requires: `can_tally`
+- `DELETE /api/v1/tally-log-entries/{id}` - Requires: `can_tally`
 - `GET /api/v1/tally-log-entries` - Requires: `can_view_tally_logs`
+- `POST /api/v1/tally-sessions/{id}/allocations` - Requires: `can_edit_tally_allocations`
+- `PUT /api/v1/allocations/{id}` - Requires: `can_edit_tally_allocations`
+- `DELETE /api/v1/allocations/{id}` - Requires: `can_delete_tally_allocations`
 
 ### Management Operations
 - `POST/PUT/DELETE /api/v1/weight-classifications` - Requires: `can_manage_weight_classes`

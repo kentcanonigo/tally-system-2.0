@@ -146,7 +146,7 @@ class Permission(Base):
 ```
 
 **Fields:**
-- `code`: Unique permission code (e.g., "can_start_tally", "can_manage_users")
+- `code`: Unique permission code (e.g., "can_tally", "can_manage_users")
 - `name`: Human-readable permission name
 - `description`: Optional description of what the permission allows
 - `category`: Permission category (e.g., "tally", "user_management", "role_management")
@@ -389,7 +389,7 @@ Authorization: Bearer <token>
   "plant_ids": [1, 2, 3],
   "role_ids": [1],
   "permissions": [
-    "can_start_tally",
+    "can_tally",
     "can_view_tally_logs",
     "can_manage_weight_classes",
     "can_manage_customers",
@@ -451,9 +451,9 @@ Authorization: Bearer <token>
   "permissions": [
     {
       "id": 1,
-      "code": "can_start_tally",
-      "name": "Can Start Tally",
-      "description": "Create new tally sessions",
+      "code": "can_tally",
+      "name": "Can Tally",
+      "description": "Add entries to tally logs (create and delete log entries)",
       "category": "tally"
     },
     ...
@@ -646,7 +646,7 @@ SUPERADMIN and ADMIN users can create custom roles with specific permission sets
 - Cannot be system roles
 
 **Example Custom Roles:**
-- **Tally Operator**: `can_start_tally`, `can_view_tally_logs`
+- **Tally Operator**: `can_tally`, `can_view_tally_logs`
 - **Inventory Manager**: `can_manage_weight_classes`, `can_complete_tally`, `can_export_data`
 - **HR Manager**: `can_manage_users`, `can_assign_basic_roles`, `can_delete_users`
 
@@ -693,7 +693,7 @@ def require_permission(permission_code: str):
     Users with SUPERADMIN role bypass all permission checks.
     
     Args:
-        permission_code: The permission code to check (e.g., "can_start_tally")
+        permission_code: The permission code to check (e.g., "can_tally")
     
     Returns:
         Dependency function that checks if user has the permission
@@ -801,10 +801,10 @@ async def list_users(
 @router.post("/tally-sessions")
 async def create_tally_session(
     session_data: TallySessionCreate,
-    current_user: User = Depends(require_permission("can_start_tally")),
+    current_user: User = Depends(require_permission("can_create_tally_sessions")),
     db: Session = Depends(get_db)
 ):
-    # Requires 'can_start_tally' permission
+    # Requires 'can_create_tally_sessions' permission
     pass
 
 # Plant-specific endpoint
@@ -823,11 +823,11 @@ async def create_plant_tally(
     plant_id: int,
     session_data: TallySessionCreate,
     current_user: User = Depends(
-        require_permission_and_plant_access("can_start_tally", plant_id)
+        require_permission_and_plant_access("can_create_tally_sessions", plant_id)
     ),
     db: Session = Depends(get_db)
 ):
-    # Requires 'can_start_tally' permission AND access to the plant
+    # Requires 'can_create_tally_sessions' permission AND access to the plant
     pass
 ```
 
@@ -840,7 +840,7 @@ from app.crud import user as user_crud
 
 # Get user's permissions as a list of permission codes
 permissions = user_crud.get_user_permissions(db, user_id)
-# Returns: ["can_start_tally", "can_view_tally_logs", "can_manage_customers", ...]
+# Returns: ["can_tally", "can_view_tally_logs", "can_manage_customers", ...]
 
 # Get user's role IDs
 role_ids = user_crud.get_user_role_ids(db, user_id)
@@ -957,7 +957,7 @@ if (!hasPermission('can_manage_customers')) {
 }
 
 // Check if user has any of the permissions
-if (!hasAnyPermission(['can_start_tally', 'can_edit_tally_session'])) {
+if (!hasAnyPermission(['can_tally', 'can_edit_tally_session'])) {
   return <div>You don't have permission to perform tally operations</div>;
 }
 
@@ -1297,7 +1297,7 @@ print(user_roles)  # Should include 'SUPERADMIN'
 ```python
 @router.post("/endpoint")
 async def my_endpoint(
-    current_user: User = Depends(require_permission("can_start_tally")),
+    current_user: User = Depends(require_permission("can_tally")),
     db: Session = Depends(get_db)
 ):
     pass
@@ -1334,7 +1334,7 @@ Creates the RBAC system tables:
 
 **Seeded Data:**
 - System roles: SUPERADMIN, ADMIN
-- Initial permissions: `can_start_tally`, `can_view_tally_logs`, `can_manage_weight_classes`, `can_manage_customers`
+- Initial permissions: `can_tally`, `can_view_tally_logs`, `can_manage_weight_classes`, `can_manage_customers`
 - SUPERADMIN role gets all permissions
 - ADMIN role gets basic permissions
 - Existing users migrated to new role system

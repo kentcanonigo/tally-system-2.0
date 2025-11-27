@@ -230,7 +230,7 @@ function TallySessions() {
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {hasAllPermissions(['can_start_tally', 'can_edit_tally_entries', 'can_edit_tally_session']) && (
+        {hasPermission('can_create_tally_sessions') && (
           <button 
             className="btn btn-primary" 
             onClick={handleCreate}
