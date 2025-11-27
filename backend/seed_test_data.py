@@ -48,7 +48,7 @@ DRESSED_CLASSIFICATIONS = [
     {"classification": "P2", "min_weight": 13.50, "max_weight": 14.99, "description": None},
     {"classification": "P1", "min_weight": 12.00, "max_weight": 13.49, "description": None},
     {"classification": "US", "min_weight": 10.50, "max_weight": 11.99, "description": None},
-    {"classification": "SQ", "min_weight": None, "max_weight": None, "description": None},
+    {"classification": "SQ", "min_weight": None, "max_weight": 10.49, "description": None},
 ]
 
 BYPRODUCT_CLASSIFICATIONS = [

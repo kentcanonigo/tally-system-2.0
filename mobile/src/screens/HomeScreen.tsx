@@ -168,6 +168,7 @@ function HomeScreen() {
           marginTop: responsive.isTablet ? 40 : 28,
           marginHorizontal: responsive.padding.medium,
           marginBottom: responsive.spacing.lg,
+          borderColor: activePlantId ? '#27ae60' : '#e74c3c',
         }]}>
           <Text style={[styles.activePlantLabel, {
             fontSize: responsive.fontSize.small,
@@ -177,8 +178,9 @@ function HomeScreen() {
           </Text>
           <Text style={[styles.activePlantName, {
             fontSize: responsive.isTablet ? 48 : 36,
+            color: activePlantId ? '#27ae60' : '#e74c3c',
           }]} numberOfLines={2}>
-            {stats.activePlantName}
+            {activePlantId ? stats.activePlantName : 'No active plant!'}
           </Text>
         </View>
 

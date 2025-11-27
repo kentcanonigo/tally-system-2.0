@@ -38,7 +38,8 @@ function SettingsScreen() {
   const [selectedTimezone, setSelectedTimezone] = useState(user?.timezone || timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [threshold, setThreshold] = useState<string>((user?.acceptable_difference_threshold || 0).toString());
-  const [selectedActivePlant, setSelectedActivePlant] = useState<number | null>(user?.active_plant_id || activePlantId);
+  const [selectedActivePlant, setSelectedActivePlant] = useState<number | null>(user?.active_plant_id ?? activePlantId);
+  const [userExplicitlySetPlant, setUserExplicitlySetPlant] = useState(false);
   
   const [visibleTabs, setVisibleTabs] = useState<string[]>(
     getFilteredVisibleTabs(user?.visible_tabs)
@@ -54,13 +55,26 @@ function SettingsScreen() {
 
   // Update state when user data changes
   useEffect(() => {
-    if (user) {
+    if (user && !userExplicitlySetPlant) {
+      // Only sync from user data if user hasn't explicitly set the plant in this session
       setSelectedTimezone(user.timezone || timezone);
       setThreshold((user.acceptable_difference_threshold || 0).toString());
-      setSelectedActivePlant(user.active_plant_id || activePlantId);
+      // Only update if user.active_plant_id is explicitly set (including null)
+      // Don't override with activePlantId from context if user preference is explicitly null
+      if (user.active_plant_id !== undefined) {
+        setSelectedActivePlant(user.active_plant_id);
+      } else if (activePlantId !== undefined) {
+        // Only use context value if user preference is not set
+        setSelectedActivePlant(activePlantId);
+      }
+      setVisibleTabs(getFilteredVisibleTabs(user.visible_tabs));
+    } else if (user) {
+      // Still update other fields even if plant was explicitly set
+      setSelectedTimezone(user.timezone || timezone);
+      setThreshold((user.acceptable_difference_threshold || 0).toString());
       setVisibleTabs(getFilteredVisibleTabs(user.visible_tabs));
     }
-  }, [user, timezone, activePlantId]);
+  }, [user, timezone]);
 
   // Load data on mount
   useEffect(() => {
@@ -82,7 +96,7 @@ function SettingsScreen() {
       
       // If active plant ID is set but the plant doesn't exist in the fetched list (404 scenario),
       // set active plant to null
-      const currentActivePlantId = selectedActivePlant || activePlantId;
+      const currentActivePlantId = selectedActivePlant ?? activePlantId;
       if (currentActivePlantId && !fetchedPlants.find(p => p.id === currentActivePlantId)) {
         console.log('Active plant not found in fetched plants, setting to null');
         setSelectedActivePlant(null);
@@ -94,22 +108,30 @@ function SettingsScreen() {
         } catch (prefError) {
           console.error('Error updating preferences:', prefError);
         }
-      } else if (user?.active_plant_id && !activePlantId && fetchedPlants.length > 0) {
-        // First time opening app: if user has an active_plant_id preference but it's not set in context,
-        // automatically set it as the active plant
-        const plantToSet = fetchedPlants.find(p => p.id === user.active_plant_id);
-        if (plantToSet) {
-          console.log('First time setup: Setting active plant to', plantToSet.name, 'from user preferences');
-          setSelectedActivePlant(plantToSet.id);
-          await setActivePlantId(plantToSet.id);
+      } else if (userExplicitlySetPlant) {
+        // If user has explicitly set the plant (including "None"), don't override it
+        // Just ensure context is in sync
+        if (selectedActivePlant !== activePlantId) {
+          await setActivePlantId(selectedActivePlant);
         }
-      } else if (!currentActivePlantId && fetchedPlants.length > 0 && user?.active_plant_id) {
-        // If user has an active_plant_id but it's not in the current state, set it
+      } else if (selectedActivePlant === null && user?.active_plant_id !== null && user?.active_plant_id !== undefined && fetchedPlants.length > 0) {
+        // If UI shows null but user preference has a plant, sync from user preference
+        // This handles the case where the component was initialized with null but user has a preference
         const plantToSet = fetchedPlants.find(p => p.id === user.active_plant_id);
         if (plantToSet) {
           console.log('Syncing active plant from user preferences:', plantToSet.name);
           setSelectedActivePlant(plantToSet.id);
           await setActivePlantId(plantToSet.id);
+        }
+      } else if (selectedActivePlant !== null && user?.active_plant_id !== null && user?.active_plant_id !== undefined && fetchedPlants.length > 0) {
+        // If both have values but they don't match, prefer user preference
+        if (selectedActivePlant !== user.active_plant_id) {
+          const plantToSet = fetchedPlants.find(p => p.id === user.active_plant_id);
+          if (plantToSet) {
+            console.log('Syncing active plant from user preferences (mismatch):', plantToSet.name);
+            setSelectedActivePlant(plantToSet.id);
+            await setActivePlantId(plantToSet.id);
+          }
         }
       }
     } catch (error: any) {
@@ -117,7 +139,7 @@ function SettingsScreen() {
       // Set plants to empty array on error so UI can still render
       setPlants([]);
       // If we get a 404 or the active plant doesn't exist, set it to null
-      const currentActivePlantId = selectedActivePlant || activePlantId;
+      const currentActivePlantId = selectedActivePlant ?? activePlantId;
       if (error.response?.status === 404 || currentActivePlantId) {
         setSelectedActivePlant(null);
         await setActivePlantId(null);
@@ -154,6 +176,7 @@ function SettingsScreen() {
 
   const handleSelectPlant = async (plantId: number | null) => {
     setSelectedActivePlant(plantId);
+    setUserExplicitlySetPlant(true); // Mark that user has explicitly set the plant
     setShowPlantDropdown(false);
     
     // Auto-save plant selection immediately
@@ -168,7 +191,8 @@ function SettingsScreen() {
       console.error('Error saving plant preference:', error);
       Alert.alert('Error', error.message || 'Failed to save plant preference');
       // Revert on error
-      setSelectedActivePlant(user?.active_plant_id || activePlantId);
+      setSelectedActivePlant(user?.active_plant_id ?? activePlantId);
+      setUserExplicitlySetPlant(false);
     }
   };
 
