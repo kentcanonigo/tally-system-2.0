@@ -15,7 +15,7 @@ function HomeScreen() {
   const canStartTally = hasPermission('can_start_tally');
   const [stats, setStats] = useState({
     customers: 0,
-    plants: 0,
+    activePlantName: 'None',
     sessions: 0,
     ongoingSessions: 0,
   });
@@ -40,15 +40,19 @@ function HomeScreen() {
       if (!activePlantId) {
         setStats({
           customers: 0,
-          plants: 0,
+          activePlantName: 'None',
           sessions: 0,
           ongoingSessions: 0,
         });
         return;
       }
 
-      // Fetch sessions filtered by active plant
-      const sessionsRes = await tallySessionsApi.getAll({ plant_id: activePlantId });
+      // Fetch sessions and plants filtered by active plant
+      const [sessionsRes, plantsRes] = await Promise.all([
+        tallySessionsApi.getAll({ plant_id: activePlantId }),
+        plantsApi.getAll(),
+      ]);
+      
       const sessions = sessionsRes.data;
       const ongoingSessions = sessions.filter((s) => s.status === 'ongoing').length;
 
@@ -56,9 +60,13 @@ function HomeScreen() {
       const customerIds = new Set(sessions.map((s) => s.customer_id));
       const uniqueCustomerCount = customerIds.size;
 
+      // Get active plant name
+      const activePlant = plantsRes.data.find(p => p.id === activePlantId);
+      const activePlantName = activePlant?.name || 'None';
+
       setStats({
         customers: uniqueCustomerCount,
-        plants: 1, // Only showing the active plant
+        activePlantName,
         sessions: sessions.length,
         ongoingSessions,
       });
@@ -153,15 +161,33 @@ function HomeScreen() {
           <Text style={dynamicStyles.subtitle}>Dashboard</Text>
         </View>
 
+        {/* Active Plant - Main Attraction */}
+        <View style={[styles.activePlantContainer, { 
+          paddingVertical: responsive.isTablet ? 48 : 32,
+          paddingHorizontal: responsive.padding.large,
+          marginTop: responsive.isTablet ? 40 : 28,
+          marginHorizontal: responsive.padding.medium,
+          marginBottom: responsive.spacing.lg,
+        }]}>
+          <Text style={[styles.activePlantLabel, {
+            fontSize: responsive.fontSize.small,
+            marginBottom: responsive.spacing.sm,
+          }]}>
+            ACTIVE PLANT
+          </Text>
+          <Text style={[styles.activePlantName, {
+            fontSize: responsive.isTablet ? 48 : 36,
+          }]} numberOfLines={2}>
+            {stats.activePlantName}
+          </Text>
+        </View>
+
+        {/* Other Stats */}
         {responsive.isLargeTablet ? (
           <View style={styles.statsContainer}>
             <View style={dynamicStyles.statCard}>
               <Text style={dynamicStyles.statValue}>{stats.customers}</Text>
               <Text style={dynamicStyles.statLabel}>Customers</Text>
-            </View>
-            <View style={dynamicStyles.statCard}>
-              <Text style={dynamicStyles.statValue}>{stats.plants}</Text>
-              <Text style={dynamicStyles.statLabel}>Plants</Text>
             </View>
             <View style={dynamicStyles.statCard}>
               <Text style={dynamicStyles.statValue}>{stats.sessions}</Text>
@@ -173,29 +199,20 @@ function HomeScreen() {
             </View>
           </View>
         ) : (
-          <>
-            <View style={styles.statsContainer}>
-              <View style={dynamicStyles.statCard}>
-                <Text style={dynamicStyles.statValue}>{stats.customers}</Text>
-                <Text style={dynamicStyles.statLabel}>Customers</Text>
-              </View>
-              <View style={dynamicStyles.statCard}>
-                <Text style={dynamicStyles.statValue}>{stats.plants}</Text>
-                <Text style={dynamicStyles.statLabel}>Plants</Text>
-              </View>
+          <View style={styles.statsContainer}>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.customers}</Text>
+              <Text style={dynamicStyles.statLabel}>Customers</Text>
             </View>
-
-            <View style={styles.statsContainer}>
-              <View style={dynamicStyles.statCard}>
-                <Text style={dynamicStyles.statValue}>{stats.sessions}</Text>
-                <Text style={dynamicStyles.statLabel}>Total Sessions</Text>
-              </View>
-              <View style={dynamicStyles.statCard}>
-                <Text style={dynamicStyles.statValue}>{stats.ongoingSessions}</Text>
-                <Text style={dynamicStyles.statLabel}>Ongoing</Text>
-              </View>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.sessions}</Text>
+              <Text style={dynamicStyles.statLabel}>Total Sessions</Text>
             </View>
-          </>
+            <View style={dynamicStyles.statCard}>
+              <Text style={dynamicStyles.statValue}>{stats.ongoingSessions}</Text>
+              <Text style={dynamicStyles.statLabel}>Ongoing</Text>
+            </View>
+          </View>
         )}
 
         <TouchableOpacity
@@ -263,6 +280,25 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  activePlantContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#27ae60',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePlantLabel: {
+    color: '#7f8c8d',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '600',
+  },
+  activePlantName: {
+    fontWeight: 'bold',
+    color: '#27ae60',
+    textAlign: 'center',
   },
 });
 

@@ -8,7 +8,7 @@ function WeightClassifications() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedPlantId, setSelectedPlantId] = useState<number | null>(null);
   const [classifications, setClassifications] = useState<WeightClassification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingClassification, setEditingClassification] = useState<WeightClassification | null>(null);
   const [formData, setFormData] = useState({
@@ -39,9 +39,12 @@ function WeightClassifications() {
       if (response.data.length > 0 && !selectedPlantId) {
         setSelectedPlantId(response.data[0].id);
       }
+      // Set loading to false after plants are fetched
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching plants:', error);
       alert('Error fetching plants');
+      setLoading(false);
     }
   };
 
@@ -171,9 +174,7 @@ function WeightClassifications() {
     }
   };
 
-  if (loading && !selectedPlantId) {
-    return <div>Loading...</div>;
-  }
+  // Don't show early loading return - let the component render and show loading state in the table
 
   return (
     <div>
@@ -212,23 +213,33 @@ function WeightClassifications() {
             </div>
           )}
 
-          {loading ? (
-            <div>Loading...</div>
-          ) : (
-            <div className="table-container">
-              <table>
-                <thead>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Classification</th>
+                  <th>Description</th>
+                  <th>Weight Range</th>
+                  <th>Category</th>
+                  {hasPermission('can_manage_weight_classes') && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
                   <tr>
-                    <th>ID</th>
-                    <th>Classification</th>
-                    <th>Description</th>
-                    <th>Weight Range</th>
-                    <th>Category</th>
-                    {hasPermission('can_manage_weight_classes') && <th>Actions</th>}
+                    <td colSpan={hasPermission('can_manage_weight_classes') ? 6 : 5} style={{ textAlign: 'center', padding: '20px' }}>
+                      Loading...
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {classifications.map((classification) => (
+                ) : classifications.length === 0 ? (
+                  <tr>
+                    <td colSpan={hasPermission('can_manage_weight_classes') ? 6 : 5} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                      No weight classifications found. Click "Add Weight Classification" to create one.
+                    </td>
+                  </tr>
+                ) : (
+                  classifications.map((classification) => (
                     <tr key={classification.id}>
                       <td>{classification.id}</td>
                       <td>{classification.classification}</td>
@@ -253,11 +264,11 @@ function WeightClassifications() {
                         </td>
                       )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
