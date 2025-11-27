@@ -46,12 +46,28 @@ function SuperadminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Permission-based Route Component
+function PermissionRoute({ children, permission }: { children: React.ReactNode; permission: string }) {
+  const { hasPermission, loading } = useAuth();
+
+  if (loading) {
+    return <div className="container"><p>Loading...</p></div>;
+  }
+
+  if (!hasPermission(permission)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 // Main Layout with Sidebar
 function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout, isSuperadmin, hasAnyPermission } = useAuth();
+  const { user, logout, isSuperadmin, hasAnyPermission, hasPermission } = useAuth();
   
   // Check if user can manage roles (SUPERADMIN or ADMIN role)
   const canManageRoles = isSuperadmin || hasAnyPermission(['can_manage_customers', 'can_manage_weight_classes']);
+  const canExportData = hasPermission('can_export_data');
 
   return (
     <div className="app">
@@ -94,9 +110,11 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           <li>
             <Link to="/tally-sessions">Tally Sessions</Link>
           </li>
-          <li>
-            <Link to="/export">Export</Link>
-          </li>
+          {canExportData && (
+            <li>
+              <Link to="/export">Export</Link>
+            </li>
+          )}
           {canManageRoles && (
             <>
               <li>
@@ -160,7 +178,14 @@ function App() {
                     <Route path="/tally-sessions" element={<TallySessions />} />
                     <Route path="/tally-sessions/:id" element={<TallySessionDetail />} />
                     <Route path="/tally-sessions/:id/logs" element={<TallySessionLogs />} />
-                    <Route path="/export" element={<ExportPage />} />
+                    <Route
+                      path="/export"
+                      element={
+                        <PermissionRoute permission="can_export_data">
+                          <ExportPage />
+                        </PermissionRoute>
+                      }
+                    />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/roles" element={<Roles />} />
                     <Route path="/roles/:id" element={<RoleEdit />} />

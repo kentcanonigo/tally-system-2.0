@@ -10,6 +10,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isSuperadmin: boolean;
+  isAdmin: boolean;
   refetchUser: () => Promise<void>;
   hasPermission: (permissionCode: string) => boolean;
   hasAnyPermission: (permissionCodes: string[]) => boolean;
@@ -93,13 +94,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Helper to check if user has a specific RBAC role
   const hasRole = (roleName: string): boolean => {
-    if (!user || !user.role_ids || user.role_ids.length === 0) return false;
-    // We need to fetch roles to check names, but for now we can check via permissions
+    if (!user) return false;
+    // Check legacy role field first
+    if (roleName === 'SUPERADMIN' && user.role === UserRole.SUPERADMIN) return true;
+    if (roleName === 'ADMIN' && user.role === UserRole.ADMIN) return true;
+    // Fallback: We need to fetch roles to check names, but for now we can check via permissions
     // SUPERADMIN users have all permissions, so we can infer from that
     // For a more robust check, we'd need to store role names in the user object
-    // For now, we'll use the legacy check as fallback and permission-based detection
-    return user.role === UserRole.SUPERADMIN || 
-           (roleName === 'SUPERADMIN' && user.permissions && user.permissions.length >= 4);
+    if (!user.role_ids || user.role_ids.length === 0) return false;
+    return (roleName === 'SUPERADMIN' && user.permissions && user.permissions.length >= 4);
   };
 
   const hasPermission = (permissionCode: string): boolean => {
@@ -129,6 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isAuthenticated: user !== null,
     isSuperadmin: hasRole('SUPERADMIN'),
+    isAdmin: hasRole('ADMIN') || hasRole('SUPERADMIN'),
     refetchUser,
     hasPermission,
     hasAnyPermission,

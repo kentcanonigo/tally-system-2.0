@@ -89,9 +89,9 @@ def create_allocation_detail(
     session_id: int,
     allocation_detail: AllocationDetailsCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_start_tally"))
+    current_user: User = Depends(require_permission("can_edit_tally_entries"))
 ):
-    """Create allocation detail. Requires 'can_start_tally' permission."""
+    """Create allocation detail. Requires 'can_edit_tally_entries' permission."""
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
@@ -117,9 +117,9 @@ def update_allocation_detail(
     allocation_id: int,
     allocation_detail: AllocationDetailsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(["can_edit_tally_session", "can_start_tally"]))
+    current_user: User = Depends(require_permission("can_edit_tally_entries"))
 ):
-    """Update allocation detail. Requires 'can_edit_tally_session' OR 'can_start_tally'."""
+    """Update allocation detail. Requires 'can_edit_tally_entries' permission."""
     # Verify weight classification exists if it's being updated
     if allocation_detail.weight_classification_id is not None:
         wc = wc_crud.get_weight_classification(db, wc_id=allocation_detail.weight_classification_id)

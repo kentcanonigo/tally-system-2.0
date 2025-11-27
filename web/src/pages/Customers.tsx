@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { customersApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { Customer } from '../types';
 
 function Customers() {
+  const { hasPermission } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -75,11 +77,16 @@ function Customers() {
         <p>Manage your customers</p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          Add Customer
-        </button>
-      </div>
+      {hasPermission('can_manage_customers') && (
+        <div style={{ marginBottom: '20px' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleCreate}
+          >
+            Add Customer
+          </button>
+        </div>
+      )}
 
       <div className="table-container">
         <table>
@@ -88,7 +95,7 @@ function Customers() {
               <th>ID</th>
               <th>Name</th>
               <th>Created At</th>
-              <th>Actions</th>
+              {hasPermission('can_manage_customers') && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -97,14 +104,23 @@ function Customers() {
                 <td>{customer.id}</td>
                 <td>{customer.name}</td>
                 <td>{new Date(customer.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button className="btn btn-secondary" onClick={() => handleEdit(customer)} style={{ marginRight: '10px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(customer.id)}>
-                    Delete
-                  </button>
-                </td>
+                {hasPermission('can_manage_customers') && (
+                  <td>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => handleEdit(customer)} 
+                      style={{ marginRight: '10px' }}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => handleDelete(customer.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

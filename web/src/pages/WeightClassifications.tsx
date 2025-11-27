@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { plantsApi, weightClassificationsApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { Plant, WeightClassification } from '../types';
 
 function WeightClassifications() {
+  const { hasPermission } = useAuth();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedPlantId, setSelectedPlantId] = useState<number | null>(null);
   const [classifications, setClassifications] = useState<WeightClassification[]>([]);
@@ -199,11 +201,16 @@ function WeightClassifications() {
 
       {selectedPlantId && (
         <>
-          <div style={{ marginBottom: '20px' }}>
-            <button className="btn btn-primary" onClick={handleCreate}>
-              Add Weight Classification
-            </button>
-          </div>
+          {hasPermission('can_manage_weight_classes') && (
+            <div style={{ marginBottom: '20px' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleCreate}
+              >
+                Add Weight Classification
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div>Loading...</div>
@@ -217,7 +224,7 @@ function WeightClassifications() {
                     <th>Description</th>
                     <th>Weight Range</th>
                     <th>Category</th>
-                    <th>Actions</th>
+                    {hasPermission('can_manage_weight_classes') && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -228,18 +235,23 @@ function WeightClassifications() {
                       <td>{classification.description || '-'}</td>
                       <td>{formatWeightRange(classification)}</td>
                       <td>{classification.category}</td>
-                      <td>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => handleEdit(classification)}
-                          style={{ marginRight: '10px' }}
-                        >
-                          Edit
-                        </button>
-                        <button className="btn btn-danger" onClick={() => handleDelete(classification.id)}>
-                          Delete
-                        </button>
-                      </td>
+                      {hasPermission('can_manage_weight_classes') && (
+                        <td>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleEdit(classification)}
+                            style={{ marginRight: '10px' }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            className="btn btn-danger" 
+                            onClick={() => handleDelete(classification.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

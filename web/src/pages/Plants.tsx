@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { plantsApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { Plant } from '../types';
 
 function Plants() {
+  const { hasPermission } = useAuth();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -75,11 +77,16 @@ function Plants() {
         <p>Manage your plants</p>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          Add Plant
-        </button>
-      </div>
+      {hasPermission('can_manage_plants') && (
+        <div style={{ marginBottom: '20px' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleCreate}
+          >
+            Add Plant
+          </button>
+        </div>
+      )}
 
       <div className="table-container">
         <table>
@@ -88,7 +95,7 @@ function Plants() {
               <th>ID</th>
               <th>Name</th>
               <th>Created At</th>
-              <th>Actions</th>
+              {hasPermission('can_manage_plants') && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -97,14 +104,23 @@ function Plants() {
                 <td>{plant.id}</td>
                 <td>{plant.name}</td>
                 <td>{new Date(plant.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button className="btn btn-secondary" onClick={() => handleEdit(plant)} style={{ marginRight: '10px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(plant.id)}>
-                    Delete
-                  </button>
-                </td>
+                {hasPermission('can_manage_plants') && (
+                  <td>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => handleEdit(plant)} 
+                      style={{ marginRight: '10px' }}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => handleDelete(plant.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

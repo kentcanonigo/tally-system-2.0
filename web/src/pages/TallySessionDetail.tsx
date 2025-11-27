@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi, exportApi, tallyLogEntriesApi } from '../services/api';
 import { generateSessionReportPDF } from '../utils/pdfGenerator';
+import { useAuth } from '../contexts/AuthContext';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
+  const { hasPermission, isAdmin } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [session, setSession] = useState<TallySession | null>(null);
@@ -41,19 +43,33 @@ function TallySessionDetail() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
-      const [customerRes, plantRes, allocationsRes, wcRes, logEntriesRes] = await Promise.all([
+      const canViewLogs = hasPermission('can_view_tally_logs');
+      
+      const promises: Promise<any>[] = [
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(Number(id)),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
-        tallyLogEntriesApi.getBySession(Number(id)),
-      ]);
+      ];
 
-      setCustomer(customerRes.data);
-      setPlant(plantRes.data);
-      setAllocations(allocationsRes.data);
-      setWeightClassifications(wcRes.data);
-      setLogEntries(logEntriesRes.data);
+      // Only fetch log entries if user has permission
+      if (canViewLogs) {
+        promises.push(tallyLogEntriesApi.getBySession(Number(id)));
+      }
+
+      const results = await Promise.all(promises);
+
+      setCustomer(results[0].data);
+      setPlant(results[1].data);
+      setAllocations(results[2].data);
+      setWeightClassifications(results[3].data);
+      
+      // Only set log entries if we fetched them
+      if (canViewLogs) {
+        setLogEntries(results[4].data);
+      } else {
+        setLogEntries([]);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       alert('Error fetching session details');
@@ -243,53 +259,73 @@ function TallySessionDetail() {
         </p>
         <p>
           Status:{' '}
-          <select
-            value={session.status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            style={{
-              padding: '4px 8px',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              fontSize: '14px',
-              marginLeft: '8px',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="ongoing">Ongoing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+          {hasPermission('can_edit_tally_session') ? (
+            <select
+              value={session.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                fontSize: '14px',
+                marginLeft: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              {hasPermission('can_edit_tally_session') && (
+                <option value="ongoing">Ongoing</option>
+              )}
+              {hasPermission('can_complete_tally') && (
+                <option value="completed">Completed</option>
+              )}
+              {hasPermission('can_cancel_tally') && (
+                <option value="cancelled">Cancelled</option>
+              )}
+            </select>
+          ) : (
+            <span style={{ marginLeft: '8px', fontWeight: '600' }}>{session.status}</span>
+          )}
         </p>
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          Add Allocation
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}/logs`)}>
-          View Logs
-        </button>
-        <button 
-          className="btn btn-info" 
-          onClick={handleExport}
-          style={{ backgroundColor: '#17a2b8', color: 'white' }}
-        >
-          Export PDF
-        </button>
-        <button 
-          className="btn btn-warning" 
-          onClick={handleResetTally}
-          style={{ backgroundColor: '#f39c12', color: 'white' }}
-        >
-          Reset Tally-er Allocations
-        </button>
-        <button 
-          className="btn btn-warning" 
-          onClick={handleResetDispatcher}
-          style={{ backgroundColor: '#e67e22', color: 'white' }}
-        >
-          Reset Dispatcher Allocations
-        </button>
+        {hasPermission('can_edit_tally_entries') && (
+          <button className="btn btn-primary" onClick={handleCreate}>
+            Add Allocation
+          </button>
+        )}
+        {hasPermission('can_view_tally_logs') && (
+          <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}/logs`)}>
+            View Logs
+          </button>
+        )}
+        {hasPermission('can_export_data') && (
+          <button 
+            className="btn btn-info" 
+            onClick={handleExport}
+            style={{ backgroundColor: '#17a2b8', color: 'white' }}
+          >
+            Export PDF
+          </button>
+        )}
+        {hasPermission('can_delete_tally_entries') && (
+          <>
+            <button 
+              className="btn btn-warning" 
+              onClick={handleResetTally}
+              style={{ backgroundColor: '#f39c12', color: 'white' }}
+            >
+              Reset Tally-er Allocations
+            </button>
+            <button 
+              className="btn btn-warning" 
+              onClick={handleResetDispatcher}
+              style={{ backgroundColor: '#e67e22', color: 'white' }}
+            >
+              Reset Dispatcher Allocations
+            </button>
+          </>
+        )}
       </div>
 
       <div className="table-container">
@@ -298,20 +334,30 @@ function TallySessionDetail() {
             <tr>
               <th>ID</th>
               <th>Weight Classification</th>
-              <th>Required Bags</th>
-              <th>Allocated (Tally)</th>
-              <th>Allocated (Dispatcher)</th>
-              <th>Difference</th>
-              <th>Heads</th>
-              <th>Actions</th>
+              {hasPermission('can_view_tally_logs') ? (
+                <>
+                  <th>Required Bags</th>
+                  <th>Allocated (Tally)</th>
+                  <th>Allocated (Dispatcher)</th>
+                  <th>Difference</th>
+                  <th>Heads</th>
+                </>
+              ) : (
+                <th>Required</th>
+              )}
+              {(hasPermission('can_edit_tally_entries') || hasPermission('can_delete_tally_entries')) && (
+                <th>Actions</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {allocations.map((allocation) => {
-              const difference = allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher;
-              const isNotStarted = allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
-              const diffColor = getDifferenceColor(difference, isNotStarted);
+              const hasProgressData = hasPermission('can_view_tally_logs') && 'allocated_bags_tally' in allocation;
+              const difference = hasProgressData ? allocation.allocated_bags_tally - allocation.allocated_bags_dispatcher : 0;
+              const isNotStarted = hasProgressData && allocation.allocated_bags_tally === 0 && allocation.allocated_bags_dispatcher === 0;
+              const diffColor = hasProgressData ? getDifferenceColor(difference, isNotStarted) : '#666';
               const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+              
               return (
                 <tr key={allocation.id}>
                   <td>{allocation.id}</td>
@@ -319,27 +365,41 @@ function TallySessionDetail() {
                     {getWeightClassificationName(allocation.weight_classification_id)}
                     {wc?.description && <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{wc.description}</div>}
                   </td>
-                  <td>{allocation.required_bags}</td>
-                  <td>{allocation.allocated_bags_tally}</td>
-                  <td>{allocation.allocated_bags_dispatcher}</td>
-                  <td style={{ color: diffColor, fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
-                    {isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2))}
-                  </td>
-                  <td>
-                    {getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0)}
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => handleEdit(allocation)}
-                      style={{ marginRight: '10px' }}
-                    >
-                      Edit
-                    </button>
-                    <button className="btn btn-danger" onClick={() => handleDelete(allocation.id)}>
-                      Delete
-                    </button>
-                  </td>
+                  {hasPermission('can_view_tally_logs') ? (
+                    <>
+                      <td>{allocation.required_bags}</td>
+                      <td>{hasProgressData ? allocation.allocated_bags_tally : '-'}</td>
+                      <td>{hasProgressData ? allocation.allocated_bags_dispatcher : '-'}</td>
+                      <td style={{ color: diffColor, fontWeight: difference === 0 && !isNotStarted ? 'normal' : 'bold' }}>
+                        {hasProgressData 
+                          ? (isNotStarted ? 'Not started' : (difference === 0 ? 'Match' : difference.toFixed(2)))
+                          : '-'}
+                      </td>
+                      <td>
+                        {hasProgressData ? getTotalHeadsForWeightClassification(allocation.weight_classification_id).toFixed(0) : '-'}
+                      </td>
+                    </>
+                  ) : (
+                    <td>{allocation.required_bags} req</td>
+                  )}
+                  {(hasPermission('can_edit_tally_entries') || hasPermission('can_delete_tally_entries')) && (
+                    <td>
+                      {hasPermission('can_edit_tally_entries') && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleEdit(allocation)}
+                          style={{ marginRight: '10px' }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {hasPermission('can_delete_tally_entries') && (
+                        <button className="btn btn-danger" onClick={() => handleDelete(allocation.id)}>
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

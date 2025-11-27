@@ -172,6 +172,31 @@ Remember: Permissions control **what** users can do, but **plant permissions** c
 
 ---
 
+## UI Behavior Based on Permissions
+
+### Web Dashboard UI Controls
+
+The web dashboard automatically shows/hides or disables UI elements based on user permissions:
+
+#### Plants Page
+- **Add Plant button**: Disabled if user lacks `can_manage_plants` permission
+
+#### Weight Classifications Page
+- **Add Weight Classification button**: Disabled if user lacks `can_manage_weight_classes` permission
+
+#### Tally Session Details Page
+- **View Logs button**: Hidden if user lacks `can_view_tally_logs` permission
+- **Export PDF button**: Hidden if user lacks `can_export_data` permission
+- **Reset Tally-er Allocations button**: Only visible to ADMIN or SUPERADMIN roles
+- **Reset Dispatcher Allocations button**: Only visible to ADMIN or SUPERADMIN roles
+- **Heads column**: Hidden in allocations table if user lacks `can_view_tally_logs` permission
+- **Allocations table**: Always visible (users can view allocations even without log viewing permission)
+
+#### Navigation Sidebar
+- **Export link**: Hidden if user lacks `can_export_data` permission
+
+---
+
 ## API Endpoints Protected by Permissions
 
 ### User Management
@@ -194,6 +219,9 @@ Remember: Permissions control **what** users can do, but **plant permissions** c
 - `POST/PUT/DELETE /api/v1/weight-classifications` - Requires: `can_manage_weight_classes`
 - `POST/PUT/DELETE /api/v1/customers` - Requires: `can_manage_customers`
 - `POST/PUT/DELETE /api/v1/plants` - Requires: `can_manage_plants` (or SUPERADMIN)
+
+### Export Operations
+- `POST /api/v1/export/sessions` - Requires: `can_export_data`
 
 ---
 

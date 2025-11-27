@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { Customer, Plant, TallySession } from '../types';
 
 // Type for react-calendar's onChange value
 type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
 
 function TallySessions() {
+  const { hasPermission, hasAllPermissions } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
@@ -228,9 +230,14 @@ function TallySessions() {
       </div>
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          Create New Session
-        </button>
+        {hasAllPermissions(['can_start_tally', 'can_edit_tally_entries', 'can_edit_tally_session']) && (
+          <button 
+            className="btn btn-primary" 
+            onClick={handleCreate}
+          >
+            Create New Session
+          </button>
+        )}
         <button 
           className="btn btn-secondary" 
           onClick={() => setShowCalendar(!showCalendar)}
@@ -298,7 +305,7 @@ function TallySessions() {
               <th>Plant</th>
               <th>Date</th>
               <th>Status</th>
-              <th>Change Status</th>
+              {hasPermission('can_edit_tally_session') && <th>Change Status</th>}
               <th>Actions</th>
             </tr>
           </thead>
@@ -310,35 +317,45 @@ function TallySessions() {
                 <td>{getPlantName(session.plant_id)}</td>
                 <td>{new Date(session.date).toLocaleDateString()}</td>
                 <td>{getStatusBadge(session.status)}</td>
-                <td>
-                  <select
-                    value={session.status}
-                    onChange={(e) => handleStatusChange(session.id, e.target.value)}
-                    style={{
-                      padding: '5px 10px',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </td>
+                {hasPermission('can_edit_tally_session') && (
+                  <td>
+                    <select
+                      value={session.status}
+                      onChange={(e) => handleStatusChange(session.id, e.target.value)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {hasPermission('can_edit_tally_session') && (
+                        <option value="ongoing">Ongoing</option>
+                      )}
+                      {hasPermission('can_complete_tally') && (
+                        <option value="completed">Completed</option>
+                      )}
+                      {hasPermission('can_cancel_tally') && (
+                        <option value="cancelled">Cancelled</option>
+                      )}
+                    </select>
+                  </td>
+                )}
                 <td>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <Link to={`/tally-sessions/${session.id}`}>
                       <button className="btn btn-primary">View Details</button>
                     </Link>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => handleDelete(session.id)}
-                      style={{ marginLeft: '5px' }}
-                    >
-                      Delete
-                    </button>
+                    {hasPermission('can_delete_tally_session') && (
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => handleDelete(session.id)}
+                        style={{ marginLeft: '5px' }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
