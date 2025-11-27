@@ -10,7 +10,7 @@ import type { Customer, Plant, TallySession } from '../types';
 type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
 
 function TallySessions() {
-  const { hasPermission, hasAllPermissions } = useAuth();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering

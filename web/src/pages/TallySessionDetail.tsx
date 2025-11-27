@@ -7,7 +7,7 @@ import type { TallySession, AllocationDetails, Customer, Plant, WeightClassifica
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
-  const { hasPermission, isAdmin } = useAuth();
+  const { hasPermission } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [session, setSession] = useState<TallySession | null>(null);
