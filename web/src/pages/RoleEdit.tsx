@@ -213,6 +213,24 @@ export default function RoleEdit() {
               >
                 {category}
               </h3>
+              {category === 'tally' && (
+                <div
+                  style={{
+                    marginBottom: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '4px',
+                    backgroundColor: '#fff3cd',
+                    border: '1px solid #ffc107',
+                    fontSize: '13px',
+                    color: '#856404',
+                  }}
+                >
+                  <strong>⚠️ Important:</strong> To create tally sessions, users must have <strong>all three</strong> of these permissions:{' '}
+                  <code style={{ backgroundColor: '#fff', padding: '2px 6px', borderRadius: '3px' }}>can_start_tally</code>,{' '}
+                  <code style={{ backgroundColor: '#fff', padding: '2px 6px', borderRadius: '3px' }}>can_edit_tally_session</code>, and{' '}
+                  <code style={{ backgroundColor: '#fff', padding: '2px 6px', borderRadius: '3px' }}>can_edit_tally_entries</code>.
+                </div>
+              )}
               <div className="checkbox-group" style={{ maxHeight: '220px' }}>
                 {permissions.map((permission) => (
                   <label

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Switch, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -48,6 +48,7 @@ function SettingsScreen() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [showPlantDropdown, setShowPlantDropdown] = useState(false);
   const [isLoadingPlants, setIsLoadingPlants] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
@@ -67,9 +68,14 @@ function SettingsScreen() {
     fetchRoles();
   }, []);
 
-  const fetchPlants = async () => {
-    try {
+  const fetchPlants = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
       setIsLoadingPlants(true);
+    }
+    
+    try {
       const response = await plantsApi.getAll();
       const fetchedPlants = response.data;
       setPlants(fetchedPlants);
@@ -88,6 +94,23 @@ function SettingsScreen() {
         } catch (prefError) {
           console.error('Error updating preferences:', prefError);
         }
+      } else if (user?.active_plant_id && !activePlantId && fetchedPlants.length > 0) {
+        // First time opening app: if user has an active_plant_id preference but it's not set in context,
+        // automatically set it as the active plant
+        const plantToSet = fetchedPlants.find(p => p.id === user.active_plant_id);
+        if (plantToSet) {
+          console.log('First time setup: Setting active plant to', plantToSet.name, 'from user preferences');
+          setSelectedActivePlant(plantToSet.id);
+          await setActivePlantId(plantToSet.id);
+        }
+      } else if (!currentActivePlantId && fetchedPlants.length > 0 && user?.active_plant_id) {
+        // If user has an active_plant_id but it's not in the current state, set it
+        const plantToSet = fetchedPlants.find(p => p.id === user.active_plant_id);
+        if (plantToSet) {
+          console.log('Syncing active plant from user preferences:', plantToSet.name);
+          setSelectedActivePlant(plantToSet.id);
+          await setActivePlantId(plantToSet.id);
+        }
       }
     } catch (error: any) {
       console.error('Error fetching plants:', error);
@@ -104,9 +127,12 @@ function SettingsScreen() {
           console.error('Error updating preferences:', prefError);
         }
       }
-      Alert.alert('Error', 'Failed to load plants');
+      if (!isRefresh) {
+        Alert.alert('Error', 'Failed to load plants');
+      }
     } finally {
       setIsLoadingPlants(false);
+      setRefreshing(false);
     }
   };
 
@@ -353,12 +379,22 @@ function SettingsScreen() {
     );
   }
 
+  const onRefresh = async () => {
+    await Promise.all([
+      fetchPlants(true),
+      fetchRoles(),
+    ]);
+  };
+
   return (
     <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <ScrollView 
         style={{ flex: 1 }} 
         contentContainerStyle={{ paddingBottom: responsive.spacing.md }}
         showsVerticalScrollIndicator={true}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
       <Text style={dynamicStyles.title}>Settings</Text>
 

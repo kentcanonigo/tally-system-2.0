@@ -18,6 +18,13 @@ Core tally operations for daily use.
 | `can_edit_tally_entries` | Can Edit Tally Entries | Edit tally log entries | Supervisors, Managers |
 | `can_delete_tally_entries` | Can Delete Tally Entries | Delete tally log entries | Managers only |
 
+**⚠️ Important:** To create tally sessions, users must have **all three** of these permissions:
+- `can_start_tally`
+- `can_edit_tally_session`
+- `can_edit_tally_entries`
+
+All three permissions are required. If a role is missing any of these permissions, users with that role will not be able to create new tally sessions.
+
 ### 2. Management (`management`)
 Basic data management operations.
 

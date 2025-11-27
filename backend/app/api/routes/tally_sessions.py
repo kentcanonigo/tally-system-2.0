@@ -6,7 +6,7 @@ from ...schemas.tally_session import TallySessionCreate, TallySessionUpdate, Tal
 from ...crud import tally_session as crud
 from ...crud import customer as customer_crud
 from ...crud import plant as plant_crud
-from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_permission, user_has_role
+from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, require_all_permissions, user_has_role
 from ...models import User
 
 router = APIRouter()
@@ -58,10 +58,10 @@ def read_tally_session(
 def create_tally_session(
     tally_session: TallySessionCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_start_tally")),
+    current_user: User = Depends(require_all_permissions(["can_start_tally", "can_edit_tally_session", "can_edit_tally_entries"])),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
-    """Create a tally session. Requires 'can_start_tally' permission and plant access."""
+    """Create a tally session. Requires all of: 'can_start_tally', 'can_edit_tally_session', and 'can_edit_tally_entries' permissions, and plant access."""
     # Check plant access
     if not user_has_role(current_user, 'SUPERADMIN') and tally_session.plant_id not in accessible_plant_ids:
         raise HTTPException(status_code=403, detail="You don't have access to this plant")

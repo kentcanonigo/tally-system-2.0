@@ -213,6 +213,43 @@ def require_any_permission(permission_codes: List[str]):
     return _check_permissions
 
 
+def require_all_permissions(permission_codes: List[str]):
+    """
+    Factory function that returns a dependency to check for all of the specified permissions.
+    User must have all of the permissions. Users with SUPERADMIN role bypass the check.
+    
+    Args:
+        permission_codes: List of permission codes to check
+    
+    Returns:
+        Dependency function that checks if user has all of the permissions
+    """
+    async def _check_permissions(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        # Users with SUPERADMIN role have all permissions
+        if user_has_role(current_user, 'SUPERADMIN'):
+            return current_user
+        
+        # Get user's permissions from their roles
+        user_permissions = user_crud.get_user_permissions(db, current_user.id)
+        
+        # Check if user has all of the required permissions
+        has_all = all(perm in user_permissions for perm in permission_codes)
+        
+        if not has_all:
+            missing = [perm for perm in permission_codes if perm not in user_permissions]
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"All of these permissions required: {', '.join(permission_codes)}. Missing: {', '.join(missing)}"
+            )
+        
+        return current_user
+    
+    return _check_permissions
+
+
 def require_permission_and_plant_access(permission_code: str, plant_id: int):
     """
     Factory function that returns a dependency to check both permission and plant access.
