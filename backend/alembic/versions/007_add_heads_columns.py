@@ -1,7 +1,7 @@
 """add heads columns to tally_log_entries and allocation_details
 
 Revision ID: 007_add_heads_columns
-Revises: 006_add_description_to_weight_classifications
+Revises: 006_add_weight_class_desc
 Create Date: 2025-01-15 12:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '007_add_heads_columns'
-down_revision = '006_add_description_to_weight_classifications'
+down_revision = '006_add_weight_class_desc'
 branch_labels = None
 depends_on = None
 

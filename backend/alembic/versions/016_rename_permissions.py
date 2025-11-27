@@ -1,7 +1,7 @@
 """rename_permissions
 
 Revision ID: 016_rename_permissions
-Revises: 015_add_create_tally_sessions_permission
+Revises: 015_add_create_tally_perm
 Create Date: 2025-01-27 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '016_rename_permissions'
-down_revision = '015_add_create_tally_sessions_permission'
+down_revision = '015_add_create_tally_perm'
 branch_labels = None
 depends_on = None
 

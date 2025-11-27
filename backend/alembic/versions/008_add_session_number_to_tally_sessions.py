@@ -1,6 +1,6 @@
 """add_session_number_to_tally_sessions
 
-Revision ID: 008_add_session_number_to_tally_sessions
+Revision ID: 008_add_session_number
 Revises: 007_add_heads_columns
 Create Date: 2025-01-15 12:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
-revision = '008_add_session_number_to_tally_sessions'
+revision = '008_add_session_number'
 down_revision = '007_add_heads_columns'
 branch_labels = None
 depends_on = None

@@ -1,7 +1,7 @@
 """add_authentication_tables
 
 Revision ID: 009_add_authentication_tables
-Revises: 008_add_session_number_to_tally_sessions
+Revises: 008_add_session_number
 Create Date: 2025-01-20 10:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '009_add_authentication_tables'
-down_revision = '008_add_session_number_to_tally_sessions'
+down_revision = '008_add_session_number'
 branch_labels = None
 depends_on = None
 

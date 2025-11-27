@@ -1,6 +1,6 @@
 """add_create_tally_sessions_permission
 
-Revision ID: 015_add_create_tally_sessions_permission
+Revision ID: 015_add_create_tally_perm
 Revises: 014_add_user_preferences
 Create Date: 2025-01-27 00:00:00.000000
 
@@ -12,7 +12,7 @@ from datetime import datetime
 
 
 # revision identifiers, used by Alembic.
-revision = '015_add_create_tally_sessions_permission'
+revision = '015_add_create_tally_perm'
 down_revision = '014_add_user_preferences'
 branch_labels = None
 depends_on = None
