@@ -32,7 +32,10 @@ function TallySessionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ startDate: string | null; endDate: string | null }>({
+    startDate: null,
+    endDate: null,
+  });
   const [currentMonth, setCurrentMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
   const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -198,7 +201,7 @@ function TallySessionsScreen() {
     if (newValue) {
       setFilterCustomerId(null);
       setFilterStatus('');
-      setSelectedDate(null);
+      setDateRange({ startDate: null, endDate: null });
     }
   };
 
@@ -309,11 +312,21 @@ function TallySessionsScreen() {
       filtered = filtered.filter((session) => activeSessionIds.includes(session.id));
     }
     
-    // Filter by selected date if set
-    if (selectedDate) {
+    // Filter by date range if set
+    if (dateRange.startDate || dateRange.endDate) {
       filtered = filtered.filter((session) => {
-        const sessionDate = new Date(session.created_at).toISOString().split('T')[0];
-        return sessionDate === selectedDate;
+        const sessionDate = session.date; // Use the date field directly
+        if (dateRange.startDate && dateRange.endDate) {
+          // Both dates set - filter by range
+          return sessionDate >= dateRange.startDate && sessionDate <= dateRange.endDate;
+        } else if (dateRange.startDate) {
+          // Only start date set - filter from start date onwards
+          return sessionDate >= dateRange.startDate;
+        } else if (dateRange.endDate) {
+          // Only end date set - filter up to end date
+          return sessionDate <= dateRange.endDate;
+        }
+        return true;
       });
     }
 
@@ -341,11 +354,11 @@ function TallySessionsScreen() {
     setSessions(filtered);
     
     // Update hasMorePages based on filtered results
-    const hasFilters = showActiveOnly || selectedDate || filterStatus || filterCustomerId;
+    const hasFilters = showActiveOnly || dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId;
     if (hasFilters) {
       // Special case: If filtering by active sessions only, max is 10 active sessions
       // Since max is 10 and page size is 10, there can only be 1 page of active sessions
-      if (showActiveOnly && !selectedDate && !filterStatus && !filterCustomerId) {
+      if (showActiveOnly && !dateRange.startDate && !dateRange.endDate && !filterStatus && !filterCustomerId) {
         setHasMorePages(false);
       } else {
         // With other filters: disable next button if:
@@ -359,7 +372,7 @@ function TallySessionsScreen() {
       // Without filters, use the server-side pagination indicator
       setHasMorePages(hasMoreUnfilteredPages);
     }
-  }, [selectedDate, allSessions, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages, filterStatus, filterCustomerId, sortBy, sortOrder, SESSIONS_PER_PAGE]);
+  }, [dateRange, allSessions, showActiveOnly, activeSessionIds, hasMoreUnfilteredPages, filterStatus, filterCustomerId, sortBy, sortOrder, SESSIONS_PER_PAGE]);
 
   // Reset to page 1 when filters change (but not on initial load)
   useEffect(() => {
@@ -367,7 +380,7 @@ function TallySessionsScreen() {
       setCurrentPage(1);
       fetchData(false, 1);
     }
-  }, [selectedDate, showActiveOnly, filterStatus, filterCustomerId]);
+  }, [dateRange, showActiveOnly, filterStatus, filterCustomerId]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -413,41 +426,121 @@ function TallySessionsScreen() {
     );
   };
 
+  // Generate all dates in a range
+  const getDatesInRange = (startDate: string, endDate: string): string[] => {
+    const dates: string[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const current = new Date(start);
+    
+    while (current <= end) {
+      dates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+  };
+
   // Create marked dates object for calendar highlighting
   const markedDates = useMemo(() => {
-    const marked: { [key: string]: { marked: boolean; dotColor: string } } = {};
+    const marked: { [key: string]: any } = {};
     allSessions.forEach((session) => {
-      const dateKey = new Date(session.created_at).toISOString().split('T')[0];
+      const dateKey = session.date;
       if (!marked[dateKey]) {
         marked[dateKey] = { marked: true, dotColor: '#3498db' };
       }
     });
     
-    // Add selected date styling
-    if (selectedDate) {
-      marked[selectedDate] = {
-        ...marked[selectedDate],
-        selected: true,
-        selectedColor: '#3498db',
+    // Add date range styling
+    if (dateRange.startDate && dateRange.endDate) {
+      // Mark the range
+      const dates = getDatesInRange(dateRange.startDate, dateRange.endDate);
+      dates.forEach((date, index) => {
+        if (index === 0) {
+          // First date
+          marked[date] = {
+            ...marked[date],
+            startingDay: true,
+            color: '#3498db',
+            textColor: '#ffffff',
+          };
+        } else if (index === dates.length - 1) {
+          // Last date
+          marked[date] = {
+            ...marked[date],
+            endingDay: true,
+            color: '#3498db',
+            textColor: '#ffffff',
+          };
+        } else {
+          // Middle dates
+          marked[date] = {
+            ...marked[date],
+            color: '#3498db',
+            textColor: '#ffffff',
+          };
+        }
+      });
+    } else if (dateRange.startDate) {
+      // Only start date selected - show as both starting and ending day (single day period)
+      marked[dateRange.startDate] = {
+        ...marked[dateRange.startDate],
+        startingDay: true,
+        endingDay: true,
+        color: '#3498db',
+        textColor: '#ffffff',
+      };
+    } else if (dateRange.endDate) {
+      // Only end date selected - show as both starting and ending day (single day period)
+      marked[dateRange.endDate] = {
+        ...marked[dateRange.endDate],
+        startingDay: true,
+        endingDay: true,
+        color: '#3498db',
+        textColor: '#ffffff',
       };
     }
     
     return marked;
-  }, [allSessions, selectedDate]);
+  }, [allSessions, dateRange]);
 
   const handleDateSelect = (day: { dateString: string }) => {
-    if (selectedDate === day.dateString) {
-      // If same date clicked, clear filter
-      setSelectedDate(null);
-    } else {
-      setSelectedDate(day.dateString);
+    if (!dateRange.startDate || (dateRange.startDate && dateRange.endDate)) {
+      // Start a new range
+      setDateRange({ startDate: day.dateString, endDate: null });
+    } else if (dateRange.startDate && !dateRange.endDate) {
+      // Complete the range
+      const start = new Date(dateRange.startDate);
+      const end = new Date(day.dateString);
+      
+      if (end < start) {
+        // If end date is before start date, swap them
+        setDateRange({ startDate: day.dateString, endDate: dateRange.startDate });
+      } else {
+        setDateRange({ startDate: dateRange.startDate, endDate: day.dateString });
+      }
     }
-    setShowCalendar(false);
   };
 
   const clearDateFilter = () => {
-    setSelectedDate(null);
+    setDateRange({ startDate: null, endDate: null });
     setShowCalendar(false);
+  };
+
+  const getDateRangeText = () => {
+    if (!dateRange.startDate && !dateRange.endDate) {
+      return 'Select Date Range';
+    }
+    if (dateRange.startDate && dateRange.endDate) {
+      return `${formatDate(dateRange.startDate, timezone)} - ${formatDate(dateRange.endDate, timezone)}`;
+    }
+    if (dateRange.startDate) {
+      return `From ${formatDate(dateRange.startDate, timezone)}`;
+    }
+    if (dateRange.endDate) {
+      return `Until ${formatDate(dateRange.endDate, timezone)}`;
+    }
+    return 'Select Date Range';
   };
 
   const handleMonthYearSelect = () => {
@@ -484,7 +577,7 @@ function TallySessionsScreen() {
           </View>
           
           <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent}>
-            <Text style={styles.filterLabel}>Date</Text>
+            <Text style={styles.filterLabel}>Date Range</Text>
             <TouchableOpacity
               style={styles.datePickerButton}
               onPress={() => {
@@ -493,16 +586,16 @@ function TallySessionsScreen() {
               }}
             >
               <Text style={styles.datePickerButtonText}>
-                {selectedDate ? formatDate(selectedDate, timezone) : 'Select Date'}
+                {getDateRangeText()}
               </Text>
               <MaterialIcons name="calendar-today" size={20} color="#3498db" />
             </TouchableOpacity>
-            {selectedDate && (
+            {(dateRange.startDate || dateRange.endDate) && (
               <TouchableOpacity
                 style={styles.clearDateButton}
-                onPress={() => setSelectedDate(null)}
+                onPress={() => setDateRange({ startDate: null, endDate: null })}
               >
-                <Text style={styles.clearDateButtonText}>Clear Date</Text>
+                <Text style={styles.clearDateButtonText}>Clear Date Range</Text>
               </TouchableOpacity>
             )}
 
@@ -720,7 +813,7 @@ function TallySessionsScreen() {
           ) : (
             <>
               <TouchableOpacity
-                style={[dynamicStyles.calendarButton, (selectedDate || filterStatus || filterCustomerId) && styles.calendarButtonActive]}
+                style={[dynamicStyles.calendarButton, (dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId) && styles.calendarButtonActive]}
                 onPress={() => setShowFilters(true)}
               >
                 <MaterialIcons name="filter-list" size={responsive.fontSize.large} color="#fff" />
@@ -748,19 +841,19 @@ function TallySessionsScreen() {
       </View>
 
       {/* Filter Status Subheader */}
-      {(showActiveOnly || selectedDate || filterStatus || filterCustomerId || isSelectionMode) && (
+      {(showActiveOnly || dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId || isSelectionMode) && (
         <View style={styles.filterStatusBar}>
           <View style={styles.filterStatusContent}>
             <MaterialIcons name="filter-list" size={16} color="#7f8c8d" />
             <Text style={styles.filterStatusText}>
               {isSelectionMode
                 ? `${selectedSessionIds.length} session${selectedSessionIds.length !== 1 ? 's' : ''} selected`
-                : showActiveOnly && selectedDate
-                ? `Active sessions for ${formatDate(selectedDate, timezone)}`
+                : showActiveOnly && (dateRange.startDate || dateRange.endDate)
+                ? `Active sessions ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
                 : showActiveOnly
                 ? 'Showing active sessions only'
-                : selectedDate
-                ? `Showing sessions for ${formatDate(selectedDate, timezone)}`
+                : dateRange.startDate || dateRange.endDate
+                ? `Showing sessions ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
                 : filterStatus || filterCustomerId
                 ? 'Filters applied'
                 : 'Showing all sessions'}
@@ -776,12 +869,12 @@ function TallySessionsScreen() {
                   <Text style={styles.resetActiveText}>Reset Active</Text>
                 </TouchableOpacity>
               )}
-              {!isSelectionMode && (showActiveOnly || selectedDate || filterStatus || filterCustomerId) && (
+              {!isSelectionMode && (showActiveOnly || dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId) && (
                 <TouchableOpacity
                   style={styles.clearFiltersButton}
                   onPress={() => {
                     setShowActiveOnly(false);
-                    setSelectedDate(null);
+                    setDateRange({ startDate: null, endDate: null });
                     setFilterStatus('');
                     setFilterCustomerId(null);
                   }}
@@ -862,11 +955,11 @@ function TallySessionsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {showActiveOnly && selectedDate
-                ? `No active sessions found for ${formatDate(selectedDate, timezone)}.`
+              {showActiveOnly && (dateRange.startDate || dateRange.endDate)
+                ? `No active sessions found ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}.`
                 : showActiveOnly
                 ? 'No active sessions found for this plant.'
-                : selectedDate || filterStatus || filterCustomerId
+                : dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId
                 ? 'No sessions found matching the current filters.'
                 : 'No sessions found for this plant.'}
             </Text>
@@ -921,7 +1014,7 @@ function TallySessionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={dynamicStyles.calendarModal}>
             <View style={styles.calendarHeader}>
-              <Text style={dynamicStyles.calendarTitle}>Filter</Text>
+              <Text style={dynamicStyles.calendarTitle}>Select Date Range</Text>
               <View style={styles.calendarHeaderButtons}>
                 <TouchableOpacity
                   style={styles.monthYearButton}
@@ -952,6 +1045,7 @@ function TallySessionsScreen() {
                 setCurrentMonth(month.dateString.slice(0, 7));
               }}
               markedDates={markedDates}
+              markingType="period"
               enableSwipeMonths={true}
               hideExtraDays={true}
               firstDay={1}
@@ -979,13 +1073,13 @@ function TallySessionsScreen() {
                 textDayHeaderFontSize: 13,
               }}
             />
-            {selectedDate && (
+            {(dateRange.startDate || dateRange.endDate) && (
               <View style={styles.calendarActions}>
                 <TouchableOpacity
                   style={styles.clearFilterButton}
                   onPress={clearDateFilter}
                 >
-                  <Text style={styles.clearFilterText}>Clear Filter</Text>
+                  <Text style={styles.clearFilterText}>Clear Range</Text>
                 </TouchableOpacity>
               </View>
             )}
