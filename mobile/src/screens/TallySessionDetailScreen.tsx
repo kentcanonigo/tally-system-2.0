@@ -290,6 +290,24 @@ function TallySessionDetailScreen() {
 
   const handleUpdateStatus = async (status: string) => {
     if (!session) return;
+    
+    // Check permissions based on target status
+    if (status === 'completed' && !hasPermission('can_complete_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to complete tally sessions.');
+      setShowStatusDropdown(false);
+      return;
+    }
+    if (status === 'cancelled' && !hasPermission('can_cancel_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to cancel tally sessions.');
+      setShowStatusDropdown(false);
+      return;
+    }
+    if (status === 'ongoing' && !hasPermission('can_edit_tally_session')) {
+      Alert.alert('Permission Denied', 'You do not have permission to edit tally sessions.');
+      setShowStatusDropdown(false);
+      return;
+    }
+    
     setShowStatusDropdown(false);
     try {
       await tallySessionsApi.update(session.id, { status: status as any });
@@ -434,20 +452,24 @@ function TallySessionDetailScreen() {
             {getWeightClassificationName(allocation.weight_classification_id)}
           </Text>
           {/* Only show edit/delete buttons if user has permission */}
-          {hasPermission('can_edit_tally_session') && (
+          {(hasPermission('can_edit_tally_allocations') || hasPermission('can_delete_tally_allocations')) && (
             <View style={styles.allocationActions}>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => handleEditAllocation(allocation)}
-              >
-                <MaterialIcons name="edit" size={18} color="#3498db" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteAllocationButton}
-                onPress={() => handleDeleteAllocation(allocation.id)}
-              >
-                <MaterialIcons name="delete" size={18} color="#e74c3c" />
-              </TouchableOpacity>
+              {hasPermission('can_edit_tally_allocations') && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => handleEditAllocation(allocation)}
+                >
+                  <MaterialIcons name="edit" size={18} color="#3498db" />
+                </TouchableOpacity>
+              )}
+              {hasPermission('can_delete_tally_allocations') && (
+                <TouchableOpacity
+                  style={styles.deleteAllocationButton}
+                  onPress={() => handleDeleteAllocation(allocation.id)}
+                >
+                  <MaterialIcons name="delete" size={18} color="#e74c3c" />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -924,17 +946,21 @@ function TallySessionDetailScreen() {
           <Text style={dynamicStyles.sessionId}>
             {customer?.name || 'Unknown'} - Session #{session.session_number} - {formatDate(session.date, timezone)}
           </Text>
-          <View style={dynamicStyles.statusPickerContainer}>
-            <TouchableOpacity
-              style={dynamicStyles.statusDropdownButton}
-              onPress={() => setShowStatusDropdown(true)}
-            >
-              <Text style={dynamicStyles.statusDropdownText}>
-                {getStatusLabel(session.status)}
-              </Text>
-              <Text style={dynamicStyles.statusDropdownIcon}>▼</Text>
-            </TouchableOpacity>
-          </View>
+          {(hasPermission('can_edit_tally_session') || 
+            hasPermission('can_complete_tally') || 
+            hasPermission('can_cancel_tally')) && (
+            <View style={dynamicStyles.statusPickerContainer}>
+              <TouchableOpacity
+                style={dynamicStyles.statusDropdownButton}
+                onPress={() => setShowStatusDropdown(true)}
+              >
+                <Text style={dynamicStyles.statusDropdownText}>
+                  {getStatusLabel(session.status)}
+                </Text>
+                <Text style={dynamicStyles.statusDropdownIcon}>▼</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <View style={dynamicStyles.infoCard}>
@@ -959,12 +985,14 @@ function TallySessionDetailScreen() {
               <Text style={dynamicStyles.actionButtonText}>View Logs</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={[dynamicStyles.actionButton, styles.exportButton]}
-            onPress={handleExportPDF}
-          >
-            <Text style={dynamicStyles.actionButtonText}>Export PDF</Text>
-          </TouchableOpacity>
+          {hasPermission('can_export_data') && (
+            <TouchableOpacity
+              style={[dynamicStyles.actionButton, styles.exportButton]}
+              onPress={handleExportPDF}
+            >
+              <Text style={dynamicStyles.actionButtonText}>Export PDF</Text>
+            </TouchableOpacity>
+          )}
           {session.status === 'ongoing' && (
             <>
               <TouchableOpacity
@@ -986,7 +1014,7 @@ function TallySessionDetailScreen() {
         <View style={styles.sectionHeader}>
           <Text style={dynamicStyles.sectionTitle}>Allocations</Text>
           {/* Only show add allocation button if session is ongoing and user has permission */}
-          {session.status === 'ongoing' && hasPermission('can_edit_tally_session') && (
+          {session.status === 'ongoing' && hasPermission('can_edit_tally_allocations') && (
             <TouchableOpacity
               style={styles.addAllocationButton}
               onPress={() => setShowAddModal(true)}
@@ -1024,14 +1052,16 @@ function TallySessionDetailScreen() {
           )}
         </View>
 
-        <View style={{ padding: responsive.padding.medium, marginTop: responsive.spacing.lg, marginBottom: responsive.spacing.xl, flexDirection: 'row' }}>
-          <TouchableOpacity
-            style={[dynamicStyles.actionButton, styles.deleteButton]}
-            onPress={handleDeleteSession}
-          >
-            <Text style={dynamicStyles.actionButtonText}>Delete Session</Text>
-          </TouchableOpacity>
-        </View>
+        {hasPermission('can_delete_tally_session') && (
+          <View style={{ padding: responsive.padding.medium, marginTop: responsive.spacing.lg, marginBottom: responsive.spacing.xl, flexDirection: 'row' }}>
+            <TouchableOpacity
+              style={[dynamicStyles.actionButton, styles.deleteButton]}
+              onPress={handleDeleteSession}
+            >
+              <Text style={dynamicStyles.actionButtonText}>Delete Session</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {showStatusDropdown && (
@@ -1050,55 +1080,61 @@ function TallySessionDetailScreen() {
               style={dynamicStyles.statusDropdownMenu}
               onStartShouldSetResponder={() => true}
             >
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.statusDropdownOption,
-                  session.status === 'ongoing' && dynamicStyles.statusDropdownOptionSelected,
-                ]}
-                onPress={() => handleUpdateStatus('ongoing')}
-              >
-                <Text
+              {hasPermission('can_edit_tally_session') && (
+                <TouchableOpacity
                   style={[
-                    dynamicStyles.statusDropdownOptionText,
-                    session.status === 'ongoing' && dynamicStyles.statusDropdownOptionTextSelected,
+                    dynamicStyles.statusDropdownOption,
+                    session.status === 'ongoing' && dynamicStyles.statusDropdownOptionSelected,
                   ]}
+                  onPress={() => handleUpdateStatus('ongoing')}
                 >
-                  Ongoing
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.statusDropdownOption,
-                  session.status === 'completed' && dynamicStyles.statusDropdownOptionSelected,
-                ]}
-                onPress={() => handleUpdateStatus('completed')}
-              >
-                <Text
+                  <Text
+                    style={[
+                      dynamicStyles.statusDropdownOptionText,
+                      session.status === 'ongoing' && dynamicStyles.statusDropdownOptionTextSelected,
+                    ]}
+                  >
+                    Ongoing
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {hasPermission('can_complete_tally') && (
+                <TouchableOpacity
                   style={[
-                    dynamicStyles.statusDropdownOptionText,
-                    session.status === 'completed' && dynamicStyles.statusDropdownOptionTextSelected,
+                    dynamicStyles.statusDropdownOption,
+                    session.status === 'completed' && dynamicStyles.statusDropdownOptionSelected,
                   ]}
+                  onPress={() => handleUpdateStatus('completed')}
                 >
-                  Completed
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.statusDropdownOption,
-                  dynamicStyles.statusDropdownOptionLast,
-                  session.status === 'cancelled' && dynamicStyles.statusDropdownOptionSelected,
-                ]}
-                onPress={() => handleUpdateStatus('cancelled')}
-              >
-                <Text
+                  <Text
+                    style={[
+                      dynamicStyles.statusDropdownOptionText,
+                      session.status === 'completed' && dynamicStyles.statusDropdownOptionTextSelected,
+                    ]}
+                  >
+                    Completed
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {hasPermission('can_cancel_tally') && (
+                <TouchableOpacity
                   style={[
-                    dynamicStyles.statusDropdownOptionText,
-                    session.status === 'cancelled' && dynamicStyles.statusDropdownOptionTextSelected,
+                    dynamicStyles.statusDropdownOption,
+                    dynamicStyles.statusDropdownOptionLast,
+                    session.status === 'cancelled' && dynamicStyles.statusDropdownOptionSelected,
                   ]}
+                  onPress={() => handleUpdateStatus('cancelled')}
                 >
-                  Cancelled
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      dynamicStyles.statusDropdownOptionText,
+                      session.status === 'cancelled' && dynamicStyles.statusDropdownOptionTextSelected,
+                    ]}
+                  >
+                    Cancelled
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </TouchableOpacity>
         </Modal>

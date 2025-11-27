@@ -315,6 +315,11 @@ function TallySessionLogsScreen() {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     
+    if (!hasPermission('can_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to delete tally log entries.');
+      return;
+    }
+    
     Alert.alert(
       'Delete Logs',
       `Are you sure you want to delete ${selectedIds.size} log entries?`,
@@ -729,12 +734,14 @@ function TallySessionLogsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {selectionMode ? (
             <>
-              <TouchableOpacity
-                style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
-                onPress={handleDeleteSelected}
-              >
-                <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
-              </TouchableOpacity>
+              {hasPermission('can_tally') && (
+                <TouchableOpacity
+                  style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                  onPress={handleDeleteSelected}
+                >
+                  <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                 onPress={selectAll}
@@ -752,12 +759,14 @@ function TallySessionLogsScreen() {
             </>
           ) : (
             <>
-              <TouchableOpacity
-                style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
-                onPress={toggleSelectionMode}
-              >
-                <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>Select</Text>
-              </TouchableOpacity>
+              {hasPermission('can_tally') && (
+                <TouchableOpacity
+                  style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                  onPress={toggleSelectionMode}
+                >
+                  <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>Select</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={dynamicStyles.settingsButton}
                 onPress={() => setShowColumnSettings(true)}

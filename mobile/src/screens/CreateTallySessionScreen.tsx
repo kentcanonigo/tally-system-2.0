@@ -9,6 +9,7 @@ import type { Customer, Plant } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePlant } from '../contexts/PlantContext';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { usePermissions } from '../utils/usePermissions';
 import { formatDate } from '../utils/dateFormat';
 
 function CreateTallySessionScreen() {
@@ -16,6 +17,8 @@ function CreateTallySessionScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
   const { timezone } = useTimezone();
+  const { hasPermission } = usePermissions();
+  const canCreateSession = hasPermission('can_create_tally_sessions');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,10 @@ function CreateTallySessionScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!canCreateSession) {
+      Alert.alert('Permission Denied', 'You do not have permission to create tally sessions.');
+      return;
+    }
     if (!activePlantId) {
       Alert.alert('Error', 'No active plant selected. Please select a plant in Settings.');
       return;
@@ -274,14 +281,19 @@ function CreateTallySessionScreen() {
           </View>
 
           <TouchableOpacity
-            style={[dynamicStyles.submitButton, submitting && styles.submitButtonDisabled]}
+            style={[
+              dynamicStyles.submitButton, 
+              (submitting || !canCreateSession) && styles.submitButtonDisabled
+            ]}
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !canCreateSession}
           >
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={dynamicStyles.submitButtonText}>Create Session</Text>
+              <Text style={dynamicStyles.submitButtonText}>
+                {canCreateSession ? 'Create Session' : 'No Permission to Create'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
