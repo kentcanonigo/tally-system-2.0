@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
@@ -31,6 +31,8 @@ function TallySessions() {
     plant_id: '',
     status: '',
   });
+  const [sortBy, setSortBy] = useState<'date' | 'id' | 'session_number' | 'status' | 'created_at' | 'updated_at'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchData();
@@ -40,19 +42,64 @@ function TallySessions() {
     fetchSessions();
   }, [filters]);
 
-  // Filter sessions by selected date
+  // Sort sessions function
+  const sortSessions = useCallback((sessionsToSort: TallySession[]): TallySession[] => {
+    const sorted = [...sessionsToSort].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortBy) {
+        case 'date':
+          aValue = new Date(a.date).getTime();
+          bValue = new Date(b.date).getTime();
+          break;
+        case 'id':
+          aValue = a.id;
+          bValue = b.id;
+          break;
+        case 'session_number':
+          aValue = a.session_number;
+          bValue = b.session_number;
+          break;
+        case 'status':
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at).getTime();
+          bValue = new Date(b.created_at).getTime();
+          break;
+        case 'updated_at':
+          aValue = new Date(a.updated_at).getTime();
+          bValue = new Date(b.updated_at).getTime();
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [sortBy, sortOrder]);
+
+  // Filter and sort sessions by selected date
   useEffect(() => {
+    let filtered = allSessions;
+    
     if (selectedDate) {
       const dateStr = selectedDate.toISOString().split('T')[0];
-      const filtered = allSessions.filter((session) => {
+      filtered = allSessions.filter((session) => {
         const sessionDate = new Date(session.date).toISOString().split('T')[0];
         return sessionDate === dateStr;
       });
-      setSessions(filtered);
-    } else {
-      setSessions(allSessions);
     }
-  }, [selectedDate, allSessions]);
+    
+    const sorted = sortSessions(filtered);
+    setSessions(sorted);
+  }, [selectedDate, allSessions, sortSessions]);
 
   const fetchData = async () => {
     try {
@@ -77,17 +124,6 @@ function TallySessions() {
 
       const response = await tallySessionsApi.getAll(params);
       setAllSessions(response.data);
-      // Apply date filter if selected
-      if (selectedDate) {
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        const filtered = response.data.filter((session) => {
-          const sessionDate = new Date(session.date).toISOString().split('T')[0];
-          return sessionDate === dateStr;
-        });
-        setSessions(filtered);
-      } else {
-        setSessions(response.data);
-      }
     } catch (error) {
       console.error('Error fetching sessions:', error);
       alert('Error fetching tally sessions');
@@ -292,6 +328,30 @@ function TallySessions() {
             <option value="ongoing">Ongoing</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: '200px' }}>
+          <label>Sort By</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          >
+            <option value="date">Date</option>
+            <option value="id">ID</option>
+            <option value="session_number">Session Number</option>
+            <option value="status">Status</option>
+            <option value="created_at">Created At</option>
+            <option value="updated_at">Updated At</option>
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: '200px' }}>
+          <label>Sort Order</label>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+          >
+            <option value="desc">Descending (Latest First)</option>
+            <option value="asc">Ascending (Oldest First)</option>
           </select>
         </div>
       </div>
