@@ -77,12 +77,22 @@ def delete_plant(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_superadmin)
 ):
-    """Delete a plant (superadmin only)."""
+    """
+    Delete a plant (superadmin only).
+    
+    Cannot delete if plant has:
+    - Associated tally sessions
+    - Associated weight classifications
+    """
     try:
         success = crud.delete_plant(db, plant_id=plant_id)
         if not success:
             raise HTTPException(status_code=404, detail="Plant not found")
         return None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # ValueError from CRUD indicates business rule violation (associated data)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )
 

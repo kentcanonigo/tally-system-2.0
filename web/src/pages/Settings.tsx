@@ -248,6 +248,17 @@ function Settings() {
                 <h2 style={{ marginBottom: '20px', color: '#2c3e50' }}>Admin Console</h2>
                 <div className="form-group">
                   <label>Enter Command</label>
+                  <div style={{ marginBottom: '10px', fontSize: '14px', color: '#7f8c8d' }}>
+                    <p style={{ marginBottom: '8px' }}>Available commands:</p>
+                    <ul style={{ marginLeft: '20px', marginBottom: '10px' }}>
+                      <li><code style={{ backgroundColor: '#f5f5f5', padding: '2px 6px', borderRadius: '3px' }}>delete_everything</code> - Purge all data (keeps users/roles)</li>
+                      <li><code style={{ backgroundColor: '#f5f5f5', padding: '2px 6px', borderRadius: '3px' }}>setup_plant &lt;plant_name&gt;</code> - Create plant with standard weight classifications</li>
+                      <li><code style={{ backgroundColor: '#f5f5f5', padding: '2px 6px', borderRadius: '3px' }}>populate_test_sessions &lt;plant_name&gt; [customers] [sessions]</code> - Create test data</li>
+                    </ul>
+                    <p style={{ fontSize: '12px', fontStyle: 'italic', marginTop: '8px' }}>
+                      Example: <code style={{ backgroundColor: '#f5f5f5', padding: '2px 6px', borderRadius: '3px' }}>setup_plant My Plant</code> or <code style={{ backgroundColor: '#f5f5f5', padding: '2px 6px', borderRadius: '3px' }}>populate_test_sessions My Plant 5 2</code>
+                    </p>
+                  </div>
                   <input
                     type="text"
                     value={consoleCommand}
@@ -257,7 +268,7 @@ function Settings() {
                         handleConsoleCommand();
                       }
                     }}
-                    placeholder="e.g., delete_everything"
+                    placeholder="e.g., setup_plant My Plant"
                     style={{
                       width: '100%',
                       padding: '10px',

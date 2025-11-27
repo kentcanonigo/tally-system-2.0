@@ -10,6 +10,7 @@ function Plants() {
   const [showModal, setShowModal] = useState(false);
   const [editingPlant, setEditingPlant] = useState<Plant | null>(null);
   const [formData, setFormData] = useState({ name: '' });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlants();
@@ -57,12 +58,17 @@ function Plants() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this plant?')) return;
+    setError(null); // Clear any previous errors
     try {
       await plantsApi.delete(id);
       fetchPlants();
-    } catch (error) {
-      console.error('Error deleting plant:', error);
-      alert('Error deleting plant');
+    } catch (err: any) {
+      console.error('Error deleting plant:', err);
+      // Extract error message from API response
+      const errorMessage = err.response?.data?.detail || 'Failed to delete plant';
+      setError(errorMessage);
+      // Auto-clear error after 10 seconds
+      setTimeout(() => setError(null), 10000);
     }
   };
 
@@ -84,6 +90,41 @@ function Plants() {
             onClick={handleCreate}
           >
             Add Plant
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div 
+          className="error-message" 
+          style={{ 
+            marginBottom: '20px', 
+            padding: '12px 16px', 
+            backgroundColor: '#fee', 
+            border: '1px solid #fcc', 
+            borderRadius: '4px',
+            color: '#c33',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <span style={{ flex: 1 }}>{error}</span>
+          <button 
+            onClick={() => setError(null)}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: '#c33', 
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              padding: '0 8px',
+              marginLeft: '12px'
+            }}
+            aria-label="Close error message"
+          >
+            ×
           </button>
         </div>
       )}
