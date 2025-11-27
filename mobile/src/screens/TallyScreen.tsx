@@ -18,6 +18,7 @@ import { getDefaultHeadsAmount } from '../utils/settings';
 import { formatDate } from '../utils/dateFormat';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePermissions } from '../utils/usePermissions';
+import { removeActiveSession } from '../utils/activeSessions';
 
 interface TallyScreenProps {
   sessionId?: number;
@@ -146,9 +147,17 @@ function TallyScreen(props?: TallyScreenProps) {
       } else {
         setLogEntries([]); // Empty array if user can't view logs
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
-      Alert.alert('Error', 'Failed to load tally data');
+      // If session doesn't exist (404), remove it from active sessions and navigate back
+      if (error.response?.status === 404 && sessionId) {
+        await removeActiveSession(sessionId);
+        Alert.alert('Session Not Found', 'This session no longer exists and has been removed from your active sessions.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        Alert.alert('Error', 'Failed to load tally data');
+      }
     }
   };
 

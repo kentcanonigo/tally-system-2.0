@@ -22,6 +22,7 @@ import type { TallySession, AllocationDetails, Customer, Plant, WeightClassifica
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { removeActiveSession } from '../utils/activeSessions';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
@@ -119,9 +120,17 @@ function TallySessionDetailScreen() {
       if (results[3].data.length > 0) {
         setFormData((prev) => ({ ...prev, weight_classification_id: results[3].data[0].id }));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
-      Alert.alert('Error', 'Failed to load session details');
+      // If session doesn't exist (404), remove it from active sessions and navigate back
+      if (error.response?.status === 404 && sessionId) {
+        await removeActiveSession(sessionId);
+        Alert.alert('Session Not Found', 'This session no longer exists and has been removed from your active sessions.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        Alert.alert('Error', 'Failed to load session details');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

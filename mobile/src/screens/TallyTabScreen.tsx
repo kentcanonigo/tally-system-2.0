@@ -58,27 +58,58 @@ function TallyTabScreen() {
 
       // Fetch sessions and customers in parallel
       const [sessionsRes, customersRes] = await Promise.all([
-        Promise.all(activeIds.map(id => tallySessionsApi.getById(id).catch(() => null))),
+        Promise.all(activeIds.map(async (id) => {
+          try {
+            return { id, data: await tallySessionsApi.getById(id) };
+          } catch (error: any) {
+            // Track which IDs failed (404 or other errors)
+            if (error.response?.status === 404) {
+              return { id, data: null, notFound: true };
+            }
+            return { id, data: null };
+          }
+        })),
         customersApi.getAll(),
       ]);
 
-      // Filter out any null results (sessions that no longer exist)
-      const validSessions = sessionsRes
-        .filter((res): res is { data: TallySession } => res !== null)
-        .map(res => res.data)
-        .filter(session => !activePlantId || session.plant_id === activePlantId); // Filter by active plant if set
+      // Separate valid sessions from invalid ones
+      const validSessionData: TallySession[] = [];
+      const invalidSessionIds: number[] = [];
 
-      setSessions(validSessions);
+      sessionsRes.forEach((res) => {
+        if (res.data && res.data.data) {
+          const session = res.data.data;
+          // Only include sessions that match the active plant filter
+          if (!activePlantId || session.plant_id === activePlantId) {
+            validSessionData.push(session);
+          }
+          // Note: If session exists but doesn't match plant filter, we keep it in storage
+          // since it might be valid for other plants
+        } else if (res.notFound) {
+          // Session doesn't exist (404) - remove from storage
+          invalidSessionIds.push(res.id);
+        }
+      });
+
+      // Remove invalid session IDs from AsyncStorage
+      if (invalidSessionIds.length > 0) {
+        await Promise.all(invalidSessionIds.map(id => removeActiveSession(id)));
+        // Update active session IDs state to reflect removal
+        const remainingIds = activeIds.filter(id => !invalidSessionIds.includes(id));
+        setActiveSessionIds(remainingIds);
+      }
+
+      setSessions(validSessionData);
       setCustomers(customersRes.data);
 
       // If selected session is no longer in active sessions, clear selection
-      if (selectedSessionId && !validSessions.find(s => s.id === selectedSessionId)) {
+      if (selectedSessionId && !validSessionData.find(s => s.id === selectedSessionId)) {
         setSelectedSessionId(null);
       }
 
       // Auto-select first session if none selected and we have sessions
-      if (!selectedSessionId && validSessions.length > 0) {
-        setSelectedSessionId(validSessions[0].id);
+      if (!selectedSessionId && validSessionData.length > 0) {
+        setSelectedSessionId(validSessionData[0].id);
       }
     } catch (error) {
       console.error('Error loading active sessions:', error);
