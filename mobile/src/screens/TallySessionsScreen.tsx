@@ -602,7 +602,7 @@ function TallySessionsScreen() {
   if (!activePlantId) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.emptyText}>Please select an active plant in Settings to view sessions.</Text>
+        <Text style={styles.emptyText}>No active plant set</Text>
       </View>
     );
   }

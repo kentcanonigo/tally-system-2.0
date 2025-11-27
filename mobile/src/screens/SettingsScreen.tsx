@@ -71,9 +71,39 @@ function SettingsScreen() {
     try {
       setIsLoadingPlants(true);
       const response = await plantsApi.getAll();
-      setPlants(response.data);
-    } catch (error) {
+      const fetchedPlants = response.data;
+      setPlants(fetchedPlants);
+      
+      // If active plant ID is set but the plant doesn't exist in the fetched list (404 scenario),
+      // set active plant to null
+      const currentActivePlantId = selectedActivePlant || activePlantId;
+      if (currentActivePlantId && !fetchedPlants.find(p => p.id === currentActivePlantId)) {
+        console.log('Active plant not found in fetched plants, setting to null');
+        setSelectedActivePlant(null);
+        await setActivePlantId(null);
+        try {
+          await updatePreferences({
+            active_plant_id: null,
+          });
+        } catch (prefError) {
+          console.error('Error updating preferences:', prefError);
+        }
+      }
+    } catch (error: any) {
       console.error('Error fetching plants:', error);
+      // If we get a 404 or the active plant doesn't exist, set it to null
+      const currentActivePlantId = selectedActivePlant || activePlantId;
+      if (error.response?.status === 404 || currentActivePlantId) {
+        setSelectedActivePlant(null);
+        await setActivePlantId(null);
+        try {
+          await updatePreferences({
+            active_plant_id: null,
+          });
+        } catch (prefError) {
+          console.error('Error updating preferences:', prefError);
+        }
+      }
       Alert.alert('Error', 'Failed to load plants');
     } finally {
       setIsLoadingPlants(false);
@@ -93,7 +123,7 @@ function SettingsScreen() {
     }
   };
 
-  const handleSelectPlant = async (plantId: number) => {
+  const handleSelectPlant = async (plantId: number | null) => {
     setSelectedActivePlant(plantId);
     setShowPlantDropdown(false);
     
@@ -143,9 +173,9 @@ function SettingsScreen() {
   };
 
   const getActivePlantName = () => {
-    if (!selectedActivePlant) return 'None Selected';
+    if (!selectedActivePlant) return 'None';
     const plant = plants.find(p => p.id === selectedActivePlant);
-    return plant ? plant.name : 'Unknown Plant';
+    return plant ? plant.name : 'None';
   };
 
   const getUserRoleLabel = () => {
@@ -547,20 +577,37 @@ function SettingsScreen() {
                 style={dynamicStyles.dropdownScroll}
                 contentContainerStyle={dynamicStyles.dropdownContent}
               >
+                <TouchableOpacity
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    plants.length === 0 && dynamicStyles.dropdownOptionLast,
+                    !selectedActivePlant && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => handleSelectPlant(null)}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.dropdownOptionText,
+                      !selectedActivePlant && dynamicStyles.dropdownOptionTextSelected,
+                    ]}
+                  >
+                    None
+                  </Text>
+                </TouchableOpacity>
                 {plants.map((plant, index) => (
                   <TouchableOpacity
                     key={plant.id}
                     style={[
                       dynamicStyles.dropdownOption,
                       index === plants.length - 1 && dynamicStyles.dropdownOptionLast,
-                      activePlantId === plant.id && dynamicStyles.dropdownOptionSelected,
+                      selectedActivePlant === plant.id && dynamicStyles.dropdownOptionSelected,
                     ]}
                     onPress={() => handleSelectPlant(plant.id)}
                   >
                     <Text
                       style={[
                         dynamicStyles.dropdownOptionText,
-                        activePlantId === plant.id && dynamicStyles.dropdownOptionTextSelected,
+                        selectedActivePlant === plant.id && dynamicStyles.dropdownOptionTextSelected,
                       ]}
                     >
                       {plant.name}

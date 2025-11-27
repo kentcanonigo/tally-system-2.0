@@ -372,6 +372,18 @@ function TallyTabScreen() {
     );
   }
 
+  if (!activePlantId) {
+    return (
+      <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={['top']}>
+        <View style={dynamicStyles.emptyContainer}>
+          <Text style={dynamicStyles.emptyText}>
+            No active plant set
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (activeSessionIds.length === 0 || sessions.length === 0) {
     return (
       <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={['top']}>

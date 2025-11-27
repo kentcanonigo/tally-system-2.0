@@ -168,5 +168,14 @@ export const permissionsApi = {
   getAll: () => api.get<Permission[]>('/permissions'),
 };
 
+// Console API (superadmin only)
+export const consoleApi = {
+  executeCommand: (command: string, args?: Record<string, any>) =>
+    api.post<{ success: boolean; message: string; data?: Record<string, any> }>('/console', {
+      command,
+      args: args || {},
+    }),
+};
+
 export default api;
 

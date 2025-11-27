@@ -6,10 +6,12 @@ import { customersApi } from '../services/api';
 import type { Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
+import { usePlant } from '../contexts/PlantContext';
 
 function CustomersScreen() {
   const responsive = useResponsive();
   const { hasPermission } = usePermissions();
+  const { activePlantId } = usePlant();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,6 +103,14 @@ function CustomersScreen() {
     return (
       <View style={styles.container}>
         <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!activePlantId) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.emptyText}>No active plant set</Text>
       </View>
     );
   }
@@ -340,6 +350,16 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
   },
 });
 
