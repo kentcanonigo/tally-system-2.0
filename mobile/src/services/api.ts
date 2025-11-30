@@ -60,13 +60,35 @@ const getDebuggerHost = (): string | null => {
 // For Android emulator, use 10.0.2.2 to reach localhost
 // For iOS simulator, use localhost
 // For physical device, use the debugger host IP from Expo Constants
-// You can also manually set the IP by storing it in AsyncStorage with key 'API_HOST_IP'
+// You can also manually set the full URL by storing it in AsyncStorage with key 'API_BASE_URL'
+// Or set just the IP by storing it in AsyncStorage with key 'API_HOST_IP' (legacy support)
 const getApiBaseUrl = async (): Promise<string> => {
   if (!__DEV__) {
+    // In production, check for manually configured URL first
+    try {
+      const manualUrl = await AsyncStorage.getItem('API_BASE_URL');
+      if (manualUrl) {
+        console.log('[API] Using manually configured URL:', manualUrl);
+        return manualUrl;
+      }
+    } catch (error) {
+      console.warn('[API] Could not read manual URL from storage:', error);
+    }
     return 'https://tally-system-api-awdvavfdgtexhyhu.southeastasia-01.azurewebsites.net/api/v1';
   }
 
-  // Check for manually configured IP in AsyncStorage first
+  // Check for manually configured full URL in AsyncStorage first (highest priority)
+  try {
+    const manualUrl = await AsyncStorage.getItem('API_BASE_URL');
+    if (manualUrl) {
+      console.log('[API] Using manually configured URL:', manualUrl);
+      return manualUrl;
+    }
+  } catch (error) {
+    console.warn('[API] Could not read manual URL from storage:', error);
+  }
+
+  // Check for manually configured IP in AsyncStorage (legacy support)
   try {
     const manualIp = await AsyncStorage.getItem('API_HOST_IP');
     if (manualIp) {
@@ -147,18 +169,58 @@ getApiBaseUrl().then(url => {
   api.defaults.baseURL = API_BASE_URL;
 });
 
-// Export function to manually set API host IP
+// Export function to manually set API host IP (legacy support)
 export const setApiHostIp = async (ip: string) => {
   try {
     await AsyncStorage.setItem('API_HOST_IP', ip);
     const newUrl = `http://${ip}:8000/api/v1`;
     api.defaults.baseURL = newUrl;
+    API_BASE_URL = newUrl;
     console.log('[API] Manually set API URL to:', newUrl);
     return newUrl;
   } catch (error) {
     console.error('[API] Error setting manual IP:', error);
     throw error;
   }
+};
+
+// Export function to manually set full API URL
+export const setApiBaseUrl = async (url: string | null) => {
+  try {
+    if (url) {
+      // Validate URL format
+      try {
+        new URL(url);
+      } catch (e) {
+        throw new Error('Invalid URL format. Please include http:// or https://');
+      }
+      
+      // Ensure URL doesn't end with a slash (except for root)
+      const cleanUrl = url.trim().replace(/\/+$/, '');
+      await AsyncStorage.setItem('API_BASE_URL', cleanUrl);
+      api.defaults.baseURL = cleanUrl;
+      API_BASE_URL = cleanUrl;
+      console.log('[API] Manually set API URL to:', cleanUrl);
+      return cleanUrl;
+    } else {
+      // Clear the manual URL to use default
+      await AsyncStorage.removeItem('API_BASE_URL');
+      // Recalculate the default URL
+      const defaultUrl = await getApiBaseUrl();
+      api.defaults.baseURL = defaultUrl;
+      API_BASE_URL = defaultUrl;
+      console.log('[API] Cleared manual URL, using default:', defaultUrl);
+      return defaultUrl;
+    }
+  } catch (error) {
+    console.error('[API] Error setting manual URL:', error);
+    throw error;
+  }
+};
+
+// Export function to get current API base URL
+export const getCurrentApiBaseUrl = async (): Promise<string> => {
+  return await getApiBaseUrl();
 };
 
 // Customers API

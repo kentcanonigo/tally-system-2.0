@@ -41,6 +41,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 | `ALGORITHM` | `HS256` | JWT algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | 8 hours token lifetime |
 | `CORS_ORIGINS` | `https://your-static-web-app.azurestaticapps.net` | Optional but recommended |
+| `DEBUG` | `False` | Set to False for production (security) |
 
 ### Save and Restart:
 

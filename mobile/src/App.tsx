@@ -9,22 +9,44 @@ import { TimezoneProvider } from './contexts/TimezoneContext';
 import { PlantProvider } from './contexts/PlantContext';
 import AppNavigator from './navigation/AppNavigator';
 
-// Get API Base URL
+// Get API Base URL (must match the logic in api.ts)
 const getApiBaseUrl = async (): Promise<string> => {
   const __DEV__ = !Constants.expoConfig?.extra?.production;
   
   if (!__DEV__) {
+    // In production, check for manually configured URL first
+    try {
+      const manualUrl = await AsyncStorage.getItem('API_BASE_URL');
+      if (manualUrl) {
+        console.log('[App] Using manually configured URL:', manualUrl);
+        return manualUrl;
+      }
+    } catch (error) {
+      console.warn('[App] Could not read manual URL from storage:', error);
+    }
     return 'https://tally-system-api-awdvavfdgtexhyhu.southeastasia-01.azurewebsites.net/api/v1';
   }
 
-  // Check for manually configured IP in AsyncStorage first
+  // Check for manually configured full URL in AsyncStorage first (highest priority)
+  try {
+    const manualUrl = await AsyncStorage.getItem('API_BASE_URL');
+    if (manualUrl) {
+      console.log('[App] Using manually configured URL:', manualUrl);
+      return manualUrl;
+    }
+  } catch (error) {
+    console.warn('[App] Could not read manual URL from storage:', error);
+  }
+
+  // Check for manually configured IP in AsyncStorage (legacy support)
   try {
     const manualIp = await AsyncStorage.getItem('API_HOST_IP');
     if (manualIp) {
+      console.log('[App] Using manually configured IP:', manualIp);
       return `http://${manualIp}:8000/api/v1`;
     }
   } catch (error) {
-    console.warn('[API] Could not read manual IP from storage:', error);
+    console.warn('[App] Could not read manual IP from storage:', error);
   }
 
   // Try to get the debugger host IP (for physical devices)
@@ -37,7 +59,7 @@ const getApiBaseUrl = async (): Promise<string> => {
       }
     }
   } catch (error) {
-    console.warn('[API] Could not get debugger host:', error);
+    console.warn('[App] Could not get debugger host:', error);
   }
 
   // Fallback to emulator/simulator addresses

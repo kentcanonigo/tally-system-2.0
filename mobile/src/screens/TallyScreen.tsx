@@ -1088,7 +1088,7 @@ function TallyScreen(props?: TallyScreenProps) {
   const renderByproductMode = () => (
     <View style={dynamicStyles.contentContainer}>
       <View style={dynamicStyles.summarySection}>
-        <View style={dynamicStyles.summaryContainer}>
+        <View style={[dynamicStyles.summaryContainer, { flex: 1 }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: responsive.spacing.md }}>
             <Text style={dynamicStyles.summaryTitle}>Byproducts</Text>
             <TouchableOpacity
@@ -1109,60 +1109,65 @@ function TallyScreen(props?: TallyScreenProps) {
               </View>
             </TouchableOpacity>
           </View>
-          <View style={dynamicStyles.summaryTable}>
+          <View style={[dynamicStyles.summaryTable, { flex: 1 }]}>
             <View style={dynamicStyles.summaryHeader}>
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Classification</Text>
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Description</Text>
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Count / Required</Text>
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Action</Text>
             </View>
-            {filteredAllocations.length > 0 ? (
-              filteredAllocations.map((allocation: AllocationDetails) => {
-                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
-                if (!wc) return null;
+            <ScrollView 
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {filteredAllocations.length > 0 ? (
+                filteredAllocations.map((allocation: AllocationDetails) => {
+                  const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                  if (!wc) return null;
 
-                // Handle case where allocated_bags might not be available (users without can_view_tally_logs)
-                const allocatedBags = tallyRole === 'tally'
-                  ? (allocation.allocated_bags_tally ?? 0)
-                  : (allocation.allocated_bags_dispatcher ?? 0);
+                  // Handle case where allocated_bags might not be available (users without can_view_tally_logs)
+                  const allocatedBags = tallyRole === 'tally'
+                    ? (allocation.allocated_bags_tally ?? 0)
+                    : (allocation.allocated_bags_dispatcher ?? 0);
 
-                const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                const hasProgressData = 'allocated_bags_tally' in allocation;
+                  const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
+                  const hasProgressData = 'allocated_bags_tally' in allocation;
 
-                return (
-                  <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
-                      {wc.classification}
-                    </Text>
-                    <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={2}>
-                      {wc.description || '-'}
-                    </Text>
-                    <Text style={[
-                      dynamicStyles.summaryCell,
-                      { flex: 1.5 },
-                      isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
-                    ]}>
-                      {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
-                    </Text>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        style={[styles.incrementButton, disabledButtonStyle, isSubmitting && { opacity: 0.6 }]}
-                        onPress={() => handleByproductIncrement(wc.id)}
-                        disabled={isSubmitting || !canStartTally}
-                      >
-                        <Text style={styles.incrementButtonText}>{canStartTally ? '+1' : '—'}</Text>
-                      </TouchableOpacity>
+                  return (
+                    <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                      <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                        {wc.classification}
+                      </Text>
+                      <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={2}>
+                        {wc.description || '-'}
+                      </Text>
+                      <Text style={[
+                        dynamicStyles.summaryCell,
+                        { flex: 1.5 },
+                        isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
+                      ]}>
+                        {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
+                      </Text>
+                      <View style={{ flex: 1, alignItems: 'center' }}>
+                        <TouchableOpacity
+                          style={[styles.incrementButton, disabledButtonStyle, isSubmitting && { opacity: 0.6 }]}
+                          onPress={() => handleByproductIncrement(wc.id)}
+                          disabled={isSubmitting || !canStartTally}
+                        >
+                          <Text style={styles.incrementButtonText}>{canStartTally ? '+1' : '—'}</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                );
-              })
-            ) : (
-              <View style={dynamicStyles.summaryRow}>
-                <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
-                  No byproduct allocations found
-                </Text>
-              </View>
-            )}
+                  );
+                })
+              ) : (
+                <View style={dynamicStyles.summaryRow}>
+                  <Text style={[dynamicStyles.summaryCell, { flex: 1, textAlign: 'center' }]}>
+                    No byproduct allocations found
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </View>

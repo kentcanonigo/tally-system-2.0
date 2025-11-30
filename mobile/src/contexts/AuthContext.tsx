@@ -36,11 +36,34 @@ interface AuthProviderProps {
   apiBaseUrl: string;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl: initialApiBaseUrl }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>(initialApiBaseUrl);
+
+  // Update API base URL when it changes in AsyncStorage
+  useEffect(() => {
+    const checkApiUrl = async () => {
+      try {
+        const storedUrl = await AsyncStorage.getItem('API_BASE_URL');
+        if (storedUrl) {
+          setApiBaseUrl(storedUrl);
+        } else {
+          setApiBaseUrl(initialApiBaseUrl);
+        }
+      } catch (err) {
+        console.error('Failed to check API URL:', err);
+      }
+    };
+
+    // Check on mount and periodically (every 2 seconds) to catch changes
+    checkApiUrl();
+    const interval = setInterval(checkApiUrl, 2000);
+
+    return () => clearInterval(interval);
+  }, [initialApiBaseUrl]);
 
   // Load token and user on mount
   useEffect(() => {
@@ -63,7 +86,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
 
   const fetchUserData = async (authToken: string) => {
     try {
-      const response = await axios.get<User>(`${apiBaseUrl}/auth/me`, {
+      // Get current API URL (might have changed)
+      const currentUrl = await AsyncStorage.getItem('API_BASE_URL') || apiBaseUrl;
+      const response = await axios.get<User>(`${currentUrl}/auth/me`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
@@ -81,9 +106,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
       setError(null);
       setLoading(true);
 
+      // Get current API URL (might have changed)
+      const currentUrl = await AsyncStorage.getItem('API_BASE_URL') || apiBaseUrl;
+
       // Login and get token
       const loginResponse = await axios.post<AuthResponse>(
-        `${apiBaseUrl}/auth/login`,
+        `${currentUrl}/auth/login`,
         credentials
       );
 
@@ -131,9 +159,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     }
     
     try {
+      // Get current API URL (might have changed)
+      const currentUrl = await AsyncStorage.getItem('API_BASE_URL') || apiBaseUrl;
+
       // Don't set loading state for preference updates to avoid navigation resets
       const response = await axios.put<User>(
-        `${apiBaseUrl}/auth/me/preferences`,
+        `${currentUrl}/auth/me/preferences`,
         preferences,
         {
           headers: {

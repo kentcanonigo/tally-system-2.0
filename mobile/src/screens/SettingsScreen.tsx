@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Switch, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
-import { plantsApi, rolesApi } from '../services/api';
+import { plantsApi, rolesApi, setApiBaseUrl, getCurrentApiBaseUrl } from '../services/api';
 import { Plant, Role } from '../types';
 import { useDefaultHeadsAmount } from '../utils/settings';
 
@@ -52,6 +53,10 @@ function SettingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  
+  // API URL state
+  const [apiUrl, setApiUrl] = useState<string>('');
+  const [isLoadingApiUrl, setIsLoadingApiUrl] = useState(false);
 
   // Update state when user data changes
   useEffect(() => {
@@ -80,7 +85,18 @@ function SettingsScreen() {
   useEffect(() => {
     fetchPlants();
     fetchRoles();
+    loadApiUrl();
   }, []);
+
+  // Load current API URL from storage
+  const loadApiUrl = async () => {
+    try {
+      const storedUrl = await AsyncStorage.getItem('API_BASE_URL');
+      setApiUrl(storedUrl || '');
+    } catch (error) {
+      console.error('Error loading API URL:', error);
+    }
+  };
 
   const fetchPlants = async (isRefresh = false) => {
     if (isRefresh) {
@@ -565,6 +581,108 @@ function SettingsScreen() {
 
         <Text style={dynamicStyles.infoText}>
           This is the default number of heads per bag for Dressed category items. Byproduct items do not use heads tracking. This setting is currently view-only.
+        </Text>
+      </View>
+
+      <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>API URL (Testing)</Text>
+        <Text style={dynamicStyles.label}>
+          Manually set the API base URL for testing (client-only, not synced):
+        </Text>
+
+        <View style={dynamicStyles.inputWrapper}>
+          <TextInput
+            style={dynamicStyles.input}
+            value={apiUrl}
+            onChangeText={setApiUrl}
+            placeholder="https://example.com/api/v1"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholderTextColor="#999"
+            editable={!isLoadingApiUrl}
+          />
+        </View>
+
+        <View style={{ flexDirection: 'row', marginTop: 8 }}>
+          <TouchableOpacity
+            style={[dynamicStyles.saveButton, { flex: 1, backgroundColor: '#3498db', marginRight: apiUrl.trim() ? 6 : 0 }]}
+            onPress={async () => {
+              setIsLoadingApiUrl(true);
+              try {
+                const urlToSave = apiUrl.trim() || null;
+                const currentStoredUrl = await AsyncStorage.getItem('API_BASE_URL');
+                
+                // Check if URL is actually changing
+                const urlChanged = urlToSave !== currentStoredUrl;
+                
+                await setApiBaseUrl(urlToSave);
+                
+                if (urlChanged) {
+                  // URL changed - need to log out and log back in with new URL
+                  Alert.alert(
+                    'API URL Changed',
+                    urlToSave 
+                      ? `API URL set to: ${urlToSave}\n\nYou need to log out and log back in for the changes to take effect. Your current session will be logged out.`
+                      : 'API URL cleared. Using default URL.\n\nYou need to log out and log back in for the changes to take effect. Your current session will be logged out.',
+                    [
+                      { 
+                        text: 'OK', 
+                        onPress: async () => {
+                          // Log out user since token is invalid for new URL
+                          await logout();
+                        }
+                      }
+                    ]
+                  );
+                } else {
+                  // URL didn't change, just show success
+                  Alert.alert(
+                    'Success',
+                    urlToSave 
+                      ? `API URL is already set to: ${urlToSave}`
+                      : 'API URL cleared. Using default URL.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              } catch (error: any) {
+                Alert.alert('Error', error.message || 'Failed to save API URL');
+              } finally {
+                setIsLoadingApiUrl(false);
+              }
+            }}
+            disabled={isLoadingApiUrl}
+          >
+            {isLoadingApiUrl ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={dynamicStyles.saveButtonText}>
+                {apiUrl.trim() ? 'Save URL' : 'Clear (Use Default)'}
+              </Text>
+            )}
+          </TouchableOpacity>
+          
+          {apiUrl.trim() && (
+            <TouchableOpacity
+              style={[dynamicStyles.saveButton, { flex: 1, backgroundColor: '#95a5a6', marginLeft: 6 }]}
+              onPress={async () => {
+                const currentUrl = await getCurrentApiBaseUrl();
+                Alert.alert(
+                  'Current API URL',
+                  `The app is currently using:\n\n${currentUrl}`,
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <Text style={dynamicStyles.saveButtonText}>View Current</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={dynamicStyles.infoText}>
+          This setting allows you to override the API URL for testing purposes. Leave empty to use the default URL. 
+          Changes are stored locally on your device only and will not sync to other devices or the server.
+          You may need to restart the app after changing this setting.
         </Text>
       </View>
 
