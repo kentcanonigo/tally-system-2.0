@@ -208,7 +208,7 @@ function TallySessionDetail() {
       if (format === 'pdf') {
         generateTallySheetPDF(response.data);
       } else {
-        generateTallySheetExcel(response.data);
+        await generateTallySheetExcel(response.data);
       }
     } catch (error) {
       console.error('Tally sheet export error:', error);
