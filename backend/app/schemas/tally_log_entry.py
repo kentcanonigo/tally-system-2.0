@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 
@@ -43,3 +43,7 @@ class TallyLogEntryResponse(TallyLogEntryBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class TallyLogEntryTransfer(BaseModel):
+    entry_ids: List[int]
+    target_session_id: int

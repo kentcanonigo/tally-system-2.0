@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ...database import get_db
-from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryResponse, TallyLogEntryRole
+from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
 from ...auth.dependencies import get_current_user, require_permission
@@ -101,3 +101,28 @@ def delete_tally_log_entry(
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")
     return None
+
+
+@router.post(
+    "/log-entries/transfer",
+    status_code=status.HTTP_200_OK
+)
+def transfer_tally_log_entries(
+    transfer_request: TallyLogEntryTransfer,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_tally"))
+):
+    """
+    Transfer tally log entries from their current sessions to a target session.
+    Requires 'can_tally' permission.
+    Updates AllocationDetails for both source and target sessions atomically.
+    """
+    try:
+        count = crud.transfer_tally_log_entries(
+            db=db,
+            entry_ids=transfer_request.entry_ids,
+            target_session_id=transfer_request.target_session_id
+        )
+        return {"message": f"Successfully transferred {count} log entries", "count": count}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

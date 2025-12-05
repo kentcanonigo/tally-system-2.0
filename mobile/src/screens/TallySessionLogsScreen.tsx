@@ -56,6 +56,14 @@ function TallySessionLogsScreen() {
   });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showTransferCustomerDropdown, setShowTransferCustomerDropdown] = useState(false);
+  const [showTransferSessionDropdown, setShowTransferSessionDropdown] = useState(false);
+  const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
+  const [availableSessions, setAvailableSessions] = useState<TallySession[]>([]);
+  const [selectedTargetCustomerId, setSelectedTargetCustomerId] = useState<number | null>(null);
+  const [selectedTargetSessionId, setSelectedTargetSessionId] = useState<number | null>(null);
+  const [loadingTransferData, setLoadingTransferData] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -348,6 +356,87 @@ function TallySessionLogsScreen() {
         }
       ]
     );
+  };
+
+  const loadTransferData = async () => {
+    if (!session || !plant) return;
+    
+    setLoadingTransferData(true);
+    try {
+      // Load all customers (we'll filter by plant on the backend if needed, but for now just get all)
+      const customersRes = await customersApi.getAll();
+      // Filter customers that have sessions in the same plant (we'll filter sessions by plant)
+      setAvailableCustomers(customersRes.data.filter(c => c.id !== customer?.id));
+      
+      // Reset selections
+      setSelectedTargetCustomerId(null);
+      setSelectedTargetSessionId(null);
+      setAvailableSessions([]);
+    } catch (error) {
+      console.error('Error loading transfer data:', error);
+      Alert.alert('Error', 'Failed to load customers');
+    } finally {
+      setLoadingTransferData(false);
+    }
+  };
+
+  const loadSessionsForCustomer = async (customerId: number) => {
+    if (!plant) return;
+    
+    try {
+      const sessionsRes = await tallySessionsApi.getAll({
+        customer_id: customerId,
+        plant_id: plant.id,
+      });
+      // Filter out the current session
+      setAvailableSessions(sessionsRes.data.filter(s => s.id !== sessionId));
+      setSelectedTargetSessionId(null);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      Alert.alert('Error', 'Failed to load sessions');
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (selectedIds.size === 0) {
+      Alert.alert('Error', 'Please select entries to transfer');
+      return;
+    }
+    
+    if (!selectedTargetSessionId) {
+      Alert.alert('Error', 'Please select a target session');
+      return;
+    }
+    
+    if (!hasPermission('can_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to transfer tally log entries.');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await tallyLogEntriesApi.transfer(Array.from(selectedIds), selectedTargetSessionId);
+      
+      Alert.alert('Success', `Successfully transferred ${selectedIds.size} log entries`);
+      setShowTransferModal(false);
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+      setSelectedTargetCustomerId(null);
+      setSelectedTargetSessionId(null);
+      setAvailableSessions([]);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error transferring logs:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to transfer log entries';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openTransferModal = () => {
+    setShowTransferModal(true);
+    loadTransferData();
   };
 
   if (loading) {
@@ -735,12 +824,20 @@ function TallySessionLogsScreen() {
           {selectionMode ? (
             <>
               {hasPermission('can_tally') && (
-                <TouchableOpacity
-                  style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
-                  onPress={handleDeleteSelected}
-                >
-                  <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                    onPress={openTransferModal}
+                  >
+                    <MaterialIcons name="swap-horiz" size={20} color="#3498db" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                    onPress={handleDeleteSelected}
+                  >
+                    <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
+                  </TouchableOpacity>
+                </>
               )}
               <TouchableOpacity
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
@@ -1316,6 +1413,225 @@ function TallySessionLogsScreen() {
                 <Text style={dynamicStyles.columnSettingsButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <Modal
+          transparent
+          visible={showTransferModal}
+          animationType="fade"
+          onRequestClose={() => {
+            setShowTransferModal(false);
+            setShowTransferCustomerDropdown(false);
+            setShowTransferSessionDropdown(false);
+          }}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              if (!showTransferCustomerDropdown && !showTransferSessionDropdown) {
+                setShowTransferModal(false);
+                setSelectedTargetCustomerId(null);
+                setSelectedTargetSessionId(null);
+                setAvailableSessions([]);
+              }
+            }}
+          >
+            <View 
+              style={dynamicStyles.columnSettingsModal}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={dynamicStyles.columnSettingsTitle}>Transfer Log Entries</Text>
+              <Text style={dynamicStyles.columnSettingsSubtitle}>
+                Transfer {selectedIds.size} selected entries to another customer's session
+              </Text>
+              
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Select Customer:</Text>
+              <View style={dynamicStyles.pickerWrapper}>
+                <TouchableOpacity
+                  style={dynamicStyles.dropdownButton}
+                  onPress={() => setShowTransferCustomerDropdown(true)}
+                  disabled={loadingTransferData}
+                >
+                  <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
+                    {selectedTargetCustomerId 
+                      ? availableCustomers.find(c => c.id === selectedTargetCustomerId)?.name || 'Select Customer'
+                      : 'Select Customer'}
+                  </Text>
+                  <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {selectedTargetCustomerId && (
+                <>
+                  <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Select Session:</Text>
+                  <View style={dynamicStyles.pickerWrapper}>
+                    <TouchableOpacity
+                      style={dynamicStyles.dropdownButton}
+                      onPress={() => setShowTransferSessionDropdown(true)}
+                      disabled={availableSessions.length === 0}
+                    >
+                      <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
+                        {selectedTargetSessionId
+                          ? (() => {
+                              const selectedSession = availableSessions.find(s => s.id === selectedTargetSessionId);
+                              return selectedSession 
+                                ? `Session #${selectedSession.session_number} - ${formatDate(selectedSession.date, timezone)}`
+                                : 'Select Session';
+                            })()
+                          : availableSessions.length === 0
+                          ? 'No sessions available'
+                          : 'Select Session'}
+                      </Text>
+                      <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {selectedTargetCustomerId && availableSessions.length === 0 && !loadingTransferData && (
+                <Text style={[dynamicStyles.columnSettingsSubtitle, { marginTop: 8, color: '#e74c3c' }]}>
+                  No sessions available for this customer in the same plant
+                </Text>
+              )}
+
+              <View style={{ flexDirection: 'row', marginTop: responsive.spacing.md, gap: responsive.spacing.sm }}>
+                <TouchableOpacity
+                  style={[dynamicStyles.columnSettingsButton, { flex: 1, backgroundColor: '#95a5a6' }]}
+                  onPress={() => {
+                    setShowTransferModal(false);
+                    setShowTransferCustomerDropdown(false);
+                    setShowTransferSessionDropdown(false);
+                    setSelectedTargetCustomerId(null);
+                    setSelectedTargetSessionId(null);
+                    setAvailableSessions([]);
+                  }}
+                >
+                  <Text style={dynamicStyles.columnSettingsButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    dynamicStyles.columnSettingsButton, 
+                    { flex: 1 },
+                    (!selectedTargetSessionId || loading) && { opacity: 0.5 }
+                  ]}
+                  onPress={handleTransfer}
+                  disabled={!selectedTargetSessionId || loading}
+                >
+                  <Text style={dynamicStyles.columnSettingsButtonText}>
+                    {loading ? 'Transferring...' : 'Transfer'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Transfer Customer Dropdown Modal */}
+      {showTransferCustomerDropdown && (
+        <Modal
+          transparent
+          visible={showTransferCustomerDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowTransferCustomerDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTransferCustomerDropdown(false)}
+          >
+            <ScrollView 
+              style={dynamicStyles.dropdownMenuScroll}
+              contentContainerStyle={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              {availableCustomers.map((cust, index) => (
+                <TouchableOpacity
+                  key={cust.id}
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    index === availableCustomers.length - 1 && dynamicStyles.dropdownOptionLast,
+                    selectedTargetCustomerId === cust.id && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={async () => {
+                    setSelectedTargetCustomerId(cust.id);
+                    setShowTransferCustomerDropdown(false);
+                    await loadSessionsForCustomer(cust.id);
+                  }}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.dropdownOptionText,
+                      selectedTargetCustomerId === cust.id && dynamicStyles.dropdownOptionTextSelected,
+                    ]}
+                  >
+                    {cust.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {availableCustomers.length === 0 && (
+                <View style={dynamicStyles.dropdownOption}>
+                  <Text style={dynamicStyles.dropdownOptionText}>No other customers available</Text>
+                </View>
+              )}
+            </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Transfer Session Dropdown Modal */}
+      {showTransferSessionDropdown && (
+        <Modal
+          transparent
+          visible={showTransferSessionDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowTransferSessionDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTransferSessionDropdown(false)}
+          >
+            <ScrollView 
+              style={dynamicStyles.dropdownMenuScroll}
+              contentContainerStyle={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              {availableSessions.map((sess, index) => (
+                <TouchableOpacity
+                  key={sess.id}
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    index === availableSessions.length - 1 && dynamicStyles.dropdownOptionLast,
+                    selectedTargetSessionId === sess.id && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedTargetSessionId(sess.id);
+                    setShowTransferSessionDropdown(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.dropdownOptionText,
+                      selectedTargetSessionId === sess.id && dynamicStyles.dropdownOptionTextSelected,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    Session #{sess.session_number} - {formatDate(sess.date, timezone)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {availableSessions.length === 0 && (
+                <View style={dynamicStyles.dropdownOption}>
+                  <Text style={dynamicStyles.dropdownOptionText}>No sessions available</Text>
+                </View>
+              )}
+            </ScrollView>
           </TouchableOpacity>
         </Modal>
       )}

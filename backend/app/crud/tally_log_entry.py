@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
 from ..models.allocation_details import AllocationDetails
+from ..models.tally_session import TallySession
 from ..schemas.tally_log_entry import TallyLogEntryCreate
 from ..crud import tally_session as session_crud
 from ..crud import weight_classification as wc_crud
@@ -136,3 +137,120 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
     db.delete(log_entry)
     db.commit()
     return log_entry
+
+
+def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session_id: int) -> int:
+    """
+    Transfer tally log entries from their current sessions to a target session.
+    Updates AllocationDetails for both source and target sessions atomically.
+    
+    Returns the number of entries successfully transferred.
+    """
+    if not entry_ids:
+        raise ValueError("No entry IDs provided")
+    
+    # Get all entries and validate they exist
+    entries = db.query(TallyLogEntry).filter(TallyLogEntry.id.in_(entry_ids)).all()
+    if len(entries) != len(entry_ids):
+        found_ids = {e.id for e in entries}
+        missing_ids = set(entry_ids) - found_ids
+        raise ValueError(f"Some entries not found: {missing_ids}")
+    
+    # Validate entries aren't already in target session
+    for entry in entries:
+        if entry.tally_session_id == target_session_id:
+            raise ValueError(f"Entry {entry.id} is already in the target session")
+    
+    # Get source sessions and validate they're all in the same plant
+    source_session_ids = {entry.tally_session_id for entry in entries}
+    source_sessions = db.query(TallySession).filter(
+        TallySession.id.in_(source_session_ids)
+    ).all()
+    
+    if len(source_sessions) != len(source_session_ids):
+        raise ValueError("Some source sessions not found")
+    
+    source_plant_ids = {session.plant_id for session in source_sessions}
+    if len(source_plant_ids) > 1:
+        raise ValueError("Entries must be from sessions in the same plant")
+    source_plant_id = source_plant_ids.pop()
+    
+    # Get target session and validate it exists and is in the same plant
+    target_session = session_crud.get_tally_session(db, target_session_id)
+    if target_session is None:
+        raise ValueError("Target session not found")
+    
+    if target_session.plant_id != source_plant_id:
+        raise ValueError("Target session must be in the same plant as source entries")
+    
+    # Validate all weight classifications exist in target plant
+    weight_classification_ids = {entry.weight_classification_id for entry in entries}
+    for wc_id in weight_classification_ids:
+        wc = wc_crud.get_weight_classification(db, wc_id)
+        if wc is None:
+            raise ValueError(f"Weight classification {wc_id} not found")
+        if wc.plant_id != source_plant_id:
+            raise ValueError(f"Weight classification {wc_id} does not belong to the same plant")
+    
+    # Transfer entries atomically
+    DEFAULT_HEADS_PER_BAG = 15.0
+    
+    for entry in entries:
+        # Decrement source session allocation
+        source_allocation = db.query(AllocationDetails).filter(
+            AllocationDetails.tally_session_id == entry.tally_session_id,
+            AllocationDetails.weight_classification_id == entry.weight_classification_id
+        ).first()
+        
+        if source_allocation:
+            # Decrement the appropriate allocated_bags field based on role
+            if entry.role == TallyLogEntryRole.TALLY:
+                source_allocation.allocated_bags_tally = max(0.0, source_allocation.allocated_bags_tally - 1)
+            elif entry.role == TallyLogEntryRole.DISPATCHER:
+                source_allocation.allocated_bags_dispatcher = max(0.0, source_allocation.allocated_bags_dispatcher - 1)
+            
+            # Decrement heads
+            heads_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+            if source_allocation.heads is None:
+                source_allocation.heads = 0.0
+            source_allocation.heads = max(0.0, source_allocation.heads - heads_value)
+        
+        # Update entry's tally_session_id
+        entry.tally_session_id = target_session_id
+        
+        # Get or create target session allocation
+        target_allocation = db.query(AllocationDetails).filter(
+            AllocationDetails.tally_session_id == target_session_id,
+            AllocationDetails.weight_classification_id == entry.weight_classification_id
+        ).first()
+        
+        if not target_allocation:
+            # Create new allocation detail if it doesn't exist
+            from ..schemas.allocation_details import AllocationDetailsCreate
+            allocation_create = AllocationDetailsCreate(
+                tally_session_id=target_session_id,
+                weight_classification_id=entry.weight_classification_id,
+                required_bags=0.0,
+                allocated_bags_tally=0.0,
+                allocated_bags_dispatcher=0.0
+            )
+            target_allocation = AllocationDetails(**allocation_create.model_dump())
+            db.add(target_allocation)
+            db.flush()  # Flush to get the ID without committing
+        
+        # Increment target session allocation
+        if entry.role == TallyLogEntryRole.TALLY:
+            target_allocation.allocated_bags_tally += 1
+        elif entry.role == TallyLogEntryRole.DISPATCHER:
+            target_allocation.allocated_bags_dispatcher += 1
+        
+        # Increment heads
+        heads_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+        if target_allocation.heads is None:
+            target_allocation.heads = 0.0
+        target_allocation.heads += heads_value
+    
+    # Commit all changes atomically
+    db.commit()
+    
+    return len(entries)
