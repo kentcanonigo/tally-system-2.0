@@ -9,6 +9,54 @@ import { TimezoneProvider } from './contexts/TimezoneContext';
 import { PlantProvider } from './contexts/PlantContext';
 import AppNavigator from './navigation/AppNavigator';
 
+// Polyfill for Base64 if not available (needed for xlsx library in React Native)
+// This must be set before any modules that use Base64 are imported
+if (typeof (global as any).Base64 === 'undefined') {
+  (global as any).Base64 = {
+    encode: (input: string) => {
+      // Simple base64 encode using btoa if available, otherwise manual implementation
+      if (typeof btoa !== 'undefined') {
+        return btoa(input);
+      }
+      // Manual base64 encoding fallback
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = input;
+      let output = '';
+      for (let i = 0; i < str.length; i += 3) {
+        const a = str.charCodeAt(i);
+        const b = str.charCodeAt(i + 1) || 0;
+        const c = str.charCodeAt(i + 2) || 0;
+        const bitmap = (a << 16) | (b << 8) | c;
+        output += chars.charAt((bitmap >> 18) & 63);
+        output += chars.charAt((bitmap >> 12) & 63);
+        output += i + 1 < str.length ? chars.charAt((bitmap >> 6) & 63) : '=';
+        output += i + 2 < str.length ? chars.charAt(bitmap & 63) : '=';
+      }
+      return output;
+    },
+    decode: (input: string) => {
+      if (typeof atob !== 'undefined') {
+        return atob(input);
+      }
+      // Manual base64 decoding fallback
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = input.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+      let output = '';
+      for (let i = 0; i < str.length; i += 4) {
+        const enc1 = chars.indexOf(str.charAt(i));
+        const enc2 = chars.indexOf(str.charAt(i + 1));
+        const enc3 = chars.indexOf(str.charAt(i + 2));
+        const enc4 = chars.indexOf(str.charAt(i + 3));
+        const bitmap = (enc1 << 18) | (enc2 << 12) | (enc3 << 6) | enc4;
+        output += String.fromCharCode((bitmap >> 16) & 255);
+        if (enc3 !== 64) output += String.fromCharCode((bitmap >> 8) & 255);
+        if (enc4 !== 64) output += String.fromCharCode(bitmap & 255);
+      }
+      return output;
+    }
+  };
+}
+
 // Get API Base URL (must match the logic in api.ts)
 const getApiBaseUrl = async (): Promise<string> => {
   const __DEV__ = !Constants.expoConfig?.extra?.production;

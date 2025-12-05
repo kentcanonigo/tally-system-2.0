@@ -311,9 +311,8 @@ def export_tally_sheet(
             # A classification can span multiple columns if it has more than 20 entries
             entry_idx = 0
             while entry_idx < len(classification_entries) and current_column < COLUMNS_PER_PAGE:
-                # Mark this column as belonging to this classification (use first column for header)
-                if entry_idx == 0:
-                    column_classifications[current_column] = (wc_id, classification)
+                # Mark this column as belonging to this classification (all columns for same classification get same label)
+                column_classifications[current_column] = (wc_id, classification)
                 
                 # Fill this column with up to 20 entries from this classification
                 for row_idx in range(ROWS_PER_PAGE):

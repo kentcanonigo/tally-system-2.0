@@ -1,6 +1,54 @@
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+
+// Polyfill for Base64 if not available (needed for xlsx library in React Native)
+// This must be set before xlsx is used
+if (typeof (global as any).Base64 === 'undefined') {
+  (global as any).Base64 = {
+    encode: (input: string) => {
+      // Simple base64 encode using btoa if available, otherwise manual implementation
+      if (typeof btoa !== 'undefined') {
+        return btoa(input);
+      }
+      // Manual base64 encoding fallback
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = input;
+      let output = '';
+      for (let i = 0; i < str.length; i += 3) {
+        const a = str.charCodeAt(i);
+        const b = str.charCodeAt(i + 1) || 0;
+        const c = str.charCodeAt(i + 2) || 0;
+        const bitmap = (a << 16) | (b << 8) | c;
+        output += chars.charAt((bitmap >> 18) & 63);
+        output += chars.charAt((bitmap >> 12) & 63);
+        output += i + 1 < str.length ? chars.charAt((bitmap >> 6) & 63) : '=';
+        output += i + 2 < str.length ? chars.charAt(bitmap & 63) : '=';
+      }
+      return output;
+    },
+    decode: (input: string) => {
+      if (typeof atob !== 'undefined') {
+        return atob(input);
+      }
+      // Manual base64 decoding fallback
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = input.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+      let output = '';
+      for (let i = 0; i < str.length; i += 4) {
+        const enc1 = chars.indexOf(str.charAt(i));
+        const enc2 = chars.indexOf(str.charAt(i + 1));
+        const enc3 = chars.indexOf(str.charAt(i + 2));
+        const enc4 = chars.indexOf(str.charAt(i + 3));
+        const bitmap = (enc1 << 18) | (enc2 << 12) | (enc3 << 6) | enc4;
+        output += String.fromCharCode((bitmap >> 16) & 255);
+        if (enc3 !== 64) output += String.fromCharCode((bitmap >> 8) & 255);
+        if (enc4 !== 64) output += String.fromCharCode(bitmap & 255);
+      }
+      return output;
+    }
+  };
+}
 
 // Type definitions matching backend schemas
 interface TallySheetColumnHeader {
@@ -189,11 +237,50 @@ export const generateTallySheetExcel = async (data: TallySheetResponse) => {
   const filename = `Tally Sheet - ${customer_name} - ${dateStr}.xlsx`;
 
   // Write to file system
-  const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+  // Use 'array' type for React Native compatibility, then convert to base64
+  const wbout = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+  
+  // Convert Uint8Array to base64 string
+  // Use a compatible base64 encoding method for React Native
+  let base64String = '';
+  const bytes = new Uint8Array(wbout);
+  const len = bytes.length;
+  for (let i = 0; i < len; i += 3) {
+    const byte1 = bytes[i];
+    const byte2 = bytes[i + 1] || 0;
+    const byte3 = bytes[i + 2] || 0;
+    
+    const bitmap = (byte1 << 16) | (byte2 << 8) | byte3;
+    
+    base64String += 
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[
+        (bitmap >> 18) & 63
+      ] +
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[
+        (bitmap >> 12) & 63
+      ] +
+      (i + 1 < len
+        ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[
+            (bitmap >> 6) & 63
+          ]
+        : '=') +
+      (i + 2 < len
+        ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[
+            bitmap & 63
+          ]
+        : '=');
+  }
+  
   const uri = FileSystem.documentDirectory + filename;
   
-  await FileSystem.writeAsStringAsync(uri, wbout, {
-    encoding: FileSystem.EncodingType.Base64,
+  // Write the base64 string - expo-file-system accepts base64 strings directly
+  // Check if EncodingType exists, otherwise use string literal
+  const encoding = (FileSystem.EncodingType && FileSystem.EncodingType.Base64) 
+    ? FileSystem.EncodingType.Base64 
+    : 'base64';
+  
+  await FileSystem.writeAsStringAsync(uri, base64String, {
+    encoding: encoding as any,
   });
 
   // Share the file
