@@ -13,8 +13,8 @@ from ...models.plant import Plant
 from ...models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
 from ...schemas.export import (
     ExportRequest, ExportResponse, CustomerExportData, ExportItem,
-    TallySheetRequest, TallySheetResponse, TallySheetPage, TallySheetEntry,
-    TallySheetColumnHeader, TallySheetSummary
+    TallySheetRequest, TallySheetResponse, TallySheetMultiCustomerResponse,
+    TallySheetPage, TallySheetEntry, TallySheetColumnHeader, TallySheetSummary
 )
 
 # Default heads per bag - matches frontend setting (currently locked to 15)
@@ -116,36 +116,26 @@ def export_sessions_data(
     )
 
 
-@router.post("/tally-sheet", response_model=TallySheetResponse)
-def export_tally_sheet(
-    request: TallySheetRequest,
-    db: Session = Depends(get_db)
-):
+def process_sessions_for_customer(
+    customer_sessions: List[TallySession],
+    db: Session
+) -> TallySheetResponse:
     """
-    Export tally sheet data for specified sessions.
+    Process tally sheet data for sessions belonging to a single customer.
     Returns paginated data organized in a 20-row grid format.
     Separates Dressed and Byproduct entries into separate tables.
     """
-    if not request.session_ids:
-        raise HTTPException(status_code=400, detail="At least one session ID is required")
+    if not customer_sessions:
+        raise ValueError("No sessions provided")
     
-    # Get all sessions and validate they exist
-    sessions = db.query(TallySession).filter(
-        TallySession.id.in_(request.session_ids)
-    ).all()
-    
-    if len(sessions) != len(request.session_ids):
-        raise HTTPException(status_code=404, detail="One or more sessions not found")
-    
-    # Get customer info (assuming all sessions are for the same customer)
-    # If multiple customers, use the first one
-    customer = db.query(Customer).filter(Customer.id == sessions[0].customer_id).first()
+    session_ids = [s.id for s in customer_sessions]
+    customer = db.query(Customer).filter(Customer.id == customer_sessions[0].customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
     # Get all tally log entries for these sessions (only TALLY role)
     entries = db.query(TallyLogEntry).join(WeightClassification).filter(
-        TallyLogEntry.tally_session_id.in_(request.session_ids),
+        TallyLogEntry.tally_session_id.in_(session_ids),
         TallyLogEntry.role == TallyLogEntryRole.TALLY
     ).order_by(TallyLogEntry.created_at.asc()).all()
     
@@ -475,7 +465,7 @@ def export_tally_sheet(
         product_type = "Mixed"
     
     # Use the date from the first session
-    session_date = sessions[0].date
+    session_date = customer_sessions[0].date
     
     return TallySheetResponse(
         customer_name=customer.name,
@@ -486,3 +476,47 @@ def export_tally_sheet(
         grand_total_heads=grand_total_heads,
         grand_total_kilograms=grand_total_kilograms
     )
+
+
+@router.post("/tally-sheet", response_model=TallySheetMultiCustomerResponse)
+def export_tally_sheet(
+    request: TallySheetRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Export tally sheet data for specified sessions.
+    Groups sessions by customer and returns separate data for each customer.
+    Returns paginated data organized in a 20-row grid format.
+    Separates Dressed and Byproduct entries into separate tables.
+    """
+    if not request.session_ids:
+        raise HTTPException(status_code=400, detail="At least one session ID is required")
+    
+    # Get all sessions and validate they exist
+    sessions = db.query(TallySession).filter(
+        TallySession.id.in_(request.session_ids)
+    ).all()
+    
+    if len(sessions) != len(request.session_ids):
+        raise HTTPException(status_code=404, detail="One or more sessions not found")
+    
+    # Group sessions by customer
+    sessions_by_customer: Dict[int, List[TallySession]] = defaultdict(list)
+    for session in sessions:
+        sessions_by_customer[session.customer_id].append(session)
+    
+    # Process each customer's sessions separately
+    customer_responses: List[TallySheetResponse] = []
+    for customer_id, customer_sessions in sessions_by_customer.items():
+        try:
+            response = process_sessions_for_customer(customer_sessions, db)
+            customer_responses.append(response)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error processing customer {customer_id}: {str(e)}")
+    
+    if not customer_responses:
+        raise HTTPException(status_code=404, detail="No valid data found for export")
+    
+    return TallySheetMultiCustomerResponse(customers=customer_responses)

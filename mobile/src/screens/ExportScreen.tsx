@@ -341,7 +341,19 @@ const ExportScreen = () => {
         const day = currentDate.getDate();
         const year = currentDate.getFullYear();
         const dateString = `${month}-${day}-${year}`;
-        const filename = `Tally Sheet (${dateString}).pdf`;
+        
+        // Determine filename based on number of customers
+        let filename: string;
+        const data = response.data as any;
+        if (data.customers && data.customers.length > 1) {
+          filename = `Tally Sheet - Multiple Customers (${data.customers.length}) (${dateString}).pdf`;
+        } else if (data.customers && data.customers.length === 1) {
+          filename = `Tally Sheet - ${data.customers[0].customer_name} (${dateString}).pdf`;
+        } else if (data.customer_name) {
+          filename = `Tally Sheet - ${data.customer_name} (${dateString}).pdf`;
+        } else {
+          filename = `Tally Sheet (${dateString}).pdf`;
+        }
         
         const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
         const newUri = fileDir + filename;

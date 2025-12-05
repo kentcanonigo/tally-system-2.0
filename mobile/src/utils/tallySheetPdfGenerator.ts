@@ -47,6 +47,10 @@ interface TallySheetResponse {
   grand_total_kilograms: number;
 }
 
+interface TallySheetMultiCustomerResponse {
+  customers: TallySheetResponse[];
+}
+
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -55,7 +59,7 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-export const generateTallySheetHTML = (data: TallySheetResponse): string => {
+const generateCustomerHTML = (data: TallySheetResponse): string => {
   const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
   const ROWS_PER_PAGE = 20;
 
@@ -231,6 +235,24 @@ export const generateTallySheetHTML = (data: TallySheetResponse): string => {
 
   const pagesHTML = pages.map(generatePageHTML).join('');
 
+  return pagesHTML;
+};
+
+export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMultiCustomerResponse): string => {
+  // Check if it's a multi-customer response
+  const isMultiCustomer = 'customers' in data;
+  const customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  
+  // Generate HTML for each customer with a page break between customers
+  const customersHTML = customers.map((customerData, index) => {
+    const customerHTML = generateCustomerHTML(customerData);
+    // Add a page break before each customer except the first
+    if (index > 0) {
+      return `<div style="page-break-before: always;"></div>${customerHTML}`;
+    }
+    return customerHTML;
+  }).join('');
+
   return `
     <!DOCTYPE html>
     <html>
@@ -244,7 +266,7 @@ export const generateTallySheetHTML = (data: TallySheetResponse): string => {
       </style>
     </head>
     <body>
-      ${pagesHTML}
+      ${customersHTML}
     </body>
     </html>
   `;

@@ -14,6 +14,8 @@ import { usePlant } from '../contexts/PlantContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
+import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 
 // Minimum width for the numpad area before switching to vertical layout
 const MIN_NUMPAD_WIDTH = 600;
@@ -39,6 +41,7 @@ function TallyTabScreen() {
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
 
   // Calculate sidebar width and determine layout mode
   const sidebarWidth = responsive.isTablet ? 200 : 150;
@@ -255,9 +258,71 @@ function TallyTabScreen() {
     }
   };
 
-  const handleExportTallySheet = () => {
-    // Placeholder for future implementation
-    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
+  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (exportSessionIds.length === 0) {
+      Alert.alert('No Sessions', 'There are no sessions to export.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setShowTallySheetFormatModal(false);
+      setShowExportTypeModal(false);
+
+      const response = await exportApi.exportTallySheet({
+        session_ids: exportSessionIds
+      });
+
+      if (format === 'pdf') {
+        const html = generateTallySheetHTML(response.data);
+        const { uri } = await printToFileAsync({
+          html,
+          base64: false
+        });
+
+        const currentDate = new Date();
+        const dateString = formatDateForFilename(currentDate);
+        
+        // Determine filename based on number of customers
+        let filename: string;
+        const data = response.data as any;
+        if (data.customers && data.customers.length > 1) {
+          // Multiple customers - use generic name with count
+          filename = `Tally Sheet - Multiple Customers (${data.customers.length}) (${dateString}).pdf`;
+        } else if (data.customers && data.customers.length === 1) {
+          // Single customer from multi-customer response
+          filename = `Tally Sheet - ${data.customers[0].customer_name} (${dateString}).pdf`;
+        } else if (data.customer_name) {
+          // Single customer (backward compatibility)
+          filename = `Tally Sheet - ${data.customer_name} (${dateString}).pdf`;
+        } else {
+          // Fallback
+          filename = `Tally Sheet (${dateString}).pdf`;
+        }
+        
+        const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+        const newUri = fileDir + filename;
+        
+        const fileInfo = await FileSystem.getInfoAsync(newUri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(newUri, { idempotent: true });
+        }
+        
+        await FileSystem.moveAsync({
+          from: uri,
+          to: newUri,
+        });
+
+        await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } else {
+        await generateTallySheetExcel(response.data);
+      }
+    } catch (error) {
+      console.error('Tally sheet export error:', error);
+      Alert.alert('Error', 'Failed to export tally sheet');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleBackToScopeSelection = () => {
@@ -873,7 +938,7 @@ function TallyTabScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* Tally Sheet Report (Placeholder) */}
+              {/* Tally Sheet Report */}
               <TouchableOpacity
                 style={{
                   flexDirection: 'row',
@@ -881,17 +946,17 @@ function TallyTabScreen() {
                   paddingVertical: responsive.spacing.sm,
                   paddingHorizontal: responsive.padding.small,
                   borderRadius: 8,
-                  backgroundColor: '#ecf0f1',
+                  backgroundColor: '#3498db',
                   marginBottom: responsive.spacing.sm,
-                  opacity: 0.6,
+                  opacity: isExporting ? 0.6 : 1,
                 }}
-                onPress={handleExportTallySheet}
-                disabled={true}
+                onPress={() => setShowTallySheetFormatModal(true)}
+                disabled={isExporting}
               >
                 <MaterialIcons
                   name="list-alt"
                   size={20}
-                  color="#2c3e50"
+                  color="#fff"
                   style={{ marginRight: 8 }}
                 />
                 <View style={{ flex: 1 }}>
@@ -899,7 +964,7 @@ function TallyTabScreen() {
                     style={{
                       fontSize: responsive.fontSize.small,
                       fontWeight: '600',
-                      color: '#2c3e50',
+                      color: '#fff',
                     }}
                   >
                     Tally Sheet Report
@@ -907,31 +972,16 @@ function TallyTabScreen() {
                   <Text
                     style={{
                       fontSize: responsive.fontSize.small - 2,
-                      color: '#7f8c8d',
+                      color: 'rgba(255,255,255,0.8)',
                       marginTop: 2,
                     }}
                   >
-                    Coming soon
+                    Detailed tally entries and summaries
                   </Text>
                 </View>
-                <View
-                  style={{
-                    backgroundColor: '#f39c12',
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      color: '#fff',
-                      fontWeight: '600',
-                    }}
-                  >
-                    SOON
-                  </Text>
-                </View>
+                {isExporting && (
+                  <ActivityIndicator size="small" color="#fff" />
+                )}
               </TouchableOpacity>
 
               <View
@@ -991,6 +1041,95 @@ function TallyTabScreen() {
               </View>
             </View>
           </View>
+        </Modal>
+      )}
+
+      {/* Tally Sheet Format Selection Modal */}
+      {hasPermission('can_export_data') && (
+        <Modal
+          transparent
+          visible={showTallySheetFormatModal}
+          animationType="fade"
+          onRequestClose={() => setShowTallySheetFormatModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.formatModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTallySheetFormatModal(false)}
+          >
+            <View
+              style={[
+                styles.formatModalContent,
+                {
+                  width: responsive.isTablet ? 400 : '90%',
+                  maxWidth: 400,
+                },
+              ]}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={styles.formatModalHeader}>
+                <Text style={styles.formatModalTitle}>Export Format</Text>
+                <TouchableOpacity
+                  onPress={() => setShowTallySheetFormatModal(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.formatOptionsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.formatOption,
+                    isExporting && styles.formatOptionDisabled,
+                  ]}
+                  onPress={() => handleExportTallySheet('pdf')}
+                  disabled={isExporting}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons
+                    name="picture-as-pdf"
+                    size={28}
+                    color="#e74c3c"
+                  />
+                  <View style={styles.formatOptionTextContainer}>
+                    <Text style={styles.formatOptionTitle}>PDF</Text>
+                    <Text style={styles.formatOptionDescription}>
+                      Portable Document Format
+                    </Text>
+                  </View>
+                  {isExporting && (
+                    <ActivityIndicator size="small" color="#3498db" />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.formatOption,
+                    isExporting && styles.formatOptionDisabled,
+                  ]}
+                  onPress={() => handleExportTallySheet('excel')}
+                  disabled={isExporting}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons
+                    name="table-chart"
+                    size={28}
+                    color="#27ae60"
+                  />
+                  <View style={styles.formatOptionTextContainer}>
+                    <Text style={styles.formatOptionTitle}>Excel</Text>
+                    <Text style={styles.formatOptionDescription}>
+                      Microsoft Excel format
+                    </Text>
+                  </View>
+                  {isExporting && (
+                    <ActivityIndicator size="small" color="#3498db" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
         </Modal>
       )}
 
@@ -1328,6 +1467,66 @@ const styles = StyleSheet.create({
   dropdownOptionTextSelected: {
     color: '#fff',
     fontWeight: '600',
+  },
+  formatModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  formatModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  formatModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  formatModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  formatOptionsContainer: {
+    padding: 20,
+  },
+  formatOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  formatOptionDisabled: {
+    opacity: 0.6,
+  },
+  formatOptionTextContainer: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  formatOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  formatOptionDescription: {
+    fontSize: 13,
+    color: '#6c757d',
   },
 });
 

@@ -70,7 +70,7 @@ class TallySheetRequest(BaseModel):
     session_ids: List[int]
 
 class TallySheetResponse(BaseModel):
-    """Response model for tally sheet export"""
+    """Response model for tally sheet export (single customer)"""
     customer_name: str
     product_type: str  # "Dressed Chicken" or similar
     date: date
@@ -78,4 +78,8 @@ class TallySheetResponse(BaseModel):
     grand_total_bags: float
     grand_total_heads: float
     grand_total_kilograms: float
+
+class TallySheetMultiCustomerResponse(BaseModel):
+    """Response model for tally sheet export (multiple customers)"""
+    customers: List[TallySheetResponse]  # One response per customer
 

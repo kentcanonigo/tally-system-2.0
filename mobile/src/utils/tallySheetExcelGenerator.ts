@@ -99,6 +99,10 @@ interface TallySheetResponse {
   grand_total_kilograms: number;
 }
 
+interface TallySheetMultiCustomerResponse {
+  customers: TallySheetResponse[];
+}
+
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -107,8 +111,10 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-export const generateTallySheetExcel = async (data: TallySheetResponse) => {
-  const workbook = XLSX.utils.book_new();
+const generateWorksheetForCustomer = (
+  data: TallySheetResponse,
+  workbook: XLSX.WorkBook
+) => {
   const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
 
   const ROWS_PER_PAGE = 20;
@@ -317,10 +323,29 @@ export const generateTallySheetExcel = async (data: TallySheetResponse) => {
 
   // Add worksheet to workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+};
 
-  // Generate filename
-  const dateStr = formatDate(date).replace(/\//g, '-');
-  const filename = `Tally Sheet - ${customer_name} - ${dateStr}.xlsx`;
+export const generateTallySheetExcel = async (data: TallySheetResponse | TallySheetMultiCustomerResponse) => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Check if it's a multi-customer response
+  const isMultiCustomer = 'customers' in data;
+  const customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  
+  // Generate a worksheet for each customer
+  customers.forEach((customerData) => {
+    generateWorksheetForCustomer(customerData, workbook);
+  });
+
+  // Generate filename based on number of customers
+  let filename: string;
+  if (customers.length === 1) {
+    const dateStr = formatDate(customers[0].date).replace(/\//g, '-');
+    filename = `Tally Sheet - ${customers[0].customer_name} - ${dateStr}.xlsx`;
+  } else {
+    const dateStr = formatDate(customers[0].date).replace(/\//g, '-');
+    filename = `Tally Sheet - Multiple Customers (${customers.length}) - ${dateStr}.xlsx`;
+  }
 
   // Write to file system
   // Use 'array' type for React Native compatibility, then convert to base64
