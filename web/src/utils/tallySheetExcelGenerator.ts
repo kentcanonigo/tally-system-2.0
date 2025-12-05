@@ -36,6 +36,7 @@ interface TallySheetPage {
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;
   is_byproduct: boolean;
+  product_type: string;
 }
 
 interface TallySheetResponse {
@@ -63,13 +64,13 @@ export const generateTallySheetExcel = (data: TallySheetResponse) => {
   const ROWS_PER_PAGE = 20;
 
   pages.forEach((page, pageIndex) => {
-    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct } = page;
+    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
     const worksheetData: any[][] = [];
 
     // Header rows
     worksheetData.push(['TALLY SHEET']);
     worksheetData.push([]);
-    worksheetData.push([`Customer: ${customer_name}`, '', '', '', `Product: ${product_type}`]);
+    worksheetData.push([`Customer: ${customer_name}`, '', '', '', `Product: ${page_product_type}`]);
     worksheetData.push([`Date: ${formatDate(date)}`, '', '', '', `Page: ${page_number} of ${total_pages}`]);
     worksheetData.push([]);
 

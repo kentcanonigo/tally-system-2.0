@@ -72,7 +72,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse) => {
       doc.addPage();
     }
 
-    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct } = page;
+    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
 
     // Header
     doc.setFontSize(18);
@@ -82,7 +82,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse) => {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text(`Customer: ${customer_name}`, 20, 25);
-    doc.text(`Product: ${product_type}`, 20, 32);
+    doc.text(`Product: ${page_product_type}`, 20, 32);
     doc.text(`Date: ${formatDate(date)}`, 20, 39);
     doc.text(`Page: ${page_number} of ${total_pages}`, 160, 39, { align: 'right' });
 

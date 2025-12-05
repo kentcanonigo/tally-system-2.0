@@ -63,6 +63,7 @@ class TallySheetPage(BaseModel):
     total_byproduct_heads: float
     total_byproduct_kilograms: float
     is_byproduct: bool  # True if this page contains byproduct entries (shows heads instead of weights)
+    product_type: str  # Product type for this page: "Dressed Chicken", "Byproduct", or "Mixed"
 
 class TallySheetRequest(BaseModel):
     """Request model for tally sheet export"""

@@ -34,6 +34,7 @@ interface TallySheetPage {
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;
   is_byproduct: boolean;
+  product_type: string;
 }
 
 interface TallySheetResponse {
@@ -59,14 +60,14 @@ export const generateTallySheetHTML = (data: TallySheetResponse): string => {
   const ROWS_PER_PAGE = 20;
 
   const generatePageHTML = (page: TallySheetPage): string => {
-    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct } = page;
+    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
     
     let html = `
       <div style="page-break-after: ${page_number < total_pages ? 'always' : 'auto'}; padding: 20px;">
         <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 10px;">TALLY SHEET</h1>
         <div style="margin-bottom: 10px;">
           <div>Customer: ${customer_name}</div>
-          <div>Product: ${product_type}</div>
+          <div>Product: ${page_product_type}</div>
           <div style="display: flex; justify-content: space-between;">
             <span>Date: ${formatDate(date)}</span>
             <span>Page: ${page_number} of ${total_pages}</span>

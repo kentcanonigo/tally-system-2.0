@@ -226,30 +226,50 @@ def export_tally_sheet(
         # Process each classification in order
         for wc_id, classification in sorted(entries_by_classification.keys(), key=get_classification_sort_key):
             classification_entries = entries_by_classification[(wc_id, classification)]
+            entries_remaining = classification_entries.copy()
             
-            # Calculate how many columns this classification will need
-            # Each classification gets at least 1 column (even if it has 0 entries, though that shouldn't happen)
-            entries_count = len(classification_entries)
-            columns_needed = (entries_count + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE  # Ceiling division
-            
-            # Check if adding this classification would exceed the page capacity
-            # We need to check both: total entries (260 max) and columns (13 max)
-            would_exceed_columns = (current_column_count + columns_needed) > COLUMNS_PER_PAGE
-            would_exceed_entries = (current_total_entries + entries_count) > ENTRIES_PER_PAGE
-            
-            if would_exceed_columns or would_exceed_entries:
-                # Create page with current entries
-                if current_page_entries:
-                    pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
-                # Reset for new page
-                current_page_entries = []
-                current_column_count = 0
-                current_total_entries = 0
-            
-            # Add all entries for this classification to current page
-            current_page_entries.extend(classification_entries)
-            current_column_count += columns_needed
-            current_total_entries += entries_count
+            # Process all entries for this classification, splitting across pages if needed
+            while entries_remaining:
+                # Calculate how many columns this classification needs (each column holds 20 entries)
+                total_entries_for_classification = len(entries_remaining)
+                total_columns_needed = (total_entries_for_classification + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE
+                
+                # Calculate how many columns are available on the current page
+                columns_available = COLUMNS_PER_PAGE - current_column_count
+                entries_available = ENTRIES_PER_PAGE - current_total_entries
+                
+                # If we can't fit even one column of this classification, start a new page
+                if columns_available == 0 or entries_available < ROWS_PER_PAGE:
+                    # Create page with current entries
+                    if current_page_entries:
+                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+                    # Reset for new page
+                    current_page_entries = []
+                    current_column_count = 0
+                    current_total_entries = 0
+                    columns_available = COLUMNS_PER_PAGE
+                    entries_available = ENTRIES_PER_PAGE
+                
+                # Determine how many columns we can add on this page
+                columns_to_add = min(total_columns_needed, columns_available)
+                entries_to_add_count = min(total_entries_for_classification, columns_to_add * ROWS_PER_PAGE, entries_available)
+                
+                # Take entries for the columns we can fit
+                entries_to_add = entries_remaining[:entries_to_add_count]
+                entries_remaining = entries_remaining[entries_to_add_count:]
+                
+                # Add entries to current page
+                current_page_entries.extend(entries_to_add)
+                current_column_count += columns_to_add
+                current_total_entries += entries_to_add_count
+                
+                # If page is full, create it and start a new one
+                if current_column_count >= COLUMNS_PER_PAGE or current_total_entries >= ENTRIES_PER_PAGE:
+                    if current_page_entries:
+                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+                    current_page_entries = []
+                    current_column_count = 0
+                    current_total_entries = 0
         
         # Create final page if there are remaining entries
         if current_page_entries:
@@ -396,6 +416,10 @@ def export_tally_sheet(
                 total_dressed_heads += heads
                 total_dressed_kilograms += kilograms
         
+        # Determine product type for this page - since entries are always separated by category,
+        # we can simply use the is_byproduct flag
+        page_product_type = "Byproduct" if is_byproduct else "Dressed Chicken"
+        
         pages.append(TallySheetPage(
             page_number=page_number,
             total_pages=0,  # Will be set after all pages are created
@@ -410,7 +434,8 @@ def export_tally_sheet(
             total_byproduct_bags=total_byproduct_bags,
             total_byproduct_heads=total_byproduct_heads,
             total_byproduct_kilograms=total_byproduct_kilograms,
-            is_byproduct=is_byproduct
+            is_byproduct=is_byproduct,
+            product_type=page_product_type
         ))
         
         return 1
