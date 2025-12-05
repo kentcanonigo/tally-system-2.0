@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { tallySessionsApi, customersApi, exportApi } from '../services/api';
+import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getActiveSessions, removeActiveSession } from '../utils/activeSessions';
@@ -258,12 +258,85 @@ function TallyTabScreen() {
     }
   };
 
+  const checkAllocationMismatches = async (sessionIds: number[]): Promise<{ hasMismatches: boolean; mismatchedSessions: string[] }> => {
+    const mismatchedSessions: string[] = [];
+    
+    try {
+      // Fetch allocations for all sessions
+      const allocationPromises = sessionIds.map(async (sessionId) => {
+        try {
+          const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+          const allocations = allocationsRes.data;
+          
+          // Check if any allocation has mismatched tallyer and dispatcher counts
+          const hasMismatch = allocations.some(
+            (allocation) => allocation.allocated_bags_tally !== allocation.allocated_bags_dispatcher
+          );
+          
+          if (hasMismatch) {
+            // Get session info for display
+            const session = sessions.find(s => s.id === sessionId);
+            const customer = session ? customers.find(c => c.id === session.customer_id) : null;
+            const sessionName = customer ? `${customer.name} - Session #${session?.session_number || sessionId}` : `Session #${session?.session_number || sessionId}`;
+            return sessionName;
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching allocations for session ${sessionId}:`, error);
+          return null;
+        }
+      });
+      
+      const results = await Promise.all(allocationPromises);
+      mismatchedSessions.push(...results.filter((name): name is string => name !== null));
+      
+      return {
+        hasMismatches: mismatchedSessions.length > 0,
+        mismatchedSessions
+      };
+    } catch (error) {
+      console.error('Error checking allocation mismatches:', error);
+      // If we can't check, allow export to proceed
+      return { hasMismatches: false, mismatchedSessions: [] };
+    }
+  };
+
   const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
     if (exportSessionIds.length === 0) {
       Alert.alert('No Sessions', 'There are no sessions to export.');
       return;
     }
 
+    // Check for allocation mismatches
+    const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(exportSessionIds);
+    
+    if (hasMismatches) {
+      const sessionList = mismatchedSessions.join('\n• ');
+      Alert.alert(
+        'Allocation Mismatch Detected',
+        `The following session(s) have mismatched tallyer and dispatcher allocations:\n\n• ${sessionList}\n\nDo you want to proceed with the export anyway?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setShowTallySheetFormatModal(false);
+            }
+          },
+          {
+            text: 'Proceed',
+            onPress: () => performExport(format)
+          }
+        ]
+      );
+      return;
+    }
+
+    // No mismatches, proceed with export
+    performExport(format);
+  };
+
+  const performExport = async (format: 'pdf' | 'excel') => {
     try {
       setIsExporting(true);
       setShowTallySheetFormatModal(false);

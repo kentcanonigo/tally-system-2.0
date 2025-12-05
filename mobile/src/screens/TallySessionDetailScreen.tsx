@@ -610,7 +610,55 @@ function TallySessionDetailScreen() {
     }
   };
 
+  const checkAllocationMismatches = async (sessionId: number): Promise<boolean> => {
+    try {
+      const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
+      const allocations = allocationsRes.data;
+      
+      // Check if any allocation has mismatched tallyer and dispatcher counts
+      return allocations.some(
+        (allocation) => allocation.allocated_bags_tally !== allocation.allocated_bags_dispatcher
+      );
+    } catch (error) {
+      console.error('Error checking allocation mismatches:', error);
+      // If we can't check, allow export to proceed
+      return false;
+    }
+  };
+
   const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (!session) return;
+    
+    // Check for allocation mismatches
+    const hasMismatch = await checkAllocationMismatches(session.id);
+    
+    if (hasMismatch) {
+      const sessionName = customer ? `${customer.name} - Session #${session.session_number}` : `Session #${session.session_number}`;
+      Alert.alert(
+        'Allocation Mismatch Detected',
+        `This session (${sessionName}) has mismatched tallyer and dispatcher allocations.\n\nDo you want to proceed with the export anyway?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setShowTallySheetFormatModal(false);
+            }
+          },
+          {
+            text: 'Proceed',
+            onPress: () => performExport(format)
+          }
+        ]
+      );
+      return;
+    }
+
+    // No mismatches, proceed with export
+    performExport(format);
+  };
+
+  const performExport = async (format: 'pdf' | 'excel') => {
     if (!session) return;
     try {
       setLoading(true);
