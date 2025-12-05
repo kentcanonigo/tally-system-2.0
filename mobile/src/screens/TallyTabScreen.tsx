@@ -29,6 +29,7 @@ function TallyTabScreen() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct'>('dressed');
+  const [tallyRole, setTallyRole] = useState<'tally' | 'dispatcher'>('tally');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -36,6 +37,8 @@ function TallyTabScreen() {
   const [exportSessionIds, setExportSessionIds] = useState<number[]>([]);
   const [exportTitle, setExportTitle] = useState('');
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
+  const [showModeDropdown, setShowModeDropdown] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
   // Calculate sidebar width and determine layout mode
   const sidebarWidth = responsive.isTablet ? 200 : 150;
@@ -277,53 +280,43 @@ function TallyTabScreen() {
       ...styles.title,
       fontSize: responsive.fontSize.large,
     },
-    modeToggleContainer: {
+    headerButton: {
       flexDirection: 'row' as const,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      borderRadius: 999,
-      padding: 2,
-    },
-    modeButton: {
-      paddingHorizontal: responsive.padding.small,
-      paddingVertical: responsive.spacing.xs,
-      borderRadius: 999,
-      minWidth: responsive.isTablet ? 90 : 80,
       alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-    },
-    modeButtonActive: {
-      backgroundColor: '#fff',
-    },
-    modeButtonText: {
-      color: '#ecf0f1',
-      fontSize: responsive.fontSize.small,
-      fontWeight: '600' as const,
-    },
-    modeButtonTextActive: {
-      color: '#2c3e50',
-    },
-    focusButton: {
-      marginLeft: responsive.spacing.sm,
       paddingHorizontal: responsive.padding.small,
       paddingVertical: responsive.spacing.xs,
-      borderRadius: 999,
+      borderRadius: 8,
       borderWidth: 1,
-      borderColor: '#ecf0f1',
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-      backgroundColor: 'transparent',
+      borderColor: 'rgba(236,240,241,0.3)',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      gap: 6,
     },
-    focusButtonActive: {
-      backgroundColor: '#ecf0f1',
-      borderColor: '#fff',
+    headerButtonActive: {
+      backgroundColor: 'rgba(236,240,241,0.2)',
+      borderColor: 'rgba(236,240,241,0.5)',
     },
-    focusButtonText: {
+    headerButtonText: {
       color: '#ecf0f1',
       fontSize: responsive.fontSize.small,
       fontWeight: '600' as const,
     },
-    focusButtonTextActive: {
-      color: '#2c3e50',
+    dropdownButton: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      paddingHorizontal: responsive.padding.small,
+      paddingVertical: responsive.spacing.xs,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(236,240,241,0.3)',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      gap: 6,
+      minWidth: responsive.isTablet ? 110 : 100,
+      justifyContent: 'space-between' as const,
+    },
+    dropdownButtonText: {
+      color: '#ecf0f1',
+      fontSize: responsive.fontSize.small,
+      fontWeight: '600' as const,
     },
     contentRow: {
       flex: 1,
@@ -432,21 +425,11 @@ function TallyTabScreen() {
     <SafeAreaView style={dynamicStyles.container} edges={['top']}>
       <View style={dynamicStyles.header}>
         {!useVerticalLayout && <Text style={dynamicStyles.title}>Active Sessions</Text>}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
           {/* Remove current session button */}
           {selectedSessionId && (
             <TouchableOpacity
-              style={{
-                marginRight: responsive.spacing.sm,
-                paddingHorizontal: responsive.padding.small,
-                paddingVertical: responsive.spacing.xs,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: '#e74c3c',
-                backgroundColor: 'rgba(231,76,60,0.15)',
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
+              style={dynamicStyles.headerButton}
               onPress={() => setShowRemoveConfirmModal(true)}
             >
               <MaterialIcons
@@ -455,32 +438,16 @@ function TallyTabScreen() {
                 color="#e74c3c"
               />
               {!useVerticalLayout && (
-                <Text
-                  style={{
-                    color: '#e74c3c',
-                    marginLeft: 6,
-                    fontSize: responsive.fontSize.small,
-                    fontWeight: '600',
-                  }}
-                >
+                <Text style={[dynamicStyles.headerButtonText, { color: '#e74c3c' }]}>
                   Remove
                 </Text>
               )}
             </TouchableOpacity>
           )}
+          {/* Export button */}
           {hasPermission('can_export_data') && (
             <TouchableOpacity
-              style={{
-                marginRight: responsive.spacing.sm,
-                paddingHorizontal: responsive.padding.small,
-                paddingVertical: responsive.spacing.xs,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: '#ecf0f1',
-                backgroundColor: 'rgba(255,255,255,0.12)',
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
+              style={dynamicStyles.headerButton}
               onPress={() => setShowExportModal(true)}
               disabled={activeSessionIds.length === 0 || isExporting}
             >
@@ -490,66 +457,72 @@ function TallyTabScreen() {
                 color="#ecf0f1"
               />
               {!useVerticalLayout && (
-                <Text
-                  style={{
-                    color: '#ecf0f1',
-                    marginLeft: 6,
-                    fontSize: responsive.fontSize.small,
-                    fontWeight: '600',
-                  }}
-                >
-                  Export
-                </Text>
+                <Text style={dynamicStyles.headerButtonText}>Export</Text>
               )}
             </TouchableOpacity>
           )}
-          <View style={dynamicStyles.modeToggleContainer}>
+          {/* Mode dropdown */}
+          <View>
             <TouchableOpacity
-              style={[
-                dynamicStyles.modeButton,
-                tallyMode === 'dressed' && dynamicStyles.modeButtonActive,
-              ]}
-              onPress={() => setTallyMode('dressed')}
+              style={dynamicStyles.dropdownButton}
+              onPress={() => {
+                setShowRoleDropdown(false);
+                setShowModeDropdown(!showModeDropdown);
+              }}
             >
-              <Text
-                style={[
-                  dynamicStyles.modeButtonText,
-                  tallyMode === 'dressed' && dynamicStyles.modeButtonTextActive,
-                ]}
-              >
-                Dressed
+              <Text style={dynamicStyles.dropdownButtonText}>
+                {tallyMode === 'dressed' ? 'Dressed' : 'Byproduct'}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                dynamicStyles.modeButton,
-                tallyMode === 'byproduct' && dynamicStyles.modeButtonActive,
-              ]}
-              onPress={() => setTallyMode('byproduct')}
-            >
-              <Text
-                style={[
-                  dynamicStyles.modeButtonText,
-                  tallyMode === 'byproduct' && dynamicStyles.modeButtonTextActive,
-                ]}
-              >
-                Byproduct
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                dynamicStyles.focusButton,
-                isFocusMode && dynamicStyles.focusButtonActive,
-              ]}
-              onPress={() => setIsFocusMode((prev) => !prev)}
-            >
               <MaterialIcons
-                name={isFocusMode ? 'lock-open' : 'lock'}
-                size={responsive.isTablet ? 20 : 18}
-                color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
+                name={showModeDropdown ? 'expand-less' : 'expand-more'}
+                size={20}
+                color="#ecf0f1"
               />
             </TouchableOpacity>
           </View>
+          {/* Role dropdown */}
+          <View>
+            <TouchableOpacity
+              style={dynamicStyles.dropdownButton}
+              onPress={() => {
+                setShowModeDropdown(false);
+                setShowRoleDropdown(!showRoleDropdown);
+              }}
+            >
+              <Text style={dynamicStyles.dropdownButtonText}>
+                {tallyRole === 'tally' ? 'Tallyer' : 'Dispatcher'}
+              </Text>
+              <MaterialIcons
+                name={showRoleDropdown ? 'expand-less' : 'expand-more'}
+                size={20}
+                color="#ecf0f1"
+              />
+            </TouchableOpacity>
+          </View>
+          {/* Focus mode button */}
+          <TouchableOpacity
+            style={[
+              dynamicStyles.headerButton,
+              isFocusMode && dynamicStyles.headerButtonActive,
+            ]}
+            onPress={() => setIsFocusMode((prev) => !prev)}
+          >
+            <MaterialIcons
+              name={isFocusMode ? 'lock-open' : 'lock'}
+              size={responsive.isTablet ? 18 : 16}
+              color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
+            />
+            {!useVerticalLayout && (
+              <Text
+                style={[
+                  dynamicStyles.headerButtonText,
+                  isFocusMode && { color: '#2c3e50' },
+                ]}
+              >
+                Focus
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
       
@@ -627,7 +600,7 @@ function TallyTabScreen() {
           <View style={dynamicStyles.tallyContainer}>
             <TallyScreen
               sessionId={selectedSessionId}
-              tallyRole="tally"
+              tallyRole={tallyRole}
               tallyMode={tallyMode}
               hideTitle={true}
               disableSafeArea={true}
@@ -1113,6 +1086,156 @@ function TallyTabScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Mode Dropdown Modal */}
+      <Modal
+        transparent
+        visible={showModeDropdown}
+        animationType="fade"
+        onRequestClose={() => setShowModeDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setShowModeDropdown(false)}
+        >
+          <View
+            style={[
+              styles.dropdownMenu,
+              {
+                width: responsive.isTablet ? 200 : 180,
+                maxHeight: 200,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                tallyMode === 'dressed' && styles.dropdownOptionSelected,
+                { padding: responsive.padding.medium },
+              ]}
+              onPress={() => {
+                setTallyMode('dressed');
+                setShowModeDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  tallyMode === 'dressed' && styles.dropdownOptionTextSelected,
+                  { fontSize: responsive.fontSize.small },
+                ]}
+              >
+                Dressed
+              </Text>
+              {tallyMode === 'dressed' && (
+                <MaterialIcons name="check" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                styles.dropdownOptionLast,
+                tallyMode === 'byproduct' && styles.dropdownOptionSelected,
+                { padding: responsive.padding.medium },
+              ]}
+              onPress={() => {
+                setTallyMode('byproduct');
+                setShowModeDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  tallyMode === 'byproduct' && styles.dropdownOptionTextSelected,
+                  { fontSize: responsive.fontSize.small },
+                ]}
+              >
+                Byproduct
+              </Text>
+              {tallyMode === 'byproduct' && (
+                <MaterialIcons name="check" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Role Dropdown Modal */}
+      <Modal
+        transparent
+        visible={showRoleDropdown}
+        animationType="fade"
+        onRequestClose={() => setShowRoleDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRoleDropdown(false)}
+        >
+          <View
+            style={[
+              styles.dropdownMenu,
+              {
+                width: responsive.isTablet ? 200 : 180,
+                maxHeight: 200,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                tallyRole === 'tally' && styles.dropdownOptionSelected,
+                { padding: responsive.padding.medium },
+              ]}
+              onPress={() => {
+                setTallyRole('tally');
+                setShowRoleDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  tallyRole === 'tally' && styles.dropdownOptionTextSelected,
+                  { fontSize: responsive.fontSize.small },
+                ]}
+              >
+                Tallyer
+              </Text>
+              {tallyRole === 'tally' && (
+                <MaterialIcons name="check" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                styles.dropdownOptionLast,
+                tallyRole === 'dispatcher' && styles.dropdownOptionSelected,
+                { padding: responsive.padding.medium },
+              ]}
+              onPress={() => {
+                setTallyRole('dispatcher');
+                setShowRoleDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  tallyRole === 'dispatcher' && styles.dropdownOptionTextSelected,
+                  { fontSize: responsive.fontSize.small },
+                ]}
+              >
+                Dispatcher
+              </Text>
+              {tallyRole === 'dispatcher' && (
+                <MaterialIcons name="check" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1167,6 +1290,44 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: Platform.OS === 'ios' ? 100 : 80,
+    paddingRight: 16,
+  },
+  dropdownMenu: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownOptionLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#3498db',
+  },
+  dropdownOptionText: {
+    color: '#2c3e50',
+  },
+  dropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 
