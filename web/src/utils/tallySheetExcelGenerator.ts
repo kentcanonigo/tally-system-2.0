@@ -59,7 +59,7 @@ const formatDate = (dateString: string): string => {
 
 export const generateTallySheetExcel = async (data: TallySheetResponse) => {
   const workbook = new ExcelJS.Workbook();
-  const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
+  const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
 
   const ROWS_PER_PAGE = 20;
   const NUM_COLUMNS = 13;

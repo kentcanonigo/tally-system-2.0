@@ -60,11 +60,10 @@ const formatDate = (dateString: string): string => {
 export const generateTallySheetPDF = (data: TallySheetResponse) => {
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
-  const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
+  const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
 
   // Layout constants
   const PAGE_WIDTH = 279.4; // Letter landscape width in mm
-  const PAGE_HEIGHT = 215.9; // Letter landscape height in mm
   const MARGIN = 10;
   const ROWS_PER_PAGE = 20;
   const NUM_COLUMNS = 13;
@@ -181,12 +180,10 @@ export const generateTallySheetPDF = (data: TallySheetResponse) => {
     const summaryStartY = GRID_START_Y; // Align with grid top
     const summaryX = GRID_START_X + ROW_NUMBER_WIDTH + GRID_WIDTH + 15; // Right side of grid
     const summaryRowHeight = 5;
-    const summaryColWidth = 22;
     const summaryTableWidth = 90; // Total width of summary table
     const summaryCol1Width = 25; // Classification column width
     const summaryCol2Width = 20; // Bags column width
     const summaryCol3Width = 20; // Heads column width
-    const summaryCol4Width = 25; // Kilograms column width
 
     // Calculate table height (header + rows + total row)
     const numSummaryRows = summaries.length;
