@@ -23,9 +23,10 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
     if wc is None:
         raise ValueError("Weight classification not found")
     
-    # Force heads=1 for byproducts (byproducts don't track heads meaningfully)
+    # Force heads to default (15) for byproducts - each bag has 15 heads
+    DEFAULT_HEADS_PER_BAG = 15.0
     if wc.category == 'Byproduct':
-        log_entry.heads = 1.0
+        log_entry.heads = DEFAULT_HEADS_PER_BAG
     
     # Get or create allocation detail for this session + classification
     allocation = db.query(AllocationDetails).filter(

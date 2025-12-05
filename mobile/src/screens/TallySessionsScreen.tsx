@@ -17,6 +17,8 @@ import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions, setActiveSessions } from '../utils/activeSessions';
 import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
+import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -62,6 +64,7 @@ function TallySessionsScreen() {
   // Export state
   const [exporting, setExporting] = useState(false);
   const [showExportTypeModal, setShowExportTypeModal] = useState(false);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to page 1 when plant changes
@@ -299,8 +302,59 @@ function TallySessionsScreen() {
     }
   };
 
-  const handleExportTallySheet = () => {
-    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
+  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (selectedSessionIds.length === 0) {
+      Alert.alert('No Sessions Selected', 'Please select at least one session to export.');
+      return;
+    }
+
+    try {
+      setExporting(true);
+      setShowTallySheetFormatModal(false);
+      setShowExportTypeModal(false);
+
+      const response = await exportApi.exportTallySheet({
+        session_ids: selectedSessionIds
+      });
+
+      if (format === 'pdf') {
+        const html = generateTallySheetHTML(response.data);
+        const { uri } = await printToFileAsync({
+          html,
+          base64: false
+        });
+
+        const currentDate = new Date();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[currentDate.getMonth()];
+        const day = currentDate.getDate();
+        const year = currentDate.getFullYear();
+        const dateString = `${month}-${day}-${year}`;
+        const filename = `Tally Sheet (${dateString}).pdf`;
+        
+        const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+        const newUri = fileDir + filename;
+        
+        const fileInfo = await FileSystem.getInfoAsync(newUri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(newUri, { idempotent: true });
+        }
+        
+        await FileSystem.moveAsync({
+          from: uri,
+          to: newUri,
+        });
+
+        await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } else {
+        await generateTallySheetExcel(response.data);
+      }
+    } catch (error) {
+      console.error('Tally sheet export error:', error);
+      Alert.alert('Error', 'Failed to export tally sheet');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Filter sessions by all filters and apply sorting
@@ -1223,25 +1277,28 @@ function TallySessionsScreen() {
                 {exporting && <ActivityIndicator size="small" color="#fff" />}
               </TouchableOpacity>
 
-              {/* Tally Sheet Report (Placeholder) */}
+              {/* Tally Sheet Report */}
               <TouchableOpacity
-                style={[styles.exportTypeOption, styles.exportTypeOptionDisabled]}
-                onPress={handleExportTallySheet}
-                disabled={true}
+                style={[styles.exportTypeOption, styles.exportTypeOptionSecondary]}
+                onPress={() => {
+                  setShowExportTypeModal(false);
+                  setShowTallySheetFormatModal(true);
+                }}
+                disabled={exporting}
               >
                 <MaterialIcons
                   name="list-alt"
                   size={24}
-                  color="#2c3e50"
+                  color="#fff"
                   style={styles.exportTypeOptionIcon}
                 />
                 <View style={styles.exportTypeOptionContent}>
-                  <Text style={styles.exportTypeOptionTitle}>Tally Sheet Report</Text>
-                  <Text style={styles.exportTypeOptionDesc}>Coming soon</Text>
+                  <Text style={styles.exportTypeOptionTitleLight}>Tally Sheet Report</Text>
+                  <Text style={styles.exportTypeOptionDescLight}>
+                    Detailed grid with individual entries
+                  </Text>
                 </View>
-                <View style={styles.soonBadge}>
-                  <Text style={styles.soonBadgeText}>SOON</Text>
-                </View>
+                {exporting && <ActivityIndicator size="small" color="#fff" />}
               </TouchableOpacity>
 
               <TouchableOpacity

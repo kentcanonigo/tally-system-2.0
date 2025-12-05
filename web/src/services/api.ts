@@ -138,6 +138,8 @@ export const tallyLogEntriesApi = {
 export const exportApi = {
   exportSessions: (data: ExportRequest) =>
     api.post<ExportResponse>('/export/sessions', data),
+  exportTallySheet: (data: { session_ids: number[] }) =>
+    api.post<any>('/export/tally-sheet', data),
 };
 
 // Users API (superadmin only)

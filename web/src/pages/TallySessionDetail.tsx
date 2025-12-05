@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tallySessionsApi, allocationDetailsApi, customersApi, plantsApi, weightClassificationsApi, exportApi, tallyLogEntriesApi } from '../services/api';
 import { generateSessionReportPDF } from '../utils/pdfGenerator';
+import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 import { useAuth } from '../contexts/AuthContext';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
@@ -18,6 +20,7 @@ function TallySessionDetail() {
   const [logEntries, setLogEntries] = useState<TallyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
@@ -196,6 +199,25 @@ function TallySessionDetail() {
     }
   };
 
+  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (!id) return;
+    setLoading(true);
+    setShowTallySheetFormatModal(false);
+    try {
+      const response = await exportApi.exportTallySheet({ session_ids: [Number(id)] });
+      if (format === 'pdf') {
+        generateTallySheetPDF(response.data);
+      } else {
+        generateTallySheetExcel(response.data);
+      }
+    } catch (error) {
+      console.error('Tally sheet export error:', error);
+      alert('Failed to export tally sheet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getWeightClassificationName = (wcId: number) => {
     return weightClassifications.find((wc) => wc.id === wcId)?.classification || wcId;
   };
@@ -300,13 +322,22 @@ function TallySessionDetail() {
           </button>
         )}
         {hasPermission('can_export_data') && (
-          <button 
-            className="btn btn-info" 
-            onClick={handleExport}
-            style={{ backgroundColor: '#17a2b8', color: 'white' }}
-          >
-            Export PDF
-          </button>
+          <>
+            <button 
+              className="btn btn-info" 
+              onClick={handleExport}
+              style={{ backgroundColor: '#17a2b8', color: 'white' }}
+            >
+              Export Allocation Report
+            </button>
+            <button 
+              className="btn btn-info" 
+              onClick={() => setShowTallySheetFormatModal(true)}
+              style={{ backgroundColor: '#6c757d', color: 'white' }}
+            >
+              Export Tally Sheet
+            </button>
+          </>
         )}
         {hasPermission('can_delete_tally_allocations') && (
           <>
@@ -480,6 +511,54 @@ function TallySessionDetail() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showTallySheetFormatModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Select Export Format</h3>
+            <p>Choose the format for the tally sheet export:</p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('pdf')}
+                disabled={loading}
+              >
+                PDF
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('excel')}
+                disabled={loading}
+              >
+                Excel
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowTallySheetFormatModal(false)}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

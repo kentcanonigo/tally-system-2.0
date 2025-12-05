@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
+from collections import defaultdict
 
 from ...database import get_db
 from ...models.allocation_details import AllocationDetails
@@ -9,7 +10,15 @@ from ...models.tally_session import TallySession
 from ...models.customer import Customer
 from ...models.weight_classification import WeightClassification
 from ...models.plant import Plant
-from ...schemas.export import ExportRequest, ExportResponse, CustomerExportData, ExportItem
+from ...models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
+from ...schemas.export import (
+    ExportRequest, ExportResponse, CustomerExportData, ExportItem,
+    TallySheetRequest, TallySheetResponse, TallySheetPage, TallySheetEntry,
+    TallySheetColumnHeader, TallySheetSummary
+)
+
+# Default heads per bag - matches frontend setting (currently locked to 15)
+DEFAULT_HEADS_PER_BAG = 15.0
 
 router = APIRouter()
 
@@ -106,3 +115,350 @@ def export_sessions_data(
         grand_total_bp=grand_total_bp
     )
 
+
+@router.post("/tally-sheet", response_model=TallySheetResponse)
+def export_tally_sheet(
+    request: TallySheetRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Export tally sheet data for specified sessions.
+    Returns paginated data organized in a 20-row grid format.
+    Separates Dressed and Byproduct entries into separate tables.
+    """
+    if not request.session_ids:
+        raise HTTPException(status_code=400, detail="At least one session ID is required")
+    
+    # Get all sessions and validate they exist
+    sessions = db.query(TallySession).filter(
+        TallySession.id.in_(request.session_ids)
+    ).all()
+    
+    if len(sessions) != len(request.session_ids):
+        raise HTTPException(status_code=404, detail="One or more sessions not found")
+    
+    # Get customer info (assuming all sessions are for the same customer)
+    # If multiple customers, use the first one
+    customer = db.query(Customer).filter(Customer.id == sessions[0].customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get all tally log entries for these sessions (only TALLY role)
+    entries = db.query(TallyLogEntry).join(WeightClassification).filter(
+        TallyLogEntry.tally_session_id.in_(request.session_ids),
+        TallyLogEntry.role == TallyLogEntryRole.TALLY
+    ).order_by(TallyLogEntry.created_at.asc()).all()
+    
+    if not entries:
+        raise HTTPException(status_code=404, detail="No tally entries found for the specified sessions")
+    
+    # Get weight classifications map
+    wc_ids = {entry.weight_classification_id for entry in entries}
+    weight_classifications = {
+        wc.id: wc for wc in db.query(WeightClassification).filter(
+            WeightClassification.id.in_(wc_ids)
+        ).all()
+    }
+    
+    # Group entries by classification
+    entries_by_classification: Dict[Tuple[int, str], List[TallyLogEntry]] = defaultdict(list)
+    for entry in entries:
+        wc = weight_classifications[entry.weight_classification_id]
+        key = (entry.weight_classification_id, wc.classification)
+        entries_by_classification[key].append(entry)
+    
+    # Define classification order (Dressed first, then Byproduct)
+    # Standard order: OS, P4, P3, P2, P1, US, SQ for Dressed
+    # LV, GZ, SI, FT, PV, HD, BLD for Byproduct
+    dressed_order = ["OS", "P4", "P3", "P2", "P1", "US", "SQ"]
+    byproduct_order = ["LV", "GZ", "SI", "FT", "PV", "HD", "BLD"]
+    
+    def get_classification_sort_key(key: Tuple[int, str]) -> Tuple[int, int]:
+        """Return sort key: (category_order, classification_order)"""
+        wc_id, classification = key
+        wc = weight_classifications[wc_id]
+        category_order = 0 if wc.category == "Dressed" else 1
+        if wc.category == "Dressed":
+            try:
+                class_order = dressed_order.index(classification)
+            except ValueError:
+                class_order = 999
+        else:
+            try:
+                class_order = byproduct_order.index(classification)
+            except ValueError:
+                class_order = 999
+        return (category_order, class_order)
+    
+    # Sort classifications
+    sorted_classifications = sorted(entries_by_classification.keys(), key=get_classification_sort_key)
+    
+    # Separate entries by category (Dressed vs Byproduct), keeping them grouped by classification
+    dressed_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
+    byproduct_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
+    
+    for wc_id, classification in sorted_classifications:
+        wc = weight_classifications[wc_id]
+        entry_list = [(entry, wc_id, classification) for entry in entries_by_classification[(wc_id, classification)]]
+        if wc.category == "Dressed":
+            dressed_entries_by_classification[(wc_id, classification)] = entry_list
+        else:
+            byproduct_entries_by_classification[(wc_id, classification)] = entry_list
+    
+    # Organize into pages with exactly 13 columns
+    ROWS_PER_PAGE = 20
+    COLUMNS_PER_PAGE = 13
+    ENTRIES_PER_PAGE = ROWS_PER_PAGE * COLUMNS_PER_PAGE  # 260 entries per page
+    
+    pages: List[TallySheetPage] = []
+    
+    # Helper function to process entries grouped by classification and create pages
+    def process_entries_by_classification(entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]], is_byproduct: bool) -> int:
+        """Process entries grouped by classification and create pages. Returns number of pages created."""
+        if not entries_by_classification:
+            return 0
+        
+        pages_created = 0
+        current_page_entries: List[Tuple[TallyLogEntry, int, str]] = []
+        current_column_count = 0
+        current_total_entries = 0
+        
+        # Process each classification in order
+        for wc_id, classification in sorted(entries_by_classification.keys(), key=get_classification_sort_key):
+            classification_entries = entries_by_classification[(wc_id, classification)]
+            
+            # Calculate how many columns this classification will need
+            # Each classification gets at least 1 column (even if it has 0 entries, though that shouldn't happen)
+            entries_count = len(classification_entries)
+            columns_needed = (entries_count + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE  # Ceiling division
+            
+            # Check if adding this classification would exceed the page capacity
+            # We need to check both: total entries (260 max) and columns (13 max)
+            would_exceed_columns = (current_column_count + columns_needed) > COLUMNS_PER_PAGE
+            would_exceed_entries = (current_total_entries + entries_count) > ENTRIES_PER_PAGE
+            
+            if would_exceed_columns or would_exceed_entries:
+                # Create page with current entries
+                if current_page_entries:
+                    pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+                # Reset for new page
+                current_page_entries = []
+                current_column_count = 0
+                current_total_entries = 0
+            
+            # Add all entries for this classification to current page
+            current_page_entries.extend(classification_entries)
+            current_column_count += columns_needed
+            current_total_entries += entries_count
+        
+        # Create final page if there are remaining entries
+        if current_page_entries:
+            pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+        
+        return pages_created
+    
+    # Helper function to create a page from a list of entries
+    def create_page_from_entries(page_entries: List[Tuple[TallyLogEntry, int, str]], is_byproduct: bool, page_number: int) -> int:
+        """Create a page from entries. Returns 1 if page was created, 0 otherwise."""
+        if not page_entries:
+            return 0
+        
+        # Build grid (20 rows x 13 columns)
+        grid: List[List[Optional[float]]] = [[None for _ in range(COLUMNS_PER_PAGE)] for _ in range(ROWS_PER_PAGE)]
+        sheet_entries: List[TallySheetEntry] = []
+        
+        # Track which classification is in each column (for headers)
+        column_classifications: Dict[int, Tuple[int, str]] = {}
+        
+        # Group entries by classification first (use entry.id to ensure uniqueness)
+        entries_by_classification_in_page: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = defaultdict(list)
+        seen_entry_ids = set()
+        for entry, wc_id, classification in page_entries:
+            # Only add each entry once (by ID) to prevent duplicates
+            if entry.id not in seen_entry_ids:
+                entries_by_classification_in_page[(wc_id, classification)].append((entry, wc_id, classification))
+                seen_entry_ids.add(entry.id)
+        
+        # Fill grid: each classification gets its own column(s), filled completely (all 20 rows per column) before next
+        current_column = 0
+        
+        for wc_id, classification in sorted(entries_by_classification_in_page.keys(), key=get_classification_sort_key):
+            if current_column >= COLUMNS_PER_PAGE:
+                break  # No more columns available
+            
+            classification_entries = entries_by_classification_in_page[(wc_id, classification)]
+            
+            # A classification can span multiple columns if it has more than 20 entries
+            entry_idx = 0
+            while entry_idx < len(classification_entries) and current_column < COLUMNS_PER_PAGE:
+                # Mark this column as belonging to this classification (use first column for header)
+                if entry_idx == 0:
+                    column_classifications[current_column] = (wc_id, classification)
+                
+                # Fill this column with up to 20 entries from this classification
+                for row_idx in range(ROWS_PER_PAGE):
+                    if entry_idx >= len(classification_entries):
+                        break  # No more entries for this classification
+                    
+                    entry, entry_wc_id, entry_classification = classification_entries[entry_idx]
+                    
+                    # For byproduct, show heads value from entry, for dressed show weight
+                    if is_byproduct:
+                        cell_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+                    else:
+                        cell_value = entry.weight
+                    
+                    grid[row_idx][current_column] = cell_value
+                    sheet_entries.append(TallySheetEntry(
+                        row=row_idx + 1,  # 1-indexed
+                        column=current_column,
+                        weight=entry.weight,
+                        classification=classification,
+                        classification_id=wc_id
+                    ))
+                    
+                    entry_idx += 1
+                
+                # If we still have more entries for this classification, move to next column
+                if entry_idx < len(classification_entries):
+                    current_column += 1
+                else:
+                    break  # All entries for this classification are done
+            
+            # Move to next classification (next column)
+            current_column += 1
+        
+        # Build column headers - always create exactly 13 column headers
+        columns: List[TallySheetColumnHeader] = []
+        for col in range(COLUMNS_PER_PAGE):
+            if col in column_classifications:
+                wc_id, classification = column_classifications[col]
+                columns.append(TallySheetColumnHeader(
+                    classification=classification,
+                    classification_id=wc_id,
+                    index=col
+                ))
+            else:
+                # Empty column - use empty placeholder
+                columns.append(TallySheetColumnHeader(
+                    classification="",
+                    classification_id=0,
+                    index=col
+                ))
+        
+        # Calculate summaries for this page
+        # Get all classifications present on this page
+        page_classifications = set()
+        for entry, wc_id, classification in page_entries:
+            page_classifications.add((wc_id, classification))
+        
+        # Calculate summaries per classification - only include relevant category
+        summary_dressed: List[TallySheetSummary] = []
+        summary_byproduct: List[TallySheetSummary] = []
+        
+        total_dressed_bags = 0.0
+        total_dressed_heads = 0.0
+        total_dressed_kilograms = 0.0
+        total_byproduct_bags = 0.0
+        total_byproduct_heads = 0.0
+        total_byproduct_kilograms = 0.0
+        
+        for wc_id, classification in sorted(page_classifications, key=get_classification_sort_key):
+            wc = weight_classifications[wc_id]
+            # Count entries for this classification on this page
+            page_entries_for_wc = [
+                (e, e_wc_id, cls) for e, e_wc_id, cls in page_entries
+                if e_wc_id == wc_id and cls == classification
+            ]
+            
+            bags = len(page_entries_for_wc)
+            # For both byproduct and dressed, use actual heads from entries with fallback to default
+            heads = sum(e.heads if e.heads is not None else DEFAULT_HEADS_PER_BAG for e, _, _ in page_entries_for_wc)
+            kilograms = sum(e.weight for e, _, _ in page_entries_for_wc)
+            
+            summary = TallySheetSummary(
+                classification=classification,
+                classification_id=wc_id,
+                bags=bags,
+                heads=heads,
+                kilograms=kilograms
+            )
+            
+            # Only add to the relevant summary list based on page type
+            if is_byproduct:
+                summary_byproduct.append(summary)
+                total_byproduct_bags += bags
+                total_byproduct_heads += heads
+                total_byproduct_kilograms += kilograms
+            else:
+                summary_dressed.append(summary)
+                total_dressed_bags += bags
+                total_dressed_heads += heads
+                total_dressed_kilograms += kilograms
+        
+        pages.append(TallySheetPage(
+            page_number=page_number,
+            total_pages=0,  # Will be set after all pages are created
+            columns=columns,
+            entries=sheet_entries,
+            grid=grid,
+            summary_dressed=summary_dressed,
+            summary_byproduct=summary_byproduct,
+            total_dressed_bags=total_dressed_bags,
+            total_dressed_heads=total_dressed_heads,
+            total_dressed_kilograms=total_dressed_kilograms,
+            total_byproduct_bags=total_byproduct_bags,
+            total_byproduct_heads=total_byproduct_heads,
+            total_byproduct_kilograms=total_byproduct_kilograms,
+            is_byproduct=is_byproduct
+        ))
+        
+        return 1
+    
+    # Process Dressed entries first
+    process_entries_by_classification(dressed_entries_by_classification, is_byproduct=False)
+    
+    # Process Byproduct entries
+    process_entries_by_classification(byproduct_entries_by_classification, is_byproduct=True)
+    
+    # Update total_pages for all pages
+    total_pages = len(pages)
+    for page in pages:
+        page.total_pages = total_pages
+    
+    # Calculate grand totals across all pages
+    grand_total_bags = sum(len(entries_by_classification[key]) for key in entries_by_classification)
+    
+    # Calculate grand total heads - use actual heads from entries for both byproduct and dressed
+    grand_total_heads = sum(
+        sum(e.heads if e.heads is not None else DEFAULT_HEADS_PER_BAG for e in entries)
+        for entries in entries_by_classification.values()
+    )
+    
+    grand_total_kilograms = sum(
+        sum(e.weight for e in entries)
+        for entries in entries_by_classification.values()
+    )
+    
+    # Determine product type (use "Mixed" if both categories exist, otherwise use the single category)
+    categories = {wc.category for wc in weight_classifications.values()}
+    if len(categories) == 1:
+        if "Byproduct" in categories:
+            product_type = "Byproduct"
+        else:
+            product_type = "Dressed Chicken"
+    else:
+        product_type = "Mixed"
+    
+    # Use the date from the first session
+    session_date = sessions[0].date
+    
+    return TallySheetResponse(
+        customer_name=customer.name,
+        product_type=product_type,
+        date=session_date,
+        pages=pages,
+        grand_total_bags=grand_total_bags,
+        grand_total_heads=grand_total_heads,
+        grand_total_kilograms=grand_total_kilograms
+    )

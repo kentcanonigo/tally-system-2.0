@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { customersApi, plantsApi, tallySessionsApi, exportApi } from '../services/api';
 import { generateSessionReportPDF } from '../utils/pdfGenerator';
+import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 import type { Customer, Plant, TallySession } from '../types';
 
 function ExportPage() {
@@ -10,6 +12,7 @@ function ExportPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
   
   const [filters, setFilters] = useState({
     customer_id: '',
@@ -117,6 +120,25 @@ function ExportPage() {
     }
   };
 
+  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (selectedIds.length === 0) return;
+    setExporting(true);
+    setShowTallySheetFormatModal(false);
+    try {
+      const response = await exportApi.exportTallySheet({ session_ids: selectedIds });
+      if (format === 'pdf') {
+        generateTallySheetPDF(response.data);
+      } else {
+        generateTallySheetExcel(response.data);
+      }
+    } catch (error) {
+      console.error('Tally sheet export failed', error);
+      alert('Tally sheet export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && sessions.length === 0) {
     return <div>Loading...</div>;
   }
@@ -135,9 +157,65 @@ function ExportPage() {
           disabled={selectedIds.length === 0 || exporting}
           style={{ opacity: selectedIds.length === 0 ? 0.5 : 1 }}
         >
-          {exporting ? 'Generating PDF...' : `Export Selected (${selectedIds.length})`}
+          {exporting ? 'Generating PDF...' : `Export Allocation Report (${selectedIds.length})`}
+        </button>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setShowTallySheetFormatModal(true)}
+          disabled={selectedIds.length === 0 || exporting}
+          style={{ opacity: selectedIds.length === 0 ? 0.5 : 1 }}
+        >
+          Export Tally Sheet ({selectedIds.length})
         </button>
       </div>
+
+      {showTallySheetFormatModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Select Export Format</h3>
+            <p>Choose the format for the tally sheet export:</p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('pdf')}
+                disabled={exporting}
+              >
+                PDF
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('excel')}
+                disabled={exporting}
+              >
+                Excel
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowTallySheetFormatModal(false)}
+                disabled={exporting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
         <div className="form-group" style={{ marginBottom: 0, minWidth: '200px' }}>

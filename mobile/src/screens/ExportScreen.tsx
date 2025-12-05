@@ -20,6 +20,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { tallySessionsApi, exportApi, customersApi } from '../services/api';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
+import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 import { TallySession, Customer } from '../types';
 import { usePlant } from '../contexts/PlantContext';
 import { usePermissions } from '../utils/usePermissions';
@@ -41,6 +43,7 @@ const ExportScreen = () => {
   const [exporting, setExporting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExportTypeModal, setShowExportTypeModal] = useState(false);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -310,9 +313,59 @@ const ExportScreen = () => {
     }
   };
 
-  const handleExportTallySheet = () => {
-    // Placeholder for future implementation
-    Alert.alert('Coming Soon', 'Tally Sheet Report export will be available in a future update.');
+  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+    if (selectedSessionIds.length === 0) {
+      Alert.alert('No Sessions Selected', 'Please select at least one session to export.');
+      return;
+    }
+
+    try {
+      setExporting(true);
+      setShowTallySheetFormatModal(false);
+      setShowExportTypeModal(false);
+
+      const response = await exportApi.exportTallySheet({
+        session_ids: selectedSessionIds
+      });
+
+      if (format === 'pdf') {
+        const html = generateTallySheetHTML(response.data);
+        const { uri } = await printToFileAsync({
+          html,
+          base64: false
+        });
+
+        const currentDate = new Date();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[currentDate.getMonth()];
+        const day = currentDate.getDate();
+        const year = currentDate.getFullYear();
+        const dateString = `${month}-${day}-${year}`;
+        const filename = `Tally Sheet (${dateString}).pdf`;
+        
+        const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+        const newUri = fileDir + filename;
+        
+        const fileInfo = await FileSystem.getInfoAsync(newUri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(newUri, { idempotent: true });
+        }
+        
+        await FileSystem.moveAsync({
+          from: uri,
+          to: newUri,
+        });
+
+        await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } else {
+        await generateTallySheetExcel(response.data);
+      }
+    } catch (error) {
+      console.error('Tally sheet export error:', error);
+      Alert.alert('Error', 'Failed to export tally sheet');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const getCustomerName = (customerId: number) => {
@@ -638,25 +691,28 @@ const ExportScreen = () => {
               {exporting && <ActivityIndicator size="small" color="#fff" />}
             </TouchableOpacity>
 
-            {/* Tally Sheet Report (Placeholder) */}
+            {/* Tally Sheet Report */}
             <TouchableOpacity
-              style={[styles.exportTypeOption, styles.exportTypeOptionDisabled]}
-              onPress={handleExportTallySheet}
-              disabled={true}
+              style={[styles.exportTypeOption, styles.exportTypeOptionSecondary]}
+              onPress={() => {
+                setShowExportTypeModal(false);
+                setShowTallySheetFormatModal(true);
+              }}
+              disabled={exporting}
             >
               <MaterialIcons
                 name="list-alt"
                 size={24}
-                color="#2c3e50"
+                color="#fff"
                 style={styles.exportTypeOptionIcon}
               />
               <View style={styles.exportTypeOptionContent}>
-                <Text style={styles.exportTypeOptionTitle}>Tally Sheet Report</Text>
-                <Text style={styles.exportTypeOptionDesc}>Coming soon</Text>
+                <Text style={styles.exportTypeOptionTitleLight}>Tally Sheet Report</Text>
+                <Text style={styles.exportTypeOptionDescLight}>
+                  Detailed grid with individual entries
+                </Text>
               </View>
-              <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>SOON</Text>
-              </View>
+              {exporting && <ActivityIndicator size="small" color="#fff" />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -668,6 +724,84 @@ const ExportScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Tally Sheet Format Selection Modal */}
+      <Modal
+        transparent
+        visible={showTallySheetFormatModal}
+        animationType="fade"
+        onRequestClose={() => setShowTallySheetFormatModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.formatModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTallySheetFormatModal(false)}
+        >
+          <View style={styles.formatModalContent}>
+            <View style={styles.formatModalHeader}>
+              <Text style={styles.formatModalTitle}>Export Format</Text>
+              <TouchableOpacity
+                onPress={() => setShowTallySheetFormatModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formatOptionsContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.formatOption,
+                  exporting && styles.formatOptionDisabled
+                ]}
+                onPress={() => handleExportTallySheet('pdf')}
+                disabled={exporting}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name="picture-as-pdf"
+                  size={28}
+                  color="#e74c3c"
+                />
+                <View style={styles.formatOptionTextContainer}>
+                  <Text style={styles.formatOptionTitle}>PDF</Text>
+                  <Text style={styles.formatOptionDescription}>
+                    Portable Document Format
+                  </Text>
+                </View>
+                {exporting && (
+                  <ActivityIndicator size="small" color="#3498db" />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.formatOption,
+                  exporting && styles.formatOptionDisabled
+                ]}
+                onPress={() => handleExportTallySheet('excel')}
+                disabled={exporting}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name="table-chart"
+                  size={28}
+                  color="#27ae60"
+                />
+                <View style={styles.formatOptionTextContainer}>
+                  <Text style={styles.formatOptionTitle}>Excel</Text>
+                  <Text style={styles.formatOptionDescription}>
+                    Microsoft Excel format
+                  </Text>
+                </View>
+                {exporting && (
+                  <ActivityIndicator size="small" color="#3498db" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -1043,6 +1177,69 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#7f8c8d',
     fontWeight: '600',
+  },
+  // Format Selection Modal Styles (Clean Design)
+  formatModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  formatModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  formatModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  formatModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  formatOptionsContainer: {
+    padding: 20,
+  },
+  formatOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  formatOptionDisabled: {
+    opacity: 0.6,
+  },
+  formatOptionTextContainer: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  formatOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  formatOptionDescription: {
+    fontSize: 13,
+    color: '#6c757d',
   },
   activeFilterButton: {
     backgroundColor: '#fff3cd',
