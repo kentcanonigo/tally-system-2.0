@@ -14,7 +14,6 @@ import {
 import type { AllocationDetails, WeightClassification, TallySession, Customer, Plant, TallyLogEntry } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
-import { getDefaultHeadsAmount } from '../utils/settings';
 import { formatDate } from '../utils/dateFormat';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePermissions } from '../utils/usePermissions';
@@ -100,7 +99,6 @@ function TallyScreen(props?: TallyScreenProps) {
   const [manualWeightInput, setManualWeightInput] = useState('0');
   const [activeInputField, setActiveInputField] = useState<'weight' | 'heads' | null>(null);
   const [showWeightClassDropdown, setShowWeightClassDropdown] = useState(false);
-  const [defaultHeadsAmount, setDefaultHeadsAmount] = useState<number>(15);
   
   // Refs for TextInput fields to maintain focus
   const headsInputRef = useRef<TextInput>(null);
@@ -114,8 +112,6 @@ function TallyScreen(props?: TallyScreenProps) {
     if (sessionId) {
       fetchData();
     }
-    // Load default heads amount
-    getDefaultHeadsAmount().then(setDefaultHeadsAmount);
   }, [sessionId]);
 
   // Reset manual input state when toggle is turned off
@@ -123,7 +119,7 @@ function TallyScreen(props?: TallyScreenProps) {
     if (!showManualInput) {
       // Clear all manual input fields
       setSelectedWeightClassId(null);
-      setManualHeadsInput(defaultHeadsAmount.toString());
+      setManualHeadsInput('15'); // Fallback value
       setManualWeightInput('0');
       setActiveInputField(null);
       // Blur any focused input fields
@@ -132,7 +128,7 @@ function TallyScreen(props?: TallyScreenProps) {
       // Reset to automatic input mode
       setTallyInput('0');
     }
-  }, [showManualInput, defaultHeadsAmount]);
+  }, [showManualInput]);
 
   // Update navigation title when data is loaded (only if not hidden)
   useLayoutEffect(() => {
@@ -342,8 +338,10 @@ function TallyScreen(props?: TallyScreenProps) {
 
   const handleTallyClear = () => {
     if (activeInputField === 'heads') {
-      // Clear heads to default heads amount
-      setManualHeadsInput(defaultHeadsAmount.toString());
+      // Clear heads to selected weight classification's default_heads or fallback
+      const selectedWC = weightClassifications.find((wc) => wc.id === selectedWeightClassId);
+      const defaultHeads = selectedWC?.default_heads ?? 15;
+      setManualHeadsInput(defaultHeads.toString());
       requestAnimationFrame(() => {
         headsInputRef.current?.focus();
       });
@@ -499,7 +497,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
           // Reset manual inputs
           setSelectedWeightClassId(null);
-          setManualHeadsInput('15');
+          setManualHeadsInput('15'); // Fallback value
           setManualWeightInput('0');
           setActiveInputField(null);
 
@@ -609,8 +607,8 @@ function TallyScreen(props?: TallyScreenProps) {
       setIsSubmitting(true);
       try {
         // Create log entry - this will also increment the allocation
-        // Default heads to 15 when using numpad
-        const defaultHeads = await getDefaultHeadsAmount();
+        // Use weight classification's default_heads or fallback to 15
+        const defaultHeads = matchedWC.default_heads ?? 15;
         await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: matchedWCId,
           role: tallyRole as TallyLogEntryRole,
@@ -1475,7 +1473,7 @@ function TallyScreen(props?: TallyScreenProps) {
             <View style={[dynamicStyles.displayField, { flex: 1 }, disabledInputStyle]}>
               <Text style={dynamicStyles.displayLabel}>Heads</Text>
               <Text style={dynamicStyles.displayValue}>
-                {defaultHeadsAmount}
+                {matchedWC ? (matchedWC.default_heads ?? 15) : 15}
               </Text>
             </View>
           </View>
@@ -1846,6 +1844,9 @@ function TallyScreen(props?: TallyScreenProps) {
                     ]}
                     onPress={() => {
                       setSelectedWeightClassId(wc.id);
+                      // Update heads input to this classification's default_heads
+                      const defaultHeads = wc.default_heads ?? 15;
+                      setManualHeadsInput(defaultHeads.toString());
                       setShowWeightClassDropdown(false);
                     }}
                   >

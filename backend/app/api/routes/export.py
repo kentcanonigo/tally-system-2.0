@@ -17,8 +17,8 @@ from ...schemas.export import (
     TallySheetPage, TallySheetEntry, TallySheetColumnHeader, TallySheetSummary
 )
 
-# Default heads per bag - matches frontend setting (currently locked to 15)
-DEFAULT_HEADS_PER_BAG = 15.0
+# Fallback default heads per bag (used only if weight classification's default_heads is not available)
+FALLBACK_DEFAULT_HEADS = 15.0
 
 router = APIRouter()
 
@@ -313,7 +313,9 @@ def process_sessions_for_customer(
                     
                     # For byproduct, show heads value from entry, for dressed show weight
                     if is_byproduct:
-                        cell_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+                        wc = weight_classifications[entry_wc_id]
+                        default_heads = wc.default_heads if wc.default_heads is not None else FALLBACK_DEFAULT_HEADS
+                        cell_value = entry.heads if entry.heads is not None else default_heads
                     else:
                         cell_value = entry.weight
                     
@@ -381,8 +383,9 @@ def process_sessions_for_customer(
             ]
             
             bags = len(page_entries_for_wc)
-            # For both byproduct and dressed, use actual heads from entries with fallback to default
-            heads = sum(e.heads if e.heads is not None else DEFAULT_HEADS_PER_BAG for e, _, _ in page_entries_for_wc)
+            # For both byproduct and dressed, use actual heads from entries with fallback to weight classification's default_heads
+            default_heads = wc.default_heads if wc.default_heads is not None else FALLBACK_DEFAULT_HEADS
+            heads = sum(e.heads if e.heads is not None else default_heads for e, _, _ in page_entries_for_wc)
             kilograms = sum(e.weight for e, _, _ in page_entries_for_wc)
             
             summary = TallySheetSummary(
@@ -444,10 +447,12 @@ def process_sessions_for_customer(
     grand_total_bags = sum(len(entries_by_classification[key]) for key in entries_by_classification)
     
     # Calculate grand total heads - use actual heads from entries for both byproduct and dressed
-    grand_total_heads = sum(
-        sum(e.heads if e.heads is not None else DEFAULT_HEADS_PER_BAG for e in entries)
-        for entries in entries_by_classification.values()
-    )
+    # Use weight classification's default_heads for each entry
+    grand_total_heads = 0.0
+    for (wc_id, classification), entries in entries_by_classification.items():
+        wc = weight_classifications[wc_id]
+        default_heads = wc.default_heads if wc.default_heads is not None else FALLBACK_DEFAULT_HEADS
+        grand_total_heads += sum(e.heads if e.heads is not None else default_heads for e in entries)
     
     grand_total_kilograms = sum(
         sum(e.weight for e in entries)

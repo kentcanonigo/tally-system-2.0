@@ -25,6 +25,7 @@ function WeightClassificationsScreen() {
   const [minWeight, setMinWeight] = useState('');
   const [maxWeight, setMaxWeight] = useState('');
   const [category, setCategory] = useState<'Dressed' | 'Byproduct'>('Dressed');
+  const [defaultHeads, setDefaultHeads] = useState('15');
 
   useEffect(() => {
     if (activePlantId) {
@@ -68,6 +69,7 @@ function WeightClassificationsScreen() {
     setMinWeight('');
     setMaxWeight('');
     setCategory('Dressed');
+    setDefaultHeads('15');
     setModalVisible(true);
   };
 
@@ -78,6 +80,7 @@ function WeightClassificationsScreen() {
     setMinWeight(wc.min_weight?.toString() || '');
     setMaxWeight(wc.max_weight?.toString() || '');
     setCategory(wc.category as 'Dressed' | 'Byproduct');
+    setDefaultHeads((wc.default_heads ?? 15).toString());
     setModalVisible(true);
   };
 
@@ -152,6 +155,7 @@ function WeightClassificationsScreen() {
         classification: classification.trim(),
         category,
         description: description.trim() || null,
+        default_heads: parseFloat(defaultHeads) || 15.0,
       };
 
       // Handle weights based on category
@@ -315,6 +319,7 @@ function WeightClassificationsScreen() {
                   <View style={styles.cardInfo}>
                     <Text style={styles.classification}>{item.classification}</Text>
                     <Text style={styles.weightRange}>{formatWeightRange(item)}</Text>
+                    <Text style={styles.defaultHeads}>Default Heads: {item.default_heads ?? 15}</Text>
                     {item.description && (
                       <Text style={styles.description}>{item.description}</Text>
                     )}
@@ -352,6 +357,7 @@ function WeightClassificationsScreen() {
                   <View style={styles.cardInfo}>
                     <Text style={styles.classification}>{item.classification}</Text>
                     <Text style={styles.weightRange}>{formatWeightRange(item)}</Text>
+                    <Text style={styles.defaultHeads}>Default Heads: {item.default_heads ?? 15}</Text>
                   </View>
                   {/* Only show edit/delete buttons if user has permission */}
                   {hasPermission('can_manage_weight_classes') && (
@@ -428,6 +434,18 @@ function WeightClassificationsScreen() {
                 multiline
                 numberOfLines={3}
               />
+
+              <Text style={styles.label}>Default Heads *</Text>
+              <TextInput
+                style={dynamicStyles.input}
+                placeholder="15"
+                value={defaultHeads}
+                onChangeText={setDefaultHeads}
+                keyboardType="numeric"
+              />
+              <Text style={styles.helpText}>
+                Default number of heads for this classification (applies to both Dressed and Byproduct)
+              </Text>
 
               {category === 'Dressed' && (
                 <>
@@ -570,6 +588,12 @@ const styles = StyleSheet.create({
     color: '#555',
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  defaultHeads: {
+    fontSize: 14,
+    color: '#3498db',
+    marginTop: 4,
+    fontWeight: '500',
   },
   actions: {
     flexDirection: 'row',

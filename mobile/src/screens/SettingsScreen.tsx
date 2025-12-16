@@ -9,7 +9,6 @@ import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
 import { plantsApi, rolesApi, setApiBaseUrl, getCurrentApiBaseUrl } from '../services/api';
 import { Plant, Role } from '../types';
-import { useDefaultHeadsAmount } from '../utils/settings';
 
 // Available tabs that can be shown/hidden
 const AVAILABLE_TABS = [
@@ -34,7 +33,6 @@ function SettingsScreen() {
   const { timezone, setTimezone, availableTimezones } = useTimezone();
   const { activePlantId, setActivePlantId, isLoading: isPlantLoading } = usePlant();
   const responsive = useResponsive();
-  const defaultHeadsAmount = useDefaultHeadsAmount();
   
   const [selectedTimezone, setSelectedTimezone] = useState(user?.timezone || timezone);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
@@ -558,29 +556,6 @@ function SettingsScreen() {
 
         <Text style={dynamicStyles.infoText}>
           Settings tab is always visible. You must have at least one other tab visible.
-        </Text>
-      </View>
-
-
-      <View style={dynamicStyles.section}>
-        <Text style={dynamicStyles.sectionTitle}>Default Heads Amount</Text>
-        <Text style={dynamicStyles.label}>
-          Default number of heads per bag:
-        </Text>
-
-        <View style={dynamicStyles.inputWrapper}>
-          <TextInput
-            style={[dynamicStyles.input, { backgroundColor: '#f5f5f5', color: '#7f8c8d' }]}
-            value={defaultHeadsAmount.toString()}
-            editable={false}
-            placeholder="15"
-            keyboardType="numeric"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        <Text style={dynamicStyles.infoText}>
-          This is the default number of heads per bag for Dressed category items. Byproduct items do not use heads tracking. This setting is currently view-only.
         </Text>
       </View>
 

@@ -14,6 +14,7 @@ class WeightClassification(Base):
     min_weight = Column(Float, nullable=True)  # Nullable for catch-all classifications
     max_weight = Column(Float, nullable=True)  # Nullable for "up" ranges and catch-all
     category = Column(String(100), nullable=False)  # Must be "Dressed" or "Byproduct" (enforced by CHECK constraint)
+    default_heads = Column(Float, nullable=False, default=15.0)  # Default number of heads for this classification
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

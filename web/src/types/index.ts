@@ -20,6 +20,7 @@ export interface WeightClassification {
   min_weight: number | null;
   max_weight: number | null;
   category: string;
+  default_heads?: number;
   created_at: string;
   updated_at: string;
 }

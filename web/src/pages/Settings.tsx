@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { getDefaultHeadsAmount } from '../utils/settings';
 import { useAuth } from '../contexts/AuthContext';
 import { consoleApi } from '../services/api';
 
@@ -11,7 +10,6 @@ function Settings() {
   const [threshold, setThreshold] = useState<string>('0');
   const [currentThreshold, setCurrentThreshold] = useState<number>(0);
   const [saved, setSaved] = useState(false);
-  const [defaultHeadsAmount] = useState<number>(getDefaultHeadsAmount());
   
   // Console modal state
   const [showConsoleModal, setShowConsoleModal] = useState(false);
@@ -166,26 +164,6 @@ function Settings() {
           <p style={{ color: '#7f8c8d', fontSize: '14px', marginTop: '15px', fontStyle: 'italic' }}>
             When viewing session logs, differences within this threshold will be displayed in orange (acceptable).
             Exact matches (0) will be green, and differences beyond the threshold will be red (unacceptable).
-          </p>
-        </div>
-
-        <h2 style={{ marginBottom: '20px', marginTop: '40px', color: '#2c3e50' }}>Default Heads Amount</h2>
-        <div className="form-group">
-          <label>Default Heads Amount</label>
-          <p style={{ color: '#7f8c8d', fontSize: '14px', marginBottom: '10px' }}>
-            Default number of heads per bag:
-          </p>
-          <input
-            type="number"
-            step="1"
-            min="0"
-            value={defaultHeadsAmount}
-            readOnly
-            disabled
-            style={{ maxWidth: '200px', backgroundColor: '#f5f5f5', color: '#7f8c8d', cursor: 'not-allowed' }}
-          />
-          <p style={{ color: '#7f8c8d', fontSize: '14px', marginTop: '15px', fontStyle: 'italic' }}>
-            This is the default number of heads that will be assigned to each bag when tallying. This setting is currently view-only.
           </p>
         </div>
 

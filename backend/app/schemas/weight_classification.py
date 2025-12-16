@@ -13,6 +13,7 @@ class WeightClassificationBase(BaseModel):
     min_weight: Optional[float] = None  # Nullable for catch-all
     max_weight: Optional[float] = None  # Nullable for "up" ranges and catch-all
     category: CategoryType
+    default_heads: Optional[float] = 15.0  # Default number of heads for this classification
 
     @field_validator('category')
     @classmethod
@@ -20,6 +21,13 @@ class WeightClassificationBase(BaseModel):
         allowed_categories = ['Dressed', 'Byproduct']
         if v not in allowed_categories:
             raise ValueError(f'category must be one of: {", ".join(allowed_categories)}')
+        return v
+    
+    @field_validator('default_heads')
+    @classmethod
+    def validate_default_heads(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError('default_heads must be non-negative')
         return v
 
     @model_validator(mode='after')
@@ -63,6 +71,7 @@ class WeightClassificationUpdate(BaseModel):
     min_weight: Optional[float] = None
     max_weight: Optional[float] = None
     category: Optional[CategoryType] = None
+    default_heads: Optional[float] = None
 
     @field_validator('category')
     @classmethod
@@ -72,6 +81,13 @@ class WeightClassificationUpdate(BaseModel):
         allowed_categories = ['Dressed', 'Byproduct']
         if v not in allowed_categories:
             raise ValueError(f'category must be one of: {", ".join(allowed_categories)}')
+        return v
+    
+    @field_validator('default_heads')
+    @classmethod
+    def validate_default_heads(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError('default_heads must be non-negative')
         return v
 
     @model_validator(mode='after')

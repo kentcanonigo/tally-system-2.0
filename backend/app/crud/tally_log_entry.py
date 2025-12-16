@@ -24,10 +24,10 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
     if wc is None:
         raise ValueError("Weight classification not found")
     
-    # Force heads to default (15) for byproducts - each bag has 15 heads
-    DEFAULT_HEADS_PER_BAG = 15.0
-    if wc.category == 'Byproduct':
-        log_entry.heads = DEFAULT_HEADS_PER_BAG
+    # Use weight classification's default_heads if heads is not provided
+    # For both Dressed and Byproduct categories
+    if log_entry.heads is None:
+        log_entry.heads = wc.default_heads if wc.default_heads is not None else 15.0
     
     # Get or create allocation detail for this session + classification
     allocation = db.query(AllocationDetails).filter(
@@ -58,7 +58,7 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
         allocation.allocated_bags_dispatcher += 1
     
     # Aggregate heads: add the heads from this log entry to the allocation
-    heads_value = log_entry.heads if log_entry.heads is not None else 15.0
+    heads_value = log_entry.heads if log_entry.heads is not None else (wc.default_heads if wc.default_heads is not None else 15.0)
     if allocation.heads is None:
         allocation.heads = 0.0
     allocation.heads += heads_value
@@ -69,7 +69,7 @@ def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> Tally
         weight_classification_id=log_entry.weight_classification_id,
         role=log_entry.role,
         weight=log_entry.weight,
-        heads=log_entry.heads if log_entry.heads is not None else 15.0,
+        heads=log_entry.heads if log_entry.heads is not None else (wc.default_heads if wc.default_heads is not None else 15.0),
         notes=log_entry.notes
     )
     db.add(db_log_entry)
@@ -115,6 +115,10 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
     if not log_entry:
         return None
 
+    # Get the weight classification for default_heads fallback
+    wc = wc_crud.get_weight_classification(db, wc_id=log_entry.weight_classification_id)
+    default_heads = wc.default_heads if wc and wc.default_heads is not None else 15.0
+
     # Get the allocation detail
     allocation = db.query(AllocationDetails).filter(
         AllocationDetails.tally_session_id == log_entry.tally_session_id,
@@ -129,7 +133,7 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
             allocation.allocated_bags_dispatcher = max(0.0, allocation.allocated_bags_dispatcher - 1)
         
         # Decrement heads: subtract the heads from this log entry
-        heads_value = log_entry.heads if log_entry.heads is not None else 15.0
+        heads_value = log_entry.heads if log_entry.heads is not None else default_heads
         if allocation.heads is None:
             allocation.heads = 0.0
         allocation.heads = max(0.0, allocation.heads - heads_value)
@@ -188,19 +192,21 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
     if target_session.status != TallySessionStatus.ONGOING:
         raise ValueError("Target session must be ongoing to transfer log entries")
     
-    # Validate all weight classifications exist in target plant
+    # Validate all weight classifications exist in target plant and cache them
     weight_classification_ids = {entry.weight_classification_id for entry in entries}
+    wc_cache = {}
     for wc_id in weight_classification_ids:
         wc = wc_crud.get_weight_classification(db, wc_id)
         if wc is None:
             raise ValueError(f"Weight classification {wc_id} not found")
         if wc.plant_id != source_plant_id:
             raise ValueError(f"Weight classification {wc_id} does not belong to the same plant")
+        wc_cache[wc_id] = wc
     
     # Transfer entries atomically
-    DEFAULT_HEADS_PER_BAG = 15.0
-    
     for entry in entries:
+        wc = wc_cache[entry.weight_classification_id]
+        default_heads = wc.default_heads if wc.default_heads is not None else 15.0
         # Decrement source session allocation
         source_allocation = db.query(AllocationDetails).filter(
             AllocationDetails.tally_session_id == entry.tally_session_id,
@@ -215,7 +221,7 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
                 source_allocation.allocated_bags_dispatcher = max(0.0, source_allocation.allocated_bags_dispatcher - 1)
             
             # Decrement heads
-            heads_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+            heads_value = entry.heads if entry.heads is not None else default_heads
             if source_allocation.heads is None:
                 source_allocation.heads = 0.0
             source_allocation.heads = max(0.0, source_allocation.heads - heads_value)
@@ -250,7 +256,7 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
             target_allocation.allocated_bags_dispatcher += 1
         
         # Increment heads
-        heads_value = entry.heads if entry.heads is not None else DEFAULT_HEADS_PER_BAG
+        heads_value = entry.heads if entry.heads is not None else default_heads
         if target_allocation.heads is None:
             target_allocation.heads = 0.0
         target_allocation.heads += heads_value

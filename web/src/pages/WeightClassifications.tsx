@@ -17,6 +17,7 @@ function WeightClassifications() {
     min_weight: null as number | null,
     max_weight: null as number | null,
     category: '',
+    default_heads: 15.0,
     isCatchAll: false,
     isUpRange: false,
     isDownRange: false,
@@ -70,6 +71,7 @@ function WeightClassifications() {
       min_weight: null, 
       max_weight: null, 
       category: '',
+      default_heads: 15.0,
       isCatchAll: false,
       isUpRange: false,
       isDownRange: false,
@@ -89,6 +91,7 @@ function WeightClassifications() {
       min_weight: classification.min_weight ?? null,
       max_weight: classification.max_weight ?? null,
       category: classification.category,
+      default_heads: classification.default_heads ?? 15.0,
       isCatchAll,
       isUpRange,
       isDownRange,
@@ -111,6 +114,7 @@ function WeightClassifications() {
       classification: formData.classification,
       category: formData.category,
       description: formData.description.trim() || null,
+      default_heads: formData.default_heads ?? 15.0,
     };
     
     // For Byproduct, always set weights to null
@@ -222,19 +226,20 @@ function WeightClassifications() {
                   <th>Description</th>
                   <th>Weight Range</th>
                   <th>Category</th>
+                  <th>Default Heads</th>
                   {hasPermission('can_manage_weight_classes') && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={hasPermission('can_manage_weight_classes') ? 6 : 5} style={{ textAlign: 'center', padding: '20px' }}>
+                    <td colSpan={hasPermission('can_manage_weight_classes') ? 7 : 6} style={{ textAlign: 'center', padding: '20px' }}>
                       Loading...
                     </td>
                   </tr>
                 ) : classifications.length === 0 ? (
                   <tr>
-                    <td colSpan={hasPermission('can_manage_weight_classes') ? 6 : 5} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    <td colSpan={hasPermission('can_manage_weight_classes') ? 7 : 6} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
                       No weight classifications found. Click "Add Weight Classification" to create one.
                     </td>
                   </tr>
@@ -246,6 +251,7 @@ function WeightClassifications() {
                       <td>{classification.description || '-'}</td>
                       <td>{formatWeightRange(classification)}</td>
                       <td>{classification.category}</td>
+                      <td>{classification.default_heads ?? 15}</td>
                       {hasPermission('can_manage_weight_classes') && (
                         <td>
                           <button
@@ -299,6 +305,20 @@ function WeightClassifications() {
                   required={formData.category === 'Byproduct'}
                   placeholder={formData.category === 'Byproduct' ? 'Required for Byproduct' : 'Optional'}
                 />
+              </div>
+              <div className="form-group">
+                <label>Default Heads</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formData.default_heads}
+                  onChange={(e) => setFormData({ ...formData, default_heads: parseFloat(e.target.value) || 15.0 })}
+                  required
+                />
+                <small style={{ color: '#7f8c8d', fontSize: '12px' }}>
+                  Default number of heads for this classification (applies to both Dressed and Byproduct)
+                </small>
               </div>
               <div className="form-group">
                 <label>Category</label>
