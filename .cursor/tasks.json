@@ -1,0 +1,29 @@
+{
+  "tasks": [
+    {
+      "label": "@backend/dev",
+      "type": "shell",
+      "command": "bash -lc \"cd backend && if command -v py >/dev/null 2>&1; then PYBIN=\\\"py -3.11\\\"; else PYBIN=python3.11; fi; if [ -d .venv/Scripts ]; then source .venv/Scripts/activate; elif [ -d venv/Scripts ]; then source venv/Scripts/activate; else $PYBIN -m venv .venv && source .venv/Scripts/activate; fi && pip install -r requirements-dev.txt && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload\"",
+      "detail": "Run FastAPI backend with Python 3.11 venv setup, migrations, uvicorn on 8000"
+    },
+    {
+      "label": "@mobile/dev",
+      "type": "shell",
+      "command": "cd mobile && npm run start",
+      "detail": "Run Expo dev server for the mobile app"
+    },
+    {
+      "label": "@web/dev",
+      "type": "shell",
+      "command": "cd web && npm run dev",
+      "detail": "Run Vite dev server for the web client"
+    },
+    {
+      "label": "@all/dev",
+      "type": "shell",
+      "command": "bash -lc \"(cd backend && bash start.sh) & (cd mobile && npm run start) & (cd web && npm run dev)\"",
+      "detail": "Run backend, mobile (Expo), and web (Vite) together"
+    }
+  ]
+}
+
