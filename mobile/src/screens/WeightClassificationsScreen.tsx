@@ -18,7 +18,7 @@ function WeightClassificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingWC, setEditingWC] = useState<WeightClassification | null>(null);
-  
+   
   // Form state
   const [classification, setClassification] = useState('');
   const [description, setDescription] = useState('');

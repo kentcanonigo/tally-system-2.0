@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal } from 'react-native';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal, BackHandler } from 'react-native';
+import { useRoute, useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatTime } from '../utils/dateFormat';
@@ -26,6 +26,7 @@ function TallySessionLogsScreen() {
   const threshold = useAcceptableDifference();
   const { hasPermission } = usePermissions();
   const sessionId = (route.params as any)?.sessionId;
+  const fromTallyTab = (route.params as any)?.fromTallyTab;
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -70,6 +71,29 @@ function TallySessionLogsScreen() {
       fetchData();
     }
   }, [sessionId]);
+
+  // Handle Android back button
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (fromTallyTab && sessionId) {
+          // Navigate back to Tally tab if we came from there, preserving the session selection
+          const parent = navigation.getParent();
+          const tabNavigator = parent?.getParent();
+          if (tabNavigator) {
+            // Use navigate instead of jumpTo to pass params
+            tabNavigator.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+          } else {
+            navigation.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+          }
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior
+      });
+
+      return () => backHandler.remove();
+    }
+  }, [fromTallyTab, navigation, sessionId]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -665,7 +689,24 @@ function TallySessionLogsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
       <View style={dynamicStyles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => {
+            if (fromTallyTab && sessionId) {
+              // Navigate back to Tally tab if we came from there, preserving the session selection
+              const parent = navigation.getParent();
+              const tabNavigator = parent?.getParent();
+              if (tabNavigator) {
+                // Use navigate instead of jumpTo to pass params
+                tabNavigator.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+              } else {
+                navigation.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+              }
+            } else {
+              navigation.goBack();
+            }
+          }} 
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
         <Text style={dynamicStyles.title}>

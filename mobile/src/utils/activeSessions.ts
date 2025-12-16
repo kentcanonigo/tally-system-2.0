@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVE_SESSIONS_KEY = 'activeSessions';
+const SELECTED_SESSION_KEY = 'selectedSessionId';
 const MAX_ACTIVE_SESSIONS = 10;
 
 /**
@@ -153,5 +154,38 @@ export const reorderActiveSessions = async (fromIndex: number, toIndex: number):
  */
 export const getMaxActiveSessions = (): number => {
   return MAX_ACTIVE_SESSIONS;
+};
+
+/**
+ * Get the selected session ID from storage
+ */
+export const getSelectedSessionId = async (): Promise<number | null> => {
+  try {
+    const stored = await AsyncStorage.getItem(SELECTED_SESSION_KEY);
+    if (stored) {
+      const sessionId = Number(stored);
+      return isNaN(sessionId) ? null : sessionId;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting selected session ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Set the selected session ID in storage
+ */
+export const setSelectedSessionId = async (sessionId: number | null): Promise<void> => {
+  try {
+    if (sessionId === null) {
+      await AsyncStorage.removeItem(SELECTED_SESSION_KEY);
+    } else {
+      await AsyncStorage.setItem(SELECTED_SESSION_KEY, String(sessionId));
+    }
+  } catch (error) {
+    console.error('Error setting selected session ID:', error);
+    throw error;
+  }
 };
 

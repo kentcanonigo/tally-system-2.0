@@ -91,6 +91,8 @@ function TallyScreen(props?: TallyScreenProps) {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [selectedByproductId, setSelectedByproductId] = useState<number | null>(null);
   const [quantityInput, setQuantityInput] = useState('1');
+  const [byproductHeadsInput, setByproductHeadsInput] = useState('15');
+  const [quantityModalHeadsInput, setQuantityModalHeadsInput] = useState('15');
   
   // Manual input state for dressed mode
   const [showManualInput, setShowManualInput] = useState(false);
@@ -113,6 +115,17 @@ function TallyScreen(props?: TallyScreenProps) {
       fetchData();
     }
   }, [sessionId]);
+
+  // Update byproduct heads input when weight classifications are loaded and in byproduct mode
+  useEffect(() => {
+    if (tallyMode === 'byproduct' && weightClassifications.length > 0) {
+      const firstByproduct = weightClassifications.find(wc => wc.category === 'Byproduct');
+      if (firstByproduct) {
+        const defaultHeads = firstByproduct.default_heads ?? 15;
+        setByproductHeadsInput(defaultHeads.toString());
+      }
+    }
+  }, [weightClassifications, tallyMode]);
 
   // Reset manual input state when toggle is turned off
   useEffect(() => {
@@ -679,6 +692,13 @@ function TallyScreen(props?: TallyScreenProps) {
       return;
     }
 
+    // Validate heads input
+    const heads = parseFloat(byproductHeadsInput);
+    if (isNaN(heads) || heads < 0) {
+      Alert.alert('Error', 'Please enter a valid heads amount');
+      return;
+    }
+
     const allocation = getCurrentAllocation(wcId);
     
     // Check if there's no allocation or required_bags is 0
@@ -696,7 +716,7 @@ function TallyScreen(props?: TallyScreenProps) {
           },
           {
             text: 'Yes, Add It',
-            onPress: () => createByproductLogEntry(wcId),
+            onPress: () => createByproductLogEntry(wcId, heads),
           },
         ]
       );
@@ -722,7 +742,7 @@ function TallyScreen(props?: TallyScreenProps) {
             },
             {
               text: 'Proceed',
-              onPress: () => createByproductLogEntry(wcId),
+              onPress: () => createByproductLogEntry(wcId, heads),
             },
           ]
         );
@@ -730,15 +750,16 @@ function TallyScreen(props?: TallyScreenProps) {
       }
     }
 
-    createByproductLogEntry(wcId);
+    createByproductLogEntry(wcId, heads);
 
-    async function createByproductLogEntry(wcId: number) {
+    async function createByproductLogEntry(wcId: number, heads: number) {
       setIsSubmitting(true);
       try {
         await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: wcId,
           role: tallyRole as TallyLogEntryRole,
           weight: 1,
+          heads: heads,
           notes: null,
         });
 
@@ -776,6 +797,13 @@ function TallyScreen(props?: TallyScreenProps) {
       return;
     }
 
+    // Validate heads input
+    const heads = parseFloat(quantityModalHeadsInput);
+    if (isNaN(heads) || heads < 0) {
+      Alert.alert('Error', 'Please enter a valid heads amount');
+      return;
+    }
+
     if (!sessionId) {
       Alert.alert('Error', 'Session ID is missing');
       return;
@@ -797,7 +825,7 @@ function TallyScreen(props?: TallyScreenProps) {
           },
           {
             text: 'Yes, Add It',
-            onPress: () => createQuantityLogEntries(quantity),
+            onPress: () => createQuantityLogEntries(quantity, heads),
           },
         ]
       );
@@ -826,7 +854,7 @@ function TallyScreen(props?: TallyScreenProps) {
             },
             {
               text: 'Proceed',
-              onPress: () => createQuantityLogEntries(quantity),
+              onPress: () => createQuantityLogEntries(quantity, heads),
             },
           ]
         );
@@ -835,9 +863,9 @@ function TallyScreen(props?: TallyScreenProps) {
     }
 
     // No over-allocation, proceed directly
-    createQuantityLogEntries(quantity);
+    createQuantityLogEntries(quantity, heads);
 
-    async function createQuantityLogEntries(quantity: number) {
+    async function createQuantityLogEntries(quantity: number, heads: number) {
       setIsSubmitting(true);
       try {
         if (!selectedByproductId) {
@@ -851,6 +879,7 @@ function TallyScreen(props?: TallyScreenProps) {
             weight_classification_id: selectedByproductId,
             role: tallyRole as TallyLogEntryRole,
             weight: 1,
+            heads: heads,
             notes: null,
           });
         }
@@ -1151,6 +1180,32 @@ function TallyScreen(props?: TallyScreenProps) {
               </View>
             </TouchableOpacity>
           </View>
+          {/* Heads input for byproducts */}
+          <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
+            <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
+              Heads:
+            </Text>
+            <TextInput
+              style={[
+                {
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: '#bdc3c7',
+                  borderRadius: 4,
+                  padding: responsive.padding.small,
+                  backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
+                  fontSize: responsive.fontSize.medium,
+                  color: '#2c3e50',
+                },
+                disabledInputStyle
+              ]}
+              value={byproductHeadsInput}
+              onChangeText={setByproductHeadsInput}
+              keyboardType="numeric"
+              placeholder="15"
+              editable={canStartTally}
+            />
+          </View>
           <View style={[dynamicStyles.summaryTable, { flex: 1 }]}>
             <View style={dynamicStyles.summaryHeader}>
               <Text style={[dynamicStyles.summaryHeaderText, { flex: 2 }]}>Classification</Text>
@@ -1197,7 +1252,12 @@ function TallyScreen(props?: TallyScreenProps) {
                       <View style={{ flex: 1, alignItems: 'center' }}>
                         <TouchableOpacity
                           style={[styles.incrementButton, disabledButtonStyle, isSubmitting && { opacity: 0.6 }]}
-                          onPress={() => handleByproductIncrement(wc.id)}
+                          onPress={() => {
+                            // Update heads input to this classification's default_heads when clicking +1
+                            const defaultHeads = wc.default_heads ?? 15;
+                            setByproductHeadsInput(defaultHeads.toString());
+                            handleByproductIncrement(wc.id);
+                          }}
                           disabled={isSubmitting || !canStartTally}
                         >
                           <Text style={styles.incrementButtonText}>{canStartTally ? '+1' : '—'}</Text>
@@ -1725,6 +1785,7 @@ function TallyScreen(props?: TallyScreenProps) {
           setShowQuantityModal(false);
           setSelectedByproductId(null);
           setQuantityInput('1');
+          setQuantityModalHeadsInput('15');
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1748,7 +1809,12 @@ function TallyScreen(props?: TallyScreenProps) {
                       selectedByproductId === wc.id && styles.modalOptionSelected,
                       { padding: responsive.padding.medium }
                     ]}
-                    onPress={() => setSelectedByproductId(wc.id)}
+                    onPress={() => {
+                      setSelectedByproductId(wc.id);
+                      // Update heads input to this classification's default_heads
+                      const defaultHeads = wc.default_heads ?? 15;
+                      setQuantityModalHeadsInput(defaultHeads.toString());
+                    }}
                   >
                     <Text style={[
                       styles.modalOptionText,
@@ -1766,10 +1832,21 @@ function TallyScreen(props?: TallyScreenProps) {
               Quantity:
             </Text>
             <TextInput
-              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.md }]}
               placeholder="Enter quantity"
               value={quantityInput}
               onChangeText={setQuantityInput}
+              keyboardType="numeric"
+            />
+
+            <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
+              Heads:
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+              placeholder="Enter heads"
+              value={quantityModalHeadsInput}
+              onChangeText={setQuantityModalHeadsInput}
               keyboardType="numeric"
             />
 
@@ -1780,6 +1857,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   setShowQuantityModal(false);
                   setSelectedByproductId(null);
                   setQuantityInput('1');
+                  setQuantityModalHeadsInput('15');
                 }}
               >
                 <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.small }]}>Cancel</Text>

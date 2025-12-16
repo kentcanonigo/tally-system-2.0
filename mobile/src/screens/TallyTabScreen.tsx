@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, ScrollView, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -9,7 +9,7 @@ import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi } from 
 import type { TallySession, Customer } from '../types';
 import { TallySessionStatus } from '../types';
 import { useResponsive } from '../utils/responsive';
-import { getActiveSessions, removeActiveSession, setActiveSessions } from '../utils/activeSessions';
+import { getActiveSessions, removeActiveSession, setActiveSessions, getSelectedSessionId, setSelectedSessionId as persistSelectedSessionId } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
 import { usePlant } from '../contexts/PlantContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ function TallyTabScreen() {
   const responsive = useResponsive();
   const { activePlantId } = usePlant();
   const navigation = useNavigation<any>();
+  const route = useRoute();
   const { hasPermission } = usePermissions();
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [sessions, setSessions] = useState<TallySession[]>([]);
@@ -124,14 +125,34 @@ function TallyTabScreen() {
       setSessions(orderedSessions);
       setCustomers(customersRes.data);
 
-      // If selected session is no longer in active sessions, clear selection
-      if (selectedSessionId && !validSessionData.find(s => s.id === selectedSessionId)) {
-        setSelectedSessionId(null);
-      }
+      // Check if we should restore a session from navigation params (takes priority)
+      const restoreSessionId = (route.params as any)?.restoreSessionId;
+      if (restoreSessionId && validSessionData.find(s => s.id === restoreSessionId)) {
+        // Restore the session if it's still valid
+        setSelectedSessionId(restoreSessionId);
+        await persistSelectedSessionId(restoreSessionId);
+        // Clear the param so it doesn't interfere with future navigations
+        navigation.setParams({ restoreSessionId: undefined });
+      } else {
+        // Try to restore from persistent storage if no navigation param
+        const persistedSessionId = await getSelectedSessionId();
+        if (persistedSessionId && validSessionData.find(s => s.id === persistedSessionId)) {
+          // Restore the persisted session if it's still valid
+          setSelectedSessionId(persistedSessionId);
+        } else {
+          // If selected session is no longer in active sessions, clear selection
+          if (selectedSessionId && !validSessionData.find(s => s.id === selectedSessionId)) {
+            setSelectedSessionId(null);
+            await persistSelectedSessionId(null);
+          }
 
-      // Auto-select first session if none selected and we have sessions
-      if (!selectedSessionId && validSessionData.length > 0) {
-        setSelectedSessionId(validSessionData[0].id);
+          // Auto-select first session if none selected and we have sessions
+          if (!selectedSessionId && validSessionData.length > 0) {
+            const firstSessionId = validSessionData[0].id;
+            setSelectedSessionId(firstSessionId);
+            await persistSelectedSessionId(firstSessionId);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading active sessions:', error);
@@ -163,8 +184,9 @@ function TallyTabScreen() {
     return customers.find((c) => c.id === customerId)?.name || `Customer ${customerId}`;
   };
 
-  const handleSessionSelect = (sessionId: number) => {
+  const handleSessionSelect = async (sessionId: number) => {
     setSelectedSessionId(sessionId);
+    await persistSelectedSessionId(sessionId);
   };
 
   const createPanResponder = useCallback((index: number) => {
@@ -243,9 +265,12 @@ function TallyTabScreen() {
       
       if (remainingSessions.length > 0) {
         // Select the first remaining session
-        setSelectedSessionId(remainingSessions[0].id);
+        const newSelectedId = remainingSessions[0].id;
+        setSelectedSessionId(newSelectedId);
+        await persistSelectedSessionId(newSelectedId);
       } else {
         setSelectedSessionId(null);
+        await persistSelectedSessionId(null);
       }
       
       // Update local state
@@ -718,6 +743,22 @@ function TallyTabScreen() {
               />
             </TouchableOpacity>
           </View>
+          {/* View Logs button - icon only */}
+          {hasPermission('can_view_tally_logs') && selectedSessionId && (
+            <TouchableOpacity
+              style={dynamicStyles.headerButton}
+              onPress={() => navigation.navigate('Sessions' as never, {
+                screen: 'TallySessionLogs',
+                params: { sessionId: selectedSessionId, fromTallyTab: true }
+              } as never)}
+            >
+              <MaterialIcons
+                name="list-alt"
+                size={responsive.isTablet ? 18 : 16}
+                color="#ecf0f1"
+              />
+            </TouchableOpacity>
+          )}
           {/* Focus mode button */}
           <TouchableOpacity
             style={[
@@ -731,16 +772,6 @@ function TallyTabScreen() {
               size={responsive.isTablet ? 18 : 16}
               color={isFocusMode ? '#2c3e50' : '#ecf0f1'}
             />
-            {!useVerticalLayout && (
-              <Text
-                style={[
-                  dynamicStyles.headerButtonText,
-                  isFocusMode && { color: '#2c3e50' },
-                ]}
-              >
-                Focus
-              </Text>
-            )}
           </TouchableOpacity>
         </View>
       </View>
