@@ -952,7 +952,7 @@ function TallySessionLogsScreen() {
                   {entry.weight.toFixed(2)}
                 </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 0.8 }]}>
-                  {wc?.category === 'Byproduct' ? '-' : (entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-')}
+                  {entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}
                 </Text>
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}
