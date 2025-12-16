@@ -68,6 +68,9 @@ function TallyScreen(props?: TallyScreenProps) {
   // Check if user has permission to start/add tally entries
   const canStartTally = hasPermission('can_tally');
   
+  // Single source of truth for can_view_tally_logs permission
+  const canViewLogs = useMemo(() => hasPermission('can_view_tally_logs'), [hasPermission]);
+  
   // Consistent disabled styling for input elements
   const disabledInputStyle = !canStartTally ? { opacity: 0.5, backgroundColor: '#d5d8dc' } : {};
   const disabledButtonStyle = !canStartTally ? { opacity: 0.5 } : {};
@@ -154,29 +157,26 @@ function TallyScreen(props?: TallyScreenProps) {
       const sessionData = sessionRes.data;
       setSession(sessionData);
       
-      // Check if user has permission to view log entries
-      const canViewLogs = hasPermission('can_view_tally_logs');
-      
-      // Fetch all required data in parallel
-      const [customerRes, plantRes, allocationsRes, weightClassificationsRes] = await Promise.all([
+      // Fetch all required data in parallel, including log entries
+      const [customerRes, plantRes, allocationsRes, weightClassificationsRes, logEntriesRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
+        tallyLogEntriesApi.getBySession(sessionId).catch((error: any) => {
+          // Handle permission errors gracefully - return empty array if user can't view logs
+          if (error.response?.status === 403 || error.response?.status === 401) {
+            return { data: [] };
+          }
+          throw error;
+        }),
       ]);
       
       setCustomer(customerRes.data);
       setPlant(plantRes.data);
       setAllocations(allocationsRes.data);
       setWeightClassifications(weightClassificationsRes.data);
-      
-      // Only fetch log entries if user has permission
-      if (canViewLogs) {
-        const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-        setLogEntries(logEntriesRes.data);
-      } else {
-        setLogEntries([]); // Empty array if user can't view logs
-      }
+      setLogEntries(logEntriesRes.data);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       // If session doesn't exist (404), remove it from active sessions and navigate back
@@ -267,6 +267,20 @@ function TallyScreen(props?: TallyScreenProps) {
         entry.role === (tallyRole === 'tally' ? TallyLogEntryRole.TALLY : TallyLogEntryRole.DISPATCHER)
       )
       .reduce((sum, entry) => sum + (entry.heads || 0), 0);
+  };
+
+  // Count log entries for a specific weight classification and role
+  const getEntryCountForWeightClassification = (wcId: number): number => {
+    return logEntries
+      .filter(entry =>
+        entry.weight_classification_id === wcId &&
+        entry.role === (tallyRole === 'tally' ? TallyLogEntryRole.TALLY : TallyLogEntryRole.DISPATCHER)
+      ).length;
+  };
+
+  // Count all log entries for a specific weight classification (all roles)
+  const getTotalEntryCountForWeightClassification = (wcId: number): number => {
+    return logEntries.filter(entry => entry.weight_classification_id === wcId).length;
   };
 
   const handleTallyNumberPress = (num: string) => {
@@ -435,9 +449,7 @@ function TallyScreen(props?: TallyScreenProps) {
       }
       
       if (allocation.required_bags > 0) {
-        const currentAllocated = tallyRole === 'tally' 
-          ? allocation.allocated_bags_tally 
-          : allocation.allocated_bags_dispatcher;
+        const currentAllocated = getTotalEntryCountForWeightClassification(selectedWeightClassId);
         const newAllocated = currentAllocated + 1;
         
         if (newAllocated > allocation.required_bags) {
@@ -492,13 +504,18 @@ function TallyScreen(props?: TallyScreenProps) {
           setActiveInputField(null);
 
           // Refresh allocations and log entries
-          const canViewLogs = hasPermission('can_view_tally_logs');
           const allocationsRes = await allocationDetailsApi.getBySession(sessionId);
           setAllocations(allocationsRes.data);
           
-          if (canViewLogs) {
+          // Always refresh log entries (errors handled gracefully in fetchData)
+          try {
             const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
             setLogEntries(logEntriesRes.data);
+          } catch (error: any) {
+            // If permission denied, log entries will remain empty - that's fine
+            if (error.response?.status !== 403 && error.response?.status !== 401) {
+              console.error('Error refreshing log entries:', error);
+            }
           }
         } catch (error: any) {
           const errorMessage = formatApiErrorMessage(
@@ -558,9 +575,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (currentAllocation.required_bags > 0) {
-      const currentAllocated = tallyRole === 'tally' 
-        ? currentAllocation.allocated_bags_tally 
-        : currentAllocation.allocated_bags_dispatcher;
+      const currentAllocated = getTotalEntryCountForWeightClassification(matchedWCId);
       const newAllocated = currentAllocated + 1; // We increment by 1
       
       if (newAllocated > currentAllocation.required_bags) {
@@ -691,9 +706,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      const currentAllocated = tallyRole === 'tally'
-        ? allocation.allocated_bags_tally
-        : allocation.allocated_bags_dispatcher;
+      const currentAllocated = getTotalEntryCountForWeightClassification(wcId);
       const newAllocated = currentAllocated + 1;
 
       if (newAllocated > allocation.required_bags) {
@@ -795,9 +808,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
     // Check for over-allocation before proceeding
     if (allocation.required_bags > 0) {
-      const currentAllocated = tallyRole === 'tally'
-        ? allocation.allocated_bags_tally
-        : allocation.allocated_bags_dispatcher;
+      const currentAllocated = getTotalEntryCountForWeightClassification(selectedByproductId);
       const newAllocated = currentAllocated + quantity;
 
       if (newAllocated > allocation.required_bags) {
@@ -929,9 +940,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      const currentAllocated = tallyRole === 'tally' 
-        ? allocation.allocated_bags_tally 
-        : allocation.allocated_bags_dispatcher;
+      const currentAllocated = getTotalEntryCountForWeightClassification(selectedWeightClassId);
       const newAllocated = currentAllocated + 1;
       
       if (newAllocated > allocation.required_bags) {
@@ -1160,13 +1169,13 @@ function TallyScreen(props?: TallyScreenProps) {
                   const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                   if (!wc) return null;
 
-                  // Handle case where allocated_bags might not be available (users without can_view_tally_logs)
-                  const allocatedBags = tallyRole === 'tally'
-                    ? (allocation.allocated_bags_tally ?? 0)
-                    : (allocation.allocated_bags_dispatcher ?? 0);
-
-                  const isFulfilled = allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                  const hasProgressData = 'allocated_bags_tally' in allocation;
+                  // Always use log entry counts as single source of truth
+                  const roleEntryCount = getEntryCountForWeightClassification(allocation.weight_classification_id);
+                  const totalEntryCount = getTotalEntryCountForWeightClassification(allocation.weight_classification_id);
+                  const requiredBags = allocation.required_bags;
+                  
+                  const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
+                  const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
 
                   return (
                     <View key={allocation.id} style={dynamicStyles.summaryRow}>
@@ -1179,9 +1188,13 @@ function TallyScreen(props?: TallyScreenProps) {
                       <Text style={[
                         dynamicStyles.summaryCell,
                         { flex: 1.5 },
-                        isFulfilled ? { color: '#27ae60', fontWeight: '600' } : {}
+                        isOverAllocated 
+                          ? { color: '#e67e22', fontWeight: '600' } 
+                          : isFulfilled 
+                            ? { color: '#27ae60', fontWeight: '600' } 
+                            : {}
                       ]}>
-                        {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
+                        {requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`}
                       </Text>
                       <View style={{ flex: 1, alignItems: 'center' }}>
                         <TouchableOpacity
@@ -1274,7 +1287,7 @@ function TallyScreen(props?: TallyScreenProps) {
             disabledInputStyle
           ]}>
             <Text style={[dynamicStyles.displayLabel, { marginBottom: 2 }]}>
-              {hasPermission('can_view_tally_logs') ? 'Alloc / Req' : 'Required'}
+              Alloc / Req
             </Text>
             <Text style={[
               dynamicStyles.displayValue,
@@ -1284,16 +1297,16 @@ function TallyScreen(props?: TallyScreenProps) {
                   : currentAllocation;
                 if (!allocation) return {};
                 
-                const hasProgressData = 'allocated_bags_tally' in allocation;
-                if (!hasProgressData) return {};
+                const wcId = allocation.weight_classification_id;
+                const totalEntryCount = getTotalEntryCountForWeightClassification(wcId);
+                const requiredBags = allocation.required_bags;
                 
-                return allocation && 
-                  (tallyRole === 'tally' 
-                    ? allocation.allocated_bags_tally >= allocation.required_bags
-                    : allocation.allocated_bags_dispatcher >= allocation.required_bags) &&
-                  allocation.required_bags > 0
-                    ? { color: '#27ae60' }
-                    : {};
+                const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
+                const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
+                
+                if (isOverAllocated) return { color: '#e67e22' };
+                if (isFulfilled) return { color: '#27ae60' };
+                return {};
               })()
             ]}>
               {(() => {
@@ -1302,15 +1315,11 @@ function TallyScreen(props?: TallyScreenProps) {
                   : currentAllocation;
                 if (!allocation) return '- / -';
                 
-                const hasProgressData = 'allocated_bags_tally' in allocation;
-                if (!hasProgressData) {
-                  return `${(allocation as AllocationDetails).required_bags}`;
-                }
+                const wcId = allocation.weight_classification_id;
+                const roleEntryCount = getEntryCountForWeightClassification(wcId);
+                const requiredBags = allocation.required_bags;
                 
-                const allocatedBags = tallyRole === 'tally' 
-                  ? (allocation.allocated_bags_tally ?? 0)
-                  : (allocation.allocated_bags_dispatcher ?? 0);
-                return `${allocatedBags} / ${allocation.required_bags}`;
+                return requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`;
               })()}
             </Text>
           </View>
@@ -1572,13 +1581,13 @@ function TallyScreen(props?: TallyScreenProps) {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
-                        const hasProgressData = 'allocated_bags_tally' in allocation;
-                        const allocatedBags = tallyRole === 'tally' 
-                          ? (allocation.allocated_bags_tally ?? 0)
-                          : (allocation.allocated_bags_dispatcher ?? 0);
-                        
-                        const isFulfilled = hasProgressData && allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                        const isOverAllocated = hasProgressData && allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        // Always use log entry counts as single source of truth
+                        const roleEntryCount = getEntryCountForWeightClassification(allocation.weight_classification_id);
+                        const totalEntryCount = getTotalEntryCountForWeightClassification(allocation.weight_classification_id);
+                        const requiredBags = Number(allocation.required_bags ?? 0);
+
+                        const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
+                        const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1596,13 +1605,13 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
+                              {requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                              {hasProgressData ? totalHeads.toFixed(0) : '-'}
+                              {totalHeads.toFixed(0)}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
-                              {hasProgressData ? sum.toFixed(2) : '-'}
+                              {sum.toFixed(2)}
                             </Text>
                           </View>
                         );
@@ -1636,13 +1645,15 @@ function TallyScreen(props?: TallyScreenProps) {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                         if (!wc) return null;
                         
-                        const hasProgressData = 'allocated_bags_tally' in allocation;
-                        const allocatedBags = tallyRole === 'tally' 
-                          ? (allocation.allocated_bags_tally ?? 0)
-                          : (allocation.allocated_bags_dispatcher ?? 0);
+                        // Always use log entry counts as single source of truth
+                        const roleEntryCount = getEntryCountForWeightClassification(allocation.weight_classification_id);
+                        const totalEntryCount = getTotalEntryCountForWeightClassification(allocation.weight_classification_id);
+                        const requiredBags = Number(allocation.required_bags ?? 0);
                         
-                        const isFulfilled = hasProgressData && allocation.required_bags > 0 && allocatedBags >= allocation.required_bags;
-                        const isOverAllocated = hasProgressData && allocation.required_bags > 0 && allocatedBags > allocation.required_bags;
+                        // Check over-allocation first (takes priority) - must be strictly greater than required
+                        const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
+                        // Fulfilled means met requirement exactly (equals required, not over-allocated)
+                        const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1660,13 +1671,13 @@ function TallyScreen(props?: TallyScreenProps) {
                                   ? { color: '#27ae60', fontWeight: '600' } 
                                   : {}
                             ]}>
-                              {hasProgressData ? `${allocatedBags} / ${(allocation as AllocationDetails).required_bags}` : `${(allocation as AllocationDetails).required_bags} req`}
+                              {requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
-                              {hasProgressData ? totalHeads.toFixed(0) : '-'}
+                              {totalHeads.toFixed(0)}
                             </Text>
                             <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
-                              {hasProgressData ? sum.toFixed(2) : '-'}
+                              {sum.toFixed(2)}
                             </Text>
                           </View>
                         );
