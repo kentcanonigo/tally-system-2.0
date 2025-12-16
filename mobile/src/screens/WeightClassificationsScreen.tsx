@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Platform, DimensionValue } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -226,8 +226,8 @@ function WeightClassificationsScreen() {
     header: {
       ...styles.header,
       padding: responsive.padding.medium,
-      width: '100%',
-      maxWidth: '100%',
+      width: '100%' as DimensionValue,
+      maxWidth: '100%' as DimensionValue,
     },
     title: {
       ...styles.title,
@@ -236,8 +236,8 @@ function WeightClassificationsScreen() {
     list: {
       ...styles.list,
       padding: responsive.padding.medium,
-      width: '100%',
-      maxWidth: '100%',
+      width: '100%' as DimensionValue,
+      maxWidth: '100%' as DimensionValue,
     },
     card: {
       ...styles.card,
@@ -255,8 +255,8 @@ function WeightClassificationsScreen() {
     },
     modalContent: {
       ...styles.modalContent,
-      width: responsive.isTablet ? 500 : '90%',
-      maxHeight: '85%',
+      width: (responsive.isTablet ? 500 : '90%') as DimensionValue,
+      maxHeight: '85%' as DimensionValue,
       padding: responsive.padding.large,
     },
     modalScrollView: {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal, BackHandler, ViewStyle, TextStyle, DimensionValue } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -480,7 +480,46 @@ function TallySessionLogsScreen() {
     );
   }
 
-  const dynamicStyles = {
+  const dynamicStyles: {
+    container: ViewStyle;
+    header: ViewStyle;
+    title: TextStyle;
+    infoText: TextStyle;
+    filterContainer: ViewStyle;
+    filterLabel: TextStyle;
+    pickerWrapper: ViewStyle;
+    dropdownButton: ViewStyle;
+    dropdownText: TextStyle;
+    dropdownIcon: TextStyle;
+    dropdownMenu: ViewStyle;
+    dropdownMenuScroll: ViewStyle;
+    dropdownOption: ViewStyle;
+    dropdownOptionLast: ViewStyle;
+    dropdownOptionSelected: ViewStyle;
+    dropdownOptionText: TextStyle;
+    dropdownOptionTextSelected: TextStyle;
+    sectionTitleContainer: ViewStyle;
+    sectionTitle: TextStyle;
+    settingsButton: ViewStyle;
+    settingsButtonText: TextStyle;
+    columnSettingsModal: ViewStyle;
+    columnSettingsTitle: TextStyle;
+    columnSettingsSubtitle: TextStyle;
+    columnSettingsOption: ViewStyle;
+    columnSettingsOptionLast: ViewStyle;
+    checkboxContainer: ViewStyle;
+    checkbox: ViewStyle;
+    checkboxChecked: ViewStyle;
+    checkboxCheckmark: TextStyle;
+    columnSettingsOptionText: TextStyle;
+    columnSettingsButton: ViewStyle;
+    columnSettingsButtonText: TextStyle;
+    tableContainer: ViewStyle;
+    tableHeader: ViewStyle;
+    tableHeaderText: TextStyle;
+    tableRow: ViewStyle;
+    tableCell: TextStyle;
+  } = {
     container: {
       ...styles.container,
       paddingHorizontal: responsive.padding.medium,
@@ -512,9 +551,9 @@ function TallySessionLogsScreen() {
       marginBottom: responsive.spacing.md,
     },
     dropdownButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
       paddingHorizontal: responsive.padding.medium,
       paddingVertical: responsive.padding.small,
       minHeight: 40,
@@ -522,7 +561,7 @@ function TallySessionLogsScreen() {
     dropdownText: {
       color: '#2c3e50',
       fontSize: responsive.fontSize.small,
-      fontWeight: '500',
+      fontWeight: '500' as const,
       flex: 1,
     },
     dropdownIcon: {
@@ -539,11 +578,11 @@ function TallySessionLogsScreen() {
       shadowRadius: 8,
       elevation: 5,
       minWidth: 200,
-      maxWidth: '90%',
-      overflow: 'hidden',
+      maxWidth: '90%' as DimensionValue,
+      overflow: 'hidden' as const,
     },
     dropdownMenuScroll: {
-      maxHeight: '70%',
+      maxHeight: '70%' as DimensionValue,
     },
     dropdownOption: {
       paddingHorizontal: responsive.padding.medium,
@@ -563,12 +602,12 @@ function TallySessionLogsScreen() {
     },
     dropdownOptionTextSelected: {
       color: '#fff',
-      fontWeight: '600',
+      fontWeight: '600' as const,
     },
     sectionTitleContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
       marginBottom: responsive.spacing.sm,
       marginTop: responsive.spacing.md,
     },
@@ -588,7 +627,7 @@ function TallySessionLogsScreen() {
       backgroundColor: '#fff',
       borderRadius: 12,
       padding: responsive.padding.large,
-      width: responsive.isTablet ? Math.min(responsive.width * 0.5, 400) : '85%',
+      width: (responsive.isTablet ? Math.min(responsive.width * 0.5, 400) : '85%') as DimensionValue,
       maxWidth: 400,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
@@ -598,7 +637,7 @@ function TallySessionLogsScreen() {
     },
     columnSettingsTitle: {
       fontSize: responsive.fontSize.large,
-      fontWeight: 'bold',
+      fontWeight: 'bold' as const,
       color: '#2c3e50',
       marginBottom: responsive.spacing.xs,
     },
@@ -617,8 +656,8 @@ function TallySessionLogsScreen() {
       marginBottom: responsive.spacing.md,
     },
     checkboxContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
     },
     checkbox: {
       width: 24,
@@ -627,8 +666,8 @@ function TallySessionLogsScreen() {
       borderColor: '#bdc3c7',
       borderRadius: 4,
       marginRight: responsive.spacing.md,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
       backgroundColor: '#fff',
     },
     checkboxChecked: {
@@ -638,24 +677,24 @@ function TallySessionLogsScreen() {
     checkboxCheckmark: {
       color: '#fff',
       fontSize: 16,
-      fontWeight: 'bold',
+      fontWeight: 'bold' as const,
     },
     columnSettingsOptionText: {
       fontSize: responsive.fontSize.medium,
       color: '#2c3e50',
-      fontWeight: '500',
+      fontWeight: '500' as const,
     },
     columnSettingsButton: {
       backgroundColor: '#3498db',
       borderRadius: 8,
       padding: responsive.padding.medium,
-      alignItems: 'center',
+      alignItems: 'center' as const,
       marginTop: responsive.spacing.sm,
     },
     columnSettingsButtonText: {
       color: '#fff',
       fontSize: responsive.fontSize.medium,
-      fontWeight: '600',
+      fontWeight: '600' as const,
     },
     tableContainer: {
       ...styles.tableContainer,
@@ -672,7 +711,7 @@ function TallySessionLogsScreen() {
     },
     tableRow: {
       ...styles.tableRow,
-      paddingVertical: responsive.padding.xs,
+      paddingVertical: responsive.spacing.xs,
       paddingHorizontal: responsive.padding.small,
     },
     tableCell: {
