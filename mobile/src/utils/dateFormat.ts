@@ -11,9 +11,12 @@ export function formatDate(dateString: string, timezone: string): string {
     
     // Check if it's a date-only string (YYYY-MM-DD format)
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      // Date-only string - treat as local date at midnight in the target timezone
-      // Parse as UTC first, then convert to target timezone
-      date = new Date(dateString + 'T00:00:00Z');
+      // Date-only string - parse as local date to avoid timezone shifts
+      // Split the date string and create a date in local timezone
+      const [year, month, day] = dateString.split('-').map(Number);
+      // Create date at noon local time to avoid timezone boundary issues
+      // Then format it in the target timezone
+      date = new Date(year, month - 1, day, 12, 0, 0);
     } else if (dateString.includes('Z') || dateString.includes('+') || (dateString.includes('-') && dateString.includes('T'))) {
       // Already has timezone info or is ISO datetime format
       date = new Date(dateString);
@@ -29,6 +32,14 @@ export function formatDate(dateString: string, timezone: string): string {
     if (isNaN(date.getTime())) {
       console.error('Invalid date:', dateString);
       return new Date(dateString).toLocaleDateString();
+    }
+    
+    // For date-only strings, format without timezone conversion to preserve the date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Use the original date components to avoid timezone shifts
+      const [year, month, day] = dateString.split('-').map(Number);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[month - 1]} ${day}, ${year}`;
     }
     
     return new Intl.DateTimeFormat('en-US', {

@@ -580,85 +580,138 @@ function TallySessionsScreen() {
     return dates;
   };
 
+  // Determine if we're selecting a single date or a range
+  const isSingleDateSelection = useMemo(() => {
+    return dateRange.startDate && dateRange.endDate && dateRange.startDate === dateRange.endDate;
+  }, [dateRange]);
+
   // Create marked dates object for calendar highlighting
   const markedDates = useMemo(() => {
     const marked: { [key: string]: any } = {};
+    
+    // First, mark all dates that have sessions with dots
     allSessions.forEach((session) => {
       const dateKey = session.date;
       if (!marked[dateKey]) {
-        marked[dateKey] = { marked: true, dotColor: '#3498db' };
+        // For single date selection, we'll use simple marking, so we can still show dots
+        if (isSingleDateSelection && dateKey === dateRange.startDate) {
+          // Don't add dot marking for the selected date, we'll handle it separately
+          marked[dateKey] = {};
+        } else {
+          marked[dateKey] = { marked: true, dotColor: '#3498db' };
+        }
       }
     });
     
-    // Add date range styling
+    // Add date range or single date styling
     if (dateRange.startDate && dateRange.endDate) {
-      // Mark the range
-      const dates = getDatesInRange(dateRange.startDate, dateRange.endDate);
-      dates.forEach((date, index) => {
-        if (index === 0) {
-          // First date
-          marked[date] = {
-            ...marked[date],
-            startingDay: true,
-            color: '#3498db',
-            textColor: '#ffffff',
-          };
-        } else if (index === dates.length - 1) {
-          // Last date
-          marked[date] = {
-            ...marked[date],
-            endingDay: true,
-            color: '#3498db',
-            textColor: '#ffffff',
-          };
-        } else {
-          // Middle dates
-          marked[date] = {
-            ...marked[date],
-            color: '#3498db',
-            textColor: '#ffffff',
-          };
-        }
-      });
+      if (isSingleDateSelection) {
+        // Single date selection - use simple marking for circle
+        marked[dateRange.startDate] = {
+          selected: true,
+          selectedColor: '#3498db',
+          selectedTextColor: '#ffffff',
+          // Keep the dot if there are sessions on this date
+          ...(allSessions.some(s => s.date === dateRange.startDate) && { 
+            marked: true, 
+            selectedDotColor: '#ffffff' 
+          }),
+        };
+      } else {
+        // Range selection - use period marking
+        const dates = getDatesInRange(dateRange.startDate, dateRange.endDate);
+        dates.forEach((date, index) => {
+          if (index === 0) {
+            // First date
+            marked[date] = {
+              ...marked[date],
+              startingDay: true,
+              color: '#3498db',
+              textColor: '#ffffff',
+            };
+          } else if (index === dates.length - 1) {
+            // Last date
+            marked[date] = {
+              ...marked[date],
+              endingDay: true,
+              color: '#3498db',
+              textColor: '#ffffff',
+            };
+          } else {
+            // Middle dates
+            marked[date] = {
+              ...marked[date],
+              color: '#3498db',
+              textColor: '#ffffff',
+            };
+          }
+        });
+      }
     } else if (dateRange.startDate) {
-      // Only start date selected - show as both starting and ending day (single day period)
+      // Only start date selected - show as selected (circle)
       marked[dateRange.startDate] = {
-        ...marked[dateRange.startDate],
-        startingDay: true,
-        endingDay: true,
-        color: '#3498db',
-        textColor: '#ffffff',
+        selected: true,
+        selectedColor: '#3498db',
+        selectedTextColor: '#ffffff',
+        // Keep the dot if there are sessions on this date
+        ...(allSessions.some(s => s.date === dateRange.startDate) && { 
+          marked: true, 
+          selectedDotColor: '#ffffff' 
+        }),
       };
     } else if (dateRange.endDate) {
-      // Only end date selected - show as both starting and ending day (single day period)
+      // Only end date selected - show as selected (circle)
       marked[dateRange.endDate] = {
-        ...marked[dateRange.endDate],
-        startingDay: true,
-        endingDay: true,
-        color: '#3498db',
-        textColor: '#ffffff',
+        selected: true,
+        selectedColor: '#3498db',
+        selectedTextColor: '#ffffff',
+        // Keep the dot if there are sessions on this date
+        ...(allSessions.some(s => s.date === dateRange.endDate) && { 
+          marked: true, 
+          selectedDotColor: '#ffffff' 
+        }),
       };
     }
     
     return marked;
-  }, [allSessions, dateRange]);
+  }, [allSessions, dateRange, isSingleDateSelection]);
 
   const handleDateSelect = (day: { dateString: string }) => {
-    if (!dateRange.startDate || (dateRange.startDate && dateRange.endDate)) {
-      // Start a new range
-      setDateRange({ startDate: day.dateString, endDate: null });
-    } else if (dateRange.startDate && !dateRange.endDate) {
-      // Complete the range
-      const start = new Date(dateRange.startDate);
-      const end = new Date(day.dateString);
-      
-      if (end < start) {
-        // If end date is before start date, swap them
-        setDateRange({ startDate: day.dateString, endDate: dateRange.startDate });
-      } else {
-        setDateRange({ startDate: dateRange.startDate, endDate: day.dateString });
-      }
+    // If no dates are selected, start a new selection
+    if (!dateRange.startDate) {
+      setDateRange({ startDate: day.dateString, endDate: day.dateString });
+      return;
     }
+    
+    // If both dates are set and they're the same (single date selection)
+    if (dateRange.startDate && dateRange.endDate && dateRange.startDate === dateRange.endDate) {
+      // If clicking the same date again, clear the filter
+      if (day.dateString === dateRange.startDate) {
+        setDateRange({ startDate: null, endDate: null });
+      } else {
+        // Clicking a different date - create a range
+        const start = new Date(dateRange.startDate);
+        const end = new Date(day.dateString);
+        
+        if (end < start) {
+          // If end date is before start date, swap them
+          setDateRange({ startDate: day.dateString, endDate: dateRange.startDate });
+        } else {
+          setDateRange({ startDate: dateRange.startDate, endDate: day.dateString });
+        }
+      }
+      return;
+    }
+    
+    // If both dates are set and they're different (range selection)
+    if (dateRange.startDate && dateRange.endDate && dateRange.startDate !== dateRange.endDate) {
+      // Start a new selection
+      setDateRange({ startDate: day.dateString, endDate: day.dateString });
+      return;
+    }
+    
+    // Fallback: should not reach here, but handle gracefully
+    setDateRange({ startDate: day.dateString, endDate: day.dateString });
   };
 
   const clearDateFilter = () => {
@@ -671,6 +724,10 @@ function TallySessionsScreen() {
       return 'Select Date Range';
     }
     if (dateRange.startDate && dateRange.endDate) {
+      // If start and end are the same, show as single date
+      if (dateRange.startDate === dateRange.endDate) {
+        return formatDate(dateRange.startDate, timezone);
+      }
       return `${formatDate(dateRange.startDate, timezone)} - ${formatDate(dateRange.endDate, timezone)}`;
     }
     if (dateRange.startDate) {
@@ -988,11 +1045,11 @@ function TallySessionsScreen() {
               {isSelectionMode
                 ? `${selectedSessionIds.length} session${selectedSessionIds.length !== 1 ? 's' : ''} selected`
                 : showActiveOnly && (dateRange.startDate || dateRange.endDate)
-                ? `Active sessions ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
+                ? `Active sessions ${dateRange.startDate && dateRange.endDate ? (dateRange.startDate === dateRange.endDate ? `on ${formatDate(dateRange.startDate, timezone)}` : `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}`) : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
                 : showActiveOnly
                 ? 'Showing active sessions only'
                 : dateRange.startDate || dateRange.endDate
-                ? `Showing sessions ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
+                ? `Showing sessions ${dateRange.startDate && dateRange.endDate ? (dateRange.startDate === dateRange.endDate ? `on ${formatDate(dateRange.startDate, timezone)}` : `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}`) : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}`
                 : filterStatus || filterCustomerId
                 ? 'Filters applied'
                 : 'Showing all sessions'}
@@ -1095,7 +1152,7 @@ function TallySessionsScreen() {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
               {showActiveOnly && (dateRange.startDate || dateRange.endDate)
-                ? `No active sessions found ${dateRange.startDate && dateRange.endDate ? `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}` : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}.`
+                ? `No active sessions found ${dateRange.startDate && dateRange.endDate ? (dateRange.startDate === dateRange.endDate ? `on ${formatDate(dateRange.startDate, timezone)}` : `from ${formatDate(dateRange.startDate, timezone)} to ${formatDate(dateRange.endDate, timezone)}`) : dateRange.startDate ? `from ${formatDate(dateRange.startDate, timezone)}` : `until ${formatDate(dateRange.endDate!, timezone)}`}.`
                 : showActiveOnly
                 ? 'No active sessions found for this plant.'
                 : dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId
@@ -1184,7 +1241,7 @@ function TallySessionsScreen() {
                 setCurrentMonth(month.dateString.slice(0, 7));
               }}
               markedDates={markedDates}
-              markingType="period"
+              markingType={isSingleDateSelection ? "simple" : "period"}
               enableSwipeMonths={true}
               hideExtraDays={true}
               firstDay={1}
