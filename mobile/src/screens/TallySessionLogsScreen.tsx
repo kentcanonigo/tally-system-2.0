@@ -518,7 +518,7 @@ function TallySessionLogsScreen() {
       overflow: 'hidden',
     },
     dropdownMenuScroll: {
-      maxHeight: '80%',
+      maxHeight: '70%',
     },
     dropdownOption: {
       paddingHorizontal: responsive.padding.medium,
@@ -1064,6 +1064,7 @@ function TallySessionLogsScreen() {
             <ScrollView 
               style={dynamicStyles.dropdownMenuScroll}
               contentContainerStyle={dynamicStyles.dropdownMenu}
+              showsVerticalScrollIndicator
               onStartShouldSetResponder={() => true}
             >
               <TouchableOpacity
@@ -1548,6 +1549,7 @@ function TallySessionLogsScreen() {
             <ScrollView 
               style={dynamicStyles.dropdownMenuScroll}
               contentContainerStyle={dynamicStyles.dropdownMenu}
+              showsVerticalScrollIndicator
               onStartShouldSetResponder={() => true}
             >
               {availableCustomers.map((cust, index) => (
@@ -1600,6 +1602,7 @@ function TallySessionLogsScreen() {
             <ScrollView 
               style={dynamicStyles.dropdownMenuScroll}
               contentContainerStyle={dynamicStyles.dropdownMenu}
+              showsVerticalScrollIndicator
               onStartShouldSetResponder={() => true}
             >
               {availableSessions.map((sess, index) => (
