@@ -82,9 +82,9 @@ function TallySessionLogsScreen() {
           const tabNavigator = parent?.getParent();
           if (tabNavigator) {
             // Use navigate instead of jumpTo to pass params
-            tabNavigator.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+            (tabNavigator as any).navigate('Tally', { restoreSessionId: sessionId });
           } else {
-            navigation.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+            (navigation as any).navigate('Tally', { restoreSessionId: sessionId });
           }
           return true; // Prevent default back behavior
         }
@@ -697,9 +697,9 @@ function TallySessionLogsScreen() {
               const tabNavigator = parent?.getParent();
               if (tabNavigator) {
                 // Use navigate instead of jumpTo to pass params
-                tabNavigator.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+                (tabNavigator as any).navigate('Tally', { restoreSessionId: sessionId });
               } else {
-                navigation.navigate('Tally' as never, { restoreSessionId: sessionId } as never);
+                (navigation as any).navigate('Tally', { restoreSessionId: sessionId });
               }
             } else {
               navigation.goBack();
