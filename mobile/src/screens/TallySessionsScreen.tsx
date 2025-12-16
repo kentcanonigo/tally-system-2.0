@@ -10,6 +10,7 @@ import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { tallySessionsApi, customersApi, plantsApi, exportApi, allocationDetailsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
+import { TallySessionStatus } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
@@ -170,15 +171,31 @@ function TallySessionsScreen() {
     try {
       const isActive = activeSessionIds.includes(sessionId);
       
-      if (!isActive && activeSessionIds.length >= getMaxActiveSessions()) {
-        Alert.alert(
-          'Maximum Active Sessions Reached',
-          `You can only have ${getMaxActiveSessions()} active sessions at a time. Please remove an active session first.`,
-          [{ text: 'OK' }]
-        );
-        return;
+      // If trying to star (add to active), check if session is ongoing
+      if (!isActive) {
+        // Find the session to check its status
+        const session = allSessions.find(s => s.id === sessionId) || sessions.find(s => s.id === sessionId);
+        
+        if (session && session.status !== TallySessionStatus.ONGOING) {
+          Alert.alert(
+            'Cannot Mark as Active',
+            'Only ongoing sessions can be marked as active.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
+        if (activeSessionIds.length >= getMaxActiveSessions()) {
+          Alert.alert(
+            'Maximum Active Sessions Reached',
+            `You can only have ${getMaxActiveSessions()} active sessions at a time. Please remove an active session first.`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
       }
       
+      // Allow unstarring (removing from active) regardless of status
       const newActiveStatus = await toggleActiveSession(sessionId);
       await loadActiveSessions();
       
@@ -1120,12 +1137,12 @@ function TallySessionsScreen() {
                     style={styles.activeToggleButton}
                     onPress={() => handleToggleActive(item.id)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    disabled={isSelectionMode}
+                    disabled={isSelectionMode || (!isActive && item.status !== TallySessionStatus.ONGOING)}
                   >
                     <MaterialIcons
                       name={isActive ? 'star' : 'star-border'}
                       size={24}
-                      color={isActive ? '#f39c12' : '#95a5a6'}
+                      color={isActive ? '#f39c12' : (!isActive && item.status !== TallySessionStatus.ONGOING ? '#d3d3d3' : '#95a5a6')}
                     />
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>

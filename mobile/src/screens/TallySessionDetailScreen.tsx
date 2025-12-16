@@ -24,7 +24,7 @@ import type { TallySession, AllocationDetails, Customer, Plant, WeightClassifica
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { removeActiveSession } from '../utils/activeSessions';
+import { removeActiveSession, isActiveSession } from '../utils/activeSessions';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
@@ -313,7 +313,16 @@ function TallySessionDetailScreen() {
     
     setShowStatusDropdown(false);
     try {
+      // Check if session is currently active before updating
+      const wasActive = await isActiveSession(session.id);
+      
       await tallySessionsApi.update(session.id, { status: status as any });
+      
+      // If status changed away from ongoing and session was active, remove it from active sessions
+      if (wasActive && status !== 'ongoing') {
+        await removeActiveSession(session.id);
+      }
+      
       fetchData();
     } catch (error) {
       console.error('Error updating status:', error);

@@ -7,6 +7,7 @@ import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
+import { TallySessionStatus } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getActiveSessions, removeActiveSession } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
@@ -85,9 +86,15 @@ function TallyTabScreen() {
       sessionsRes.forEach((res) => {
         if (res.data && res.data.data) {
           const session = res.data.data;
-          // Only include sessions that match the active plant filter
+          // Only include sessions that match the active plant filter and are ongoing
           if (!activePlantId || session.plant_id === activePlantId) {
-            validSessionData.push(session);
+            // Filter out non-ongoing sessions
+            if (session.status === TallySessionStatus.ONGOING) {
+              validSessionData.push(session);
+            } else {
+              // Session is not ongoing - remove from storage
+              invalidSessionIds.push(res.id);
+            }
           }
           // Note: If session exists but doesn't match plant filter, we keep it in storage
           // since it might be valid for other plants
@@ -97,7 +104,7 @@ function TallyTabScreen() {
         }
       });
 
-      // Remove invalid session IDs from AsyncStorage
+      // Remove invalid session IDs (non-existent or non-ongoing) from AsyncStorage
       if (invalidSessionIds.length > 0) {
         await Promise.all(invalidSessionIds.map(id => removeActiveSession(id)));
         // Update active session IDs state to reflect removal
