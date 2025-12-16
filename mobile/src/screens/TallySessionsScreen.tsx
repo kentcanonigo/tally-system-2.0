@@ -52,7 +52,7 @@ function TallySessionsScreen() {
 
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState<number | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('ongoing');
   const [sortBy, setSortBy] = useState<'date' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
@@ -860,7 +860,7 @@ function TallySessionsScreen() {
               onPress={() => {
                 setFilterCustomerId(null);
                 setFilterStatus('');
-                setSelectedDate(null);
+                setDateRange({ startDate: null, endDate: null });
                 setSortBy('date');
                 setSortOrder('desc');
               }}
@@ -1139,7 +1139,6 @@ function TallySessionsScreen() {
                 </View>
               </View>
               <View>
-                <Text style={styles.sessionDate}>Created: {formatDate(item.date, timezone)}</Text>
                 <Text style={styles.sessionDate}>Last edited: {formatDateTime(item.updated_at, timezone)}</Text>
               </View>
             </TouchableOpacity>
