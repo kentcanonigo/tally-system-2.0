@@ -183,6 +183,11 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
     if target_session.plant_id != source_plant_id:
         raise ValueError("Target session must be in the same plant as source entries")
     
+    # Validate target session is ongoing
+    from ..models.tally_session import TallySessionStatus
+    if target_session.status != TallySessionStatus.ONGOING:
+        raise ValueError("Target session must be ongoing to transfer log entries")
+    
     # Validate all weight classifications exist in target plant
     weight_classification_ids = {entry.weight_classification_id for entry in entries}
     for wc_id in weight_classification_ids:

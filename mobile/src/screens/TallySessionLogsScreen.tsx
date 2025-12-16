@@ -387,9 +387,10 @@ function TallySessionLogsScreen() {
       const sessionsRes = await tallySessionsApi.getAll({
         customer_id: customerId,
         plant_id: plant.id,
+        status: 'ongoing',
       });
-      // Filter out the current session
-      setAvailableSessions(sessionsRes.data.filter(s => s.id !== sessionId));
+      // Filter out the current session and only show ongoing sessions
+      setAvailableSessions(sessionsRes.data.filter(s => s.id !== sessionId && s.status === 'ongoing'));
       setSelectedTargetSessionId(null);
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -1481,11 +1482,11 @@ function TallySessionLogsScreen() {
                           ? (() => {
                               const selectedSession = availableSessions.find(s => s.id === selectedTargetSessionId);
                               return selectedSession 
-                                ? `Session #${selectedSession.session_number} - ${formatDate(selectedSession.date, timezone)}`
+                                ? `Session #${selectedSession.session_number} - ${formatDate(selectedSession.date, timezone)} (${selectedSession.status})`
                                 : 'Select Session';
                             })()
                           : availableSessions.length === 0
-                          ? 'No sessions available'
+                          ? 'No ongoing sessions available'
                           : 'Select Session'}
                       </Text>
                       <Text style={dynamicStyles.dropdownIcon}>▼</Text>
@@ -1496,7 +1497,13 @@ function TallySessionLogsScreen() {
 
               {selectedTargetCustomerId && availableSessions.length === 0 && !loadingTransferData && (
                 <Text style={[dynamicStyles.columnSettingsSubtitle, { marginTop: 8, color: '#e74c3c' }]}>
-                  No sessions available for this customer in the same plant
+                  No ongoing sessions available for this customer in the same plant. Only ongoing sessions can receive transferred entries.
+                </Text>
+              )}
+              
+              {selectedTargetCustomerId && availableSessions.length > 0 && (
+                <Text style={[dynamicStyles.columnSettingsSubtitle, { marginTop: 8, fontSize: 12, color: '#7f8c8d' }]}>
+                  Only ongoing sessions are available for transfer
                 </Text>
               )}
 
@@ -1625,13 +1632,13 @@ function TallySessionLogsScreen() {
                     ]}
                     numberOfLines={2}
                   >
-                    Session #{sess.session_number} - {formatDate(sess.date, timezone)}
+                    Session #{sess.session_number} - {formatDate(sess.date, timezone)} ({sess.status})
                   </Text>
                 </TouchableOpacity>
               ))}
               {availableSessions.length === 0 && (
                 <View style={dynamicStyles.dropdownOption}>
-                  <Text style={dynamicStyles.dropdownOptionText}>No sessions available</Text>
+                  <Text style={dynamicStyles.dropdownOptionText}>No ongoing sessions available</Text>
                 </View>
               )}
             </ScrollView>
