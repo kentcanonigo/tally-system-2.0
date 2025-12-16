@@ -1073,7 +1073,7 @@ function TallySessionsScreen() {
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>
                     <Text style={[dynamicStyles.sessionId, { marginLeft: 8 }]}>
-                      {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.created_at, timezone)}
+                      {getCustomerName(item.customer_id)} - Order #{item.session_number} - {formatDate(item.date, timezone)}
                     </Text>
                   </View>
                 </View>
