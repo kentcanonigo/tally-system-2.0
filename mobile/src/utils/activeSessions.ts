@@ -120,6 +120,35 @@ export const toggleActiveSession = async (sessionId: number): Promise<boolean> =
 };
 
 /**
+ * Reorder active sessions by moving an item from one index to another
+ * @param fromIndex The index of the item to move
+ * @param toIndex The index where the item should be moved to
+ * @returns The new ordered array of session IDs
+ */
+export const reorderActiveSessions = async (fromIndex: number, toIndex: number): Promise<number[]> => {
+  try {
+    const activeSessions = await getActiveSessions();
+    
+    if (fromIndex < 0 || fromIndex >= activeSessions.length || toIndex < 0 || toIndex >= activeSessions.length) {
+      console.error('Invalid indices for reordering:', { fromIndex, toIndex, length: activeSessions.length });
+      return activeSessions;
+    }
+    
+    // Create a new array with the reordered items
+    const reordered = [...activeSessions];
+    const [movedItem] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, movedItem);
+    
+    // Save the new order
+    await setActiveSessions(reordered);
+    return reordered;
+  } catch (error) {
+    console.error('Error reordering active sessions:', error);
+    throw error;
+  }
+};
+
+/**
  * Get the maximum number of active sessions allowed
  */
 export const getMaxActiveSessions = (): number => {

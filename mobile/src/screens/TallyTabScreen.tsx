@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, ScrollView, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { printToFileAsync } from 'expo-print';
@@ -9,7 +9,7 @@ import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi } from 
 import type { TallySession, Customer } from '../types';
 import { TallySessionStatus } from '../types';
 import { useResponsive } from '../utils/responsive';
-import { getActiveSessions, removeActiveSession } from '../utils/activeSessions';
+import { getActiveSessions, removeActiveSession, setActiveSessions } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
 import { usePlant } from '../contexts/PlantContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -43,6 +43,9 @@ function TallyTabScreen() {
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragStartPos = useRef({ x: 0, y: 0, index: -1 });
 
   // Calculate sidebar width and determine layout mode
   const sidebarWidth = responsive.isTablet ? 200 : 150;
@@ -112,7 +115,13 @@ function TallyTabScreen() {
         setActiveSessionIds(remainingIds);
       }
 
-      setSessions(validSessionData);
+      // Order sessions according to activeSessionIds order (respecting user's custom order)
+      const orderedSessions = activeIds
+        .filter(id => !invalidSessionIds.includes(id))
+        .map(id => validSessionData.find(s => s.id === id))
+        .filter((session): session is TallySession => session !== undefined);
+
+      setSessions(orderedSessions);
       setCustomers(customersRes.data);
 
       // If selected session is no longer in active sessions, clear selection
@@ -157,6 +166,71 @@ function TallyTabScreen() {
   const handleSessionSelect = (sessionId: number) => {
     setSelectedSessionId(sessionId);
   };
+
+  const createPanResponder = useCallback((index: number) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Start dragging if moved more than 10 pixels
+        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderGrant: (evt) => {
+        setDraggedIndex(index);
+        dragStartPos.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY,
+          index: index,
+        };
+        setDragOffset({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (draggedIndex === null) return;
+        
+        const currentPos = useVerticalLayout 
+          ? evt.nativeEvent.pageX 
+          : evt.nativeEvent.pageY;
+        const startPos = useVerticalLayout 
+          ? dragStartPos.current.x 
+          : dragStartPos.current.y;
+        const delta = currentPos - startPos;
+        
+        setDragOffset({
+          x: useVerticalLayout ? gestureState.dx : 0,
+          y: useVerticalLayout ? 0 : gestureState.dy,
+        });
+        
+        // Calculate which index we should move to
+        const itemSize = useVerticalLayout ? 120 : 60; // Approximate item size
+        const newIndex = Math.round(delta / itemSize) + dragStartPos.current.index;
+        
+        if (newIndex >= 0 && newIndex < sessions.length && newIndex !== draggedIndex) {
+          const newSessions = [...sessions];
+          const [movedItem] = newSessions.splice(draggedIndex, 1);
+          newSessions.splice(newIndex, 0, movedItem);
+          setSessions(newSessions);
+          setDraggedIndex(newIndex);
+          dragStartPos.current.index = newIndex;
+          dragStartPos.current.x = evt.nativeEvent.pageX;
+          dragStartPos.current.y = evt.nativeEvent.pageY;
+        }
+      },
+      onPanResponderRelease: async () => {
+        if (draggedIndex === null) return;
+        
+        try {
+          const newOrderedIds = sessions.map(s => s.id);
+          await setActiveSessions(newOrderedIds);
+          setActiveSessionIds(newOrderedIds);
+        } catch (error) {
+          console.error('Error reordering sessions:', error);
+          loadActiveSessions();
+        } finally {
+          setDraggedIndex(null);
+          setDragOffset({ x: 0, y: 0 });
+        }
+      },
+    });
+  }, [draggedIndex, sessions, useVerticalLayout]);
 
   const handleRemoveCurrentSession = async () => {
     if (!selectedSessionId) return;
@@ -680,27 +754,49 @@ function TallyTabScreen() {
               showsHorizontalScrollIndicator={true}
               contentContainerStyle={dynamicStyles.sessionsTopBarContainer}
             >
-              {sessions.map((session) => {
+              {sessions.map((session, index) => {
                 const isSelected = selectedSessionId === session.id;
+                const isDragging = draggedIndex === index;
+                const panResponder = createPanResponder(index);
                 return (
-                  <TouchableOpacity
+                  <Animated.View
                     key={session.id}
                     style={[
-                      dynamicStyles.sessionTopBarButton,
-                      isSelected && dynamicStyles.sessionButtonSelected,
+                      isDragging && {
+                        transform: [
+                          { translateX: dragOffset.x },
+                          { translateY: dragOffset.y },
+                          { scale: 1.05 },
+                        ],
+                        zIndex: 1000,
+                        opacity: 0.8,
+                      },
                     ]}
-                    onPress={() => handleSessionSelect(session.id)}
+                    {...panResponder.panHandlers}
                   >
-                    <Text
+                    <TouchableOpacity
                       style={[
-                        dynamicStyles.sessionTopBarButtonText,
-                        isSelected && dynamicStyles.sessionButtonTextSelected,
+                        dynamicStyles.sessionTopBarButton,
+                        isSelected && dynamicStyles.sessionButtonSelected,
                       ]}
-                      numberOfLines={1}
+                      onPress={() => {
+                        if (draggedIndex === null) {
+                          handleSessionSelect(session.id);
+                        }
+                      }}
+                      activeOpacity={0.7}
                     >
-                      {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
-                    </Text>
-                  </TouchableOpacity>
+                      <Text
+                        style={[
+                          dynamicStyles.sessionTopBarButtonText,
+                          isSelected && dynamicStyles.sessionButtonTextSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 );
               })}
             </ScrollView>
@@ -713,27 +809,49 @@ function TallyTabScreen() {
               style={styles.sessionsScrollView}
               contentContainerStyle={dynamicStyles.sessionsContainer}
             >
-              {sessions.map((session) => {
+              {sessions.map((session, index) => {
                 const isSelected = selectedSessionId === session.id;
+                const isDragging = draggedIndex === index;
+                const panResponder = createPanResponder(index);
                 return (
-                  <TouchableOpacity
+                  <Animated.View
                     key={session.id}
                     style={[
-                      dynamicStyles.sessionButton,
-                      isSelected && dynamicStyles.sessionButtonSelected,
+                      isDragging && {
+                        transform: [
+                          { translateX: dragOffset.x },
+                          { translateY: dragOffset.y },
+                          { scale: 1.05 },
+                        ],
+                        zIndex: 1000,
+                        opacity: 0.8,
+                      },
                     ]}
-                    onPress={() => handleSessionSelect(session.id)}
+                    {...panResponder.panHandlers}
                   >
-                    <Text
+                    <TouchableOpacity
                       style={[
-                        dynamicStyles.sessionButtonText,
-                        isSelected && dynamicStyles.sessionButtonTextSelected,
+                        dynamicStyles.sessionButton,
+                        isSelected && dynamicStyles.sessionButtonSelected,
                       ]}
-                      numberOfLines={2}
+                      onPress={() => {
+                        if (draggedIndex === null) {
+                          handleSessionSelect(session.id);
+                        }
+                      }}
+                      activeOpacity={0.7}
                     >
-                      {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
-                    </Text>
-                  </TouchableOpacity>
+                      <Text
+                        style={[
+                          dynamicStyles.sessionButtonText,
+                          isSelected && dynamicStyles.sessionButtonTextSelected,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {`${getCustomerName(session.customer_id)} (#${session.session_number})`}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 );
               })}
             </ScrollView>
