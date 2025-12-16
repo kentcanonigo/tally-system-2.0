@@ -20,6 +20,36 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { usePermissions } from '../utils/usePermissions';
 import { removeActiveSession } from '../utils/activeSessions';
 
+// Normalize API errors (FastAPI 422 can return an array of error objects)
+const formatApiErrorMessage = (error: any, fallback: string) => {
+  const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item?.msg) return item.msg;
+        if (item?.message) return item.message;
+        return JSON.stringify(item);
+      })
+      .join('\n');
+  }
+
+  if (detail && typeof detail === 'object') {
+    return detail.message || detail.msg || JSON.stringify(detail);
+  }
+
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (error?.message) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 interface TallyScreenProps {
   sessionId?: number;
   tallyRole?: 'tally' | 'dispatcher';
@@ -471,9 +501,10 @@ function TallyScreen(props?: TallyScreenProps) {
             setLogEntries(logEntriesRes.data);
           }
         } catch (error: any) {
-          const errorMessage = error.response?.data?.detail
-            || error.message
-            || 'Failed to log tally entry. Please try again.';
+          const errorMessage = formatApiErrorMessage(
+            error,
+            'Failed to log tally entry. Please try again.'
+          );
           Alert.alert('Error', errorMessage);
         } finally {
           setIsSubmitting(false);
@@ -495,13 +526,16 @@ function TallyScreen(props?: TallyScreenProps) {
       return;
     }
 
+    // Capture the ID early so it's available in all branches (including over-allocation confirmations)
+    const matchedWCId = matchedWC.id;
+
     if (!sessionId) {
       Alert.alert('Error', 'Session ID is missing');
       return;
     }
 
     // Check for over-allocation before proceeding
-    const currentAllocation = getCurrentAllocation(matchedWC.id);
+    const currentAllocation = getCurrentAllocation(matchedWCId);
     
     // Check if there's no allocation or required_bags is 0
     if (!currentAllocation || currentAllocation.required_bags === 0) {
@@ -554,8 +588,6 @@ function TallyScreen(props?: TallyScreenProps) {
     }
 
     // No over-allocation, proceed directly
-    // Capture the ID to avoid null check issues in nested function
-    const matchedWCId = matchedWC.id;
     createLogEntry();
 
     async function createLogEntry() {
@@ -588,10 +620,10 @@ function TallyScreen(props?: TallyScreenProps) {
         // Show success feedback (optional - you can remove this if it's too much)
         // Alert.alert('Success', `Logged ${weight} for ${matchedWC.classification}`);
       } catch (error: any) {
-        const errorMessage = error.response?.data?.detail 
-          || error.message 
-          || 'Failed to log tally entry. Please try again.';
-        
+        const errorMessage = formatApiErrorMessage(
+          error,
+          'Failed to log tally entry. Please try again.'
+        );
         Alert.alert('Error', errorMessage);
       } finally {
         setIsSubmitting(false);
@@ -709,9 +741,10 @@ function TallyScreen(props?: TallyScreenProps) {
           setLogEntries(logEntriesRes.data);
         }
       } catch (error: any) {
-        const errorMessage = error.response?.data?.detail
-          || error.message
-          || 'Failed to log tally entry. Please try again.';
+        const errorMessage = formatApiErrorMessage(
+          error,
+          'Failed to log tally entry. Please try again.'
+        );
         Alert.alert('Error', errorMessage);
       } finally {
         setIsSubmitting(false);
@@ -831,9 +864,10 @@ function TallyScreen(props?: TallyScreenProps) {
           setQuantityInput('1');
         }, 0);
       } catch (error: any) {
-        const errorMessage = error.response?.data?.detail
-          || error.message
-          || 'Failed to log tally entries. Please try again.';
+        const errorMessage = formatApiErrorMessage(
+          error,
+          'Failed to log tally entries. Please try again.'
+        );
         Alert.alert('Error', errorMessage);
       } finally {
         setIsSubmitting(false);
@@ -958,9 +992,10 @@ function TallyScreen(props?: TallyScreenProps) {
           setLogEntries(logEntriesRes.data);
         }
       } catch (error: any) {
-        const errorMessage = error.response?.data?.detail
-          || error.message
-          || 'Failed to log tally entry. Please try again.';
+        const errorMessage = formatApiErrorMessage(
+          error,
+          'Failed to log tally entry. Please try again.'
+        );
         Alert.alert('Error', errorMessage);
       } finally {
         setIsSubmitting(false);
