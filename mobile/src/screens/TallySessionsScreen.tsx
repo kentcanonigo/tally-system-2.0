@@ -876,7 +876,7 @@ function TallySessionsScreen() {
               style={styles.resetButtonBottom}
               onPress={() => {
                 setFilterCustomerId(null);
-                setFilterStatus('');
+                setFilterStatus('ongoing');
                 setDateRange({ startDate: null, endDate: null });
                 setSortBy('date');
                 setSortOrder('desc');
@@ -1088,7 +1088,7 @@ function TallySessionsScreen() {
                   onPress={() => {
                     setShowActiveOnly(false);
                     setDateRange({ startDate: null, endDate: null });
-                    setFilterStatus('');
+                    setFilterStatus('ongoing');
                     setFilterCustomerId(null);
                   }}
                   hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
