@@ -262,21 +262,17 @@ const generateWorksheetForCustomer = (
     worksheetData.push(pageTotalRow);
     currentRow++;
 
-    // Signatures (on every page) - 2x2 grid format
+    // Signatures (on every page) - all in one line
     const emptyRow3: any[] = Array(SUMMARY_START_COL + 3).fill('');
     worksheetData.push(emptyRow3);
     currentRow++;
     
-    const sigRow1: any[] = Array(SUMMARY_START_COL + 3).fill('');
-    sigRow1[0] = 'Prepared by: _______________';
-    sigRow1[Math.floor(SUMMARY_START_COL / 2)] = 'Checked by: _______________';
-    worksheetData.push(sigRow1);
-    currentRow++;
-    
-    const sigRow2: any[] = Array(SUMMARY_START_COL + 3).fill('');
-    sigRow2[0] = 'Approved by: _______________';
-    sigRow2[Math.floor(SUMMARY_START_COL / 2)] = 'Received by: _______________';
-    worksheetData.push(sigRow2);
+    const sigRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
+    sigRow[0] = 'Prepared by: _______________';
+    sigRow[1] = 'Checked by: _______________';
+    sigRow[2] = 'Approved by: _______________';
+    sigRow[3] = 'Received by: _______________';
+    worksheetData.push(sigRow);
     currentRow++;
   });
 

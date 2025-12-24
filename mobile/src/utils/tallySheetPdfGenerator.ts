@@ -211,15 +211,19 @@ const generateCustomerHTML = (data: TallySheetResponse): string => {
       </div>
     `;
 
-    // Signature section and grand totals (only on last page)
+    // Signature section (on every page) - all in one line
+    html += `
+      <div style="margin-top: 20px; display: flex; justify-content: space-between; flex-wrap: wrap;">
+        <span>Prepared by: _______________</span>
+        <span>Checked by: _______________</span>
+        <span>Approved by: _______________</span>
+        <span>Received by: _______________</span>
+      </div>
+    `;
+
+    // Grand totals (only on last page)
     if (page_number === total_pages) {
       html += `
-        <div style="margin-top: 30px;">
-          <div>Prepared by: _______________</div>
-          <div>Checked by: _______________</div>
-          <div>Approved by: _______________</div>
-          <div>Received by: _______________</div>
-        </div>
         <div style="margin-top: 20px;">
           <h3 style="font-size: 14px; font-weight: bold;">Grand Total:</h3>
           <div>Bags: ${grand_total_bags.toFixed(2)}</div>

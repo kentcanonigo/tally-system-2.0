@@ -357,20 +357,18 @@ export const generateTallySheetExcel = async (data: TallySheetResponse) => {
     pageTotalRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
     pageTotalRow.getCell(SUMMARY_START_COL + 3).style = summaryTotalStyle;
 
-    // Signatures (on every page) - 2x2 grid format
+    // Signatures (on every page) - all in one line
     worksheet.addRow([]);
     currentRow++;
-    const sigRow1 = worksheet.addRow([]);
-    sigRow1.getCell(1).value = 'Prepared by: _______________';
-    sigRow1.getCell(1).font = { size: 10 };
-    sigRow1.getCell(Math.floor(SUMMARY_START_COL / 2) + 1).value = 'Checked by: _______________';
-    sigRow1.getCell(Math.floor(SUMMARY_START_COL / 2) + 1).font = { size: 10 };
-    currentRow++;
-    const sigRow2 = worksheet.addRow([]);
-    sigRow2.getCell(1).value = 'Approved by: _______________';
-    sigRow2.getCell(1).font = { size: 10 };
-    sigRow2.getCell(Math.floor(SUMMARY_START_COL / 2) + 1).value = 'Received by: _______________';
-    sigRow2.getCell(Math.floor(SUMMARY_START_COL / 2) + 1).font = { size: 10 };
+    const sigRow = worksheet.addRow([]);
+    sigRow.getCell(1).value = 'Prepared by: _______________';
+    sigRow.getCell(1).font = { size: 10 };
+    sigRow.getCell(2).value = 'Checked by: _______________';
+    sigRow.getCell(2).font = { size: 10 };
+    sigRow.getCell(3).value = 'Approved by: _______________';
+    sigRow.getCell(3).font = { size: 10 };
+    sigRow.getCell(4).value = 'Received by: _______________';
+    sigRow.getCell(4).font = { size: 10 };
     currentRow++;
   });
 

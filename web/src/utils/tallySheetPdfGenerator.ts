@@ -263,22 +263,20 @@ export const generateTallySheetPDF = (data: TallySheetResponse) => {
     // Update currentY for signature positioning
     const currentY = summaryStartY + 5 + (numSummaryRows * summaryRowHeight) + summaryRowHeight;
 
-    // ========== SIGNATURES (on every page) - below summary table, 2x2 grid ==========
+    // ========== SIGNATURES (on every page) - below summary table, all in one line ==========
     const signatureStartY = Math.max(totalsY + 8, currentY + 8);
-    const signatureCol1X = MARGIN + 5;
-    const signatureCol2X = PAGE_WIDTH / 2 + 10;
+    const signatureSpacing = (PAGE_WIDTH - (2 * MARGIN)) / 4; // Divide available width into 4 equal parts
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    // Row 1
-    doc.text('Prepared by: _______________', signatureCol1X, signatureStartY);
-    doc.text('Checked by: _______________', signatureCol2X, signatureStartY);
-    // Row 2
-    doc.text('Approved by: _______________', signatureCol1X, signatureStartY + 6);
-    doc.text('Received by: _______________', signatureCol2X, signatureStartY + 6);
+    // All signatures in one line
+    doc.text('Prepared by: _______________', MARGIN + 5, signatureStartY);
+    doc.text('Checked by: _______________', MARGIN + 5 + signatureSpacing, signatureStartY);
+    doc.text('Approved by: _______________', MARGIN + 5 + (signatureSpacing * 2), signatureStartY);
+    doc.text('Received by: _______________', MARGIN + 5 + (signatureSpacing * 3), signatureStartY);
 
     // ========== GRAND TOTAL (only on last page) ==========
     if (page_number === total_pages) {
-      const grandTotalY = signatureStartY + 25;
+      const grandTotalY = signatureStartY + 15;
       
       // Draw a line above grand total
       doc.setLineWidth(0.2);
