@@ -306,10 +306,17 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
     summaryHeaderRow.getCell(SUMMARY_START_COL).style = summaryHeaderStyle;
     summaryHeaderRow.getCell(SUMMARY_START_COL + 1).value = 'Bags';
     summaryHeaderRow.getCell(SUMMARY_START_COL + 1).style = summaryHeaderStyle;
-    summaryHeaderRow.getCell(SUMMARY_START_COL + 2).value = 'Heads';
-    summaryHeaderRow.getCell(SUMMARY_START_COL + 2).style = summaryHeaderStyle;
-    summaryHeaderRow.getCell(SUMMARY_START_COL + 3).value = 'Kilograms';
-    summaryHeaderRow.getCell(SUMMARY_START_COL + 3).style = summaryHeaderStyle;
+    if (is_byproduct) {
+      // For byproducts: Classification, Bags, Kilograms (which is heads value)
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 2).value = 'Kilograms';
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 2).style = summaryHeaderStyle;
+    } else {
+      // For dressed: Classification, Bags, Heads, Kilograms
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 2).value = 'Heads';
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 2).style = summaryHeaderStyle;
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 3).value = 'Kilograms';
+      summaryHeaderRow.getCell(SUMMARY_START_COL + 3).style = summaryHeaderStyle;
+    }
 
     // Summary rows
     summaries.forEach((summary, index) => {
@@ -321,16 +328,19 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
       summaryRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
       summaryRow.getCell(SUMMARY_START_COL + 1).style = summaryCellStyle;
       if (is_byproduct) {
+        // For byproducts: show heads value as Kilograms
         summaryRow.getCell(SUMMARY_START_COL + 2).value = Math.round(summary.heads);
         summaryRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
+        summaryRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
       } else {
+        // For dressed: show Heads and Kilograms
         summaryRow.getCell(SUMMARY_START_COL + 2).value = summary.heads;
         summaryRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
+        summaryRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
+        summaryRow.getCell(SUMMARY_START_COL + 3).value = summary.kilograms;
+        summaryRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
+        summaryRow.getCell(SUMMARY_START_COL + 3).style = summaryCellStyle;
       }
-      summaryRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
-      summaryRow.getCell(SUMMARY_START_COL + 3).value = summary.kilograms;
-      summaryRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
-      summaryRow.getCell(SUMMARY_START_COL + 3).style = summaryCellStyle;
     });
 
     // Page total row in summary table
@@ -346,16 +356,19 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
     pageTotalRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
     pageTotalRow.getCell(SUMMARY_START_COL + 1).style = summaryTotalStyle;
     if (is_byproduct) {
+      // For byproducts: show heads total as Kilograms
       pageTotalRow.getCell(SUMMARY_START_COL + 2).value = Math.round(pageTotalHeads);
       pageTotalRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
+      pageTotalRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
     } else {
+      // For dressed: show Heads and Kilograms totals
       pageTotalRow.getCell(SUMMARY_START_COL + 2).value = pageTotalHeads;
       pageTotalRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
+      pageTotalRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
+      pageTotalRow.getCell(SUMMARY_START_COL + 3).value = pageTotalKilos;
+      pageTotalRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
+      pageTotalRow.getCell(SUMMARY_START_COL + 3).style = summaryTotalStyle;
     }
-    pageTotalRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
-    pageTotalRow.getCell(SUMMARY_START_COL + 3).value = pageTotalKilos;
-    pageTotalRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
-    pageTotalRow.getCell(SUMMARY_START_COL + 3).style = summaryTotalStyle;
 
     // Signatures (on every page) - all in one line
     worksheet.addRow([]);

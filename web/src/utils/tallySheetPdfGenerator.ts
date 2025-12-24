@@ -180,10 +180,12 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     const summaryStartY = GRID_START_Y; // Align with grid top
     const summaryX = GRID_START_X + ROW_NUMBER_WIDTH + GRID_WIDTH + 15; // Right side of grid
     const summaryRowHeight = 5;
-    const summaryTableWidth = 90; // Total width of summary table
+    // For byproducts, we only show 3 columns (Classification, Bags, Kilograms), so adjust width
+    const summaryTableWidth = is_byproduct ? 70 : 90; // Total width of summary table
     const summaryCol1Width = 25; // Classification column width
     const summaryCol2Width = 20; // Bags column width
-    const summaryCol3Width = 20; // Heads column width
+    const summaryCol3Width = is_byproduct ? 0 : 20; // Heads column width (not used for byproducts)
+    const summaryCol4Width = is_byproduct ? 25 : 25; // Kilograms column width (or Kilograms for byproducts)
 
     // Calculate table height (header + rows + total row)
     const numSummaryRows = summaries.length;
@@ -212,7 +214,10 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     // Vertical lines
     doc.line(summaryX + summaryCol1Width, summaryStartY - 5, summaryX + summaryCol1Width, summaryStartY - 5 + summaryTableHeight);
     doc.line(summaryX + summaryCol1Width + summaryCol2Width, summaryStartY - 5, summaryX + summaryCol1Width + summaryCol2Width, summaryStartY - 5 + summaryTableHeight);
-    doc.line(summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5, summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5 + summaryTableHeight);
+    if (!is_byproduct) {
+      // Only draw the third vertical line for dressed (Heads column)
+      doc.line(summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5, summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5 + summaryTableHeight);
+    }
 
     // Single summary table on the right - text centered vertically in cells
     // Header row
@@ -222,8 +227,14 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     // Left align classification, right align numbers
     doc.text('Classification', summaryX + 2, headerRowY);
     doc.text('Bags', summaryX + summaryCol1Width + summaryCol2Width - 2, headerRowY, { align: 'right' });
-    doc.text('Heads', summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, headerRowY, { align: 'right' });
-    doc.text('Kilograms', summaryX + summaryTableWidth - 2, headerRowY, { align: 'right' });
+    if (is_byproduct) {
+      // For byproducts: Classification, Bags, Kilograms (which is heads value)
+      doc.text('Kilograms', summaryX + summaryTableWidth - 2, headerRowY, { align: 'right' });
+    } else {
+      // For dressed: Classification, Bags, Heads, Kilograms
+      doc.text('Heads', summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, headerRowY, { align: 'right' });
+      doc.text('Kilograms', summaryX + summaryTableWidth - 2, headerRowY, { align: 'right' });
+    }
 
     // Summary rows - dynamic based on entries for this page
     doc.setFontSize(8);
@@ -236,11 +247,13 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
       // Right align numbers
       doc.text(summary.bags.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width - 2, rowY, { align: 'right' });
       if (is_byproduct) {
-        doc.text(summary.heads.toFixed(0), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, rowY, { align: 'right' });
+        // For byproducts: show heads value as Kilograms
+        doc.text(summary.heads.toFixed(0), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
       } else {
+        // For dressed: show Heads and Kilograms
         doc.text(summary.heads.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, rowY, { align: 'right' });
+        doc.text(summary.kilograms.toFixed(2), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
       }
-      doc.text(summary.kilograms.toFixed(2), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
     });
 
     // Page total row - centered vertically
@@ -254,11 +267,13 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     // Right align numbers
     doc.text(pageTotalBags.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width - 2, totalRowTextY, { align: 'right' });
     if (is_byproduct) {
-      doc.text(pageTotalHeads.toFixed(0), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, totalRowTextY, { align: 'right' });
+      // For byproducts: show heads total as Kilograms
+      doc.text(pageTotalHeads.toFixed(0), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
     } else {
+      // For dressed: show Heads and Kilograms totals
       doc.text(pageTotalHeads.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, totalRowTextY, { align: 'right' });
+      doc.text(pageTotalKilos.toFixed(2), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
     }
-    doc.text(pageTotalKilos.toFixed(2), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
     
     // Update currentY for signature positioning
     const currentY = summaryStartY + 5 + (numSummaryRows * summaryRowHeight) + summaryRowHeight;

@@ -185,8 +185,14 @@ const generateWorksheetForCustomer = (
     // Summary table headers (same row as grid header)
     headerRow[SUMMARY_START_COL - 1] = 'Classification';
     headerRow[SUMMARY_START_COL] = 'Bags';
-    headerRow[SUMMARY_START_COL + 1] = 'Heads';
-    headerRow[SUMMARY_START_COL + 2] = 'Kilograms';
+    if (is_byproduct) {
+      // For byproducts: Classification, Bags, Kilograms (which is heads value)
+      headerRow[SUMMARY_START_COL + 1] = 'Kilograms';
+    } else {
+      // For dressed: Classification, Bags, Heads, Kilograms
+      headerRow[SUMMARY_START_COL + 1] = 'Heads';
+      headerRow[SUMMARY_START_COL + 2] = 'Kilograms';
+    }
     worksheetData.push(headerRow);
     currentRow++;
 
@@ -209,8 +215,14 @@ const generateWorksheetForCustomer = (
         const summary = summaries[row];
         rowData[SUMMARY_START_COL - 1] = summary.classification;
         rowData[SUMMARY_START_COL] = summary.bags;
-        rowData[SUMMARY_START_COL + 1] = is_byproduct ? Math.round(summary.heads) : summary.heads;
-        rowData[SUMMARY_START_COL + 2] = summary.kilograms;
+        if (is_byproduct) {
+          // For byproducts: show heads value as Kilograms
+          rowData[SUMMARY_START_COL + 1] = Math.round(summary.heads);
+        } else {
+          // For dressed: show Heads and Kilograms
+          rowData[SUMMARY_START_COL + 1] = summary.heads;
+          rowData[SUMMARY_START_COL + 2] = summary.kilograms;
+        }
       }
 
       worksheetData.push(rowData);
@@ -244,8 +256,14 @@ const generateWorksheetForCustomer = (
         const summaryRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
         summaryRow[SUMMARY_START_COL - 1] = summary.classification;
         summaryRow[SUMMARY_START_COL] = summary.bags;
-        summaryRow[SUMMARY_START_COL + 1] = is_byproduct ? Math.round(summary.heads) : summary.heads;
-        summaryRow[SUMMARY_START_COL + 2] = summary.kilograms;
+        if (is_byproduct) {
+          // For byproducts: show heads value as Kilograms
+          summaryRow[SUMMARY_START_COL + 1] = Math.round(summary.heads);
+        } else {
+          // For dressed: show Heads and Kilograms
+          summaryRow[SUMMARY_START_COL + 1] = summary.heads;
+          summaryRow[SUMMARY_START_COL + 2] = summary.kilograms;
+        }
         worksheetData.push(summaryRow);
         currentRow++;
       });
@@ -258,8 +276,14 @@ const generateWorksheetForCustomer = (
     const pageTotalRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
     pageTotalRow[SUMMARY_START_COL - 1] = 'TOTAL';
     pageTotalRow[SUMMARY_START_COL] = pageTotalBags;
-    pageTotalRow[SUMMARY_START_COL + 1] = is_byproduct ? Math.round(pageTotalHeads) : pageTotalHeads;
-    pageTotalRow[SUMMARY_START_COL + 2] = pageTotalKilos;
+    if (is_byproduct) {
+      // For byproducts: show heads total as Kilograms
+      pageTotalRow[SUMMARY_START_COL + 1] = Math.round(pageTotalHeads);
+    } else {
+      // For dressed: show Heads and Kilograms totals
+      pageTotalRow[SUMMARY_START_COL + 1] = pageTotalHeads;
+      pageTotalRow[SUMMARY_START_COL + 2] = pageTotalKilos;
+    }
     worksheetData.push(pageTotalRow);
     currentRow++;
 

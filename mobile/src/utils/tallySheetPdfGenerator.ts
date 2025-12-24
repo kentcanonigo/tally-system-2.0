@@ -141,7 +141,6 @@ const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean 
             <tr>
               <th style="border: 1px solid #000; padding: 3px; text-align: left;">Classification</th>
               <th style="border: 1px solid #000; padding: 3px; text-align: center;">Bags</th>
-              <th style="border: 1px solid #000; padding: 3px; text-align: center;">Heads</th>
               <th style="border: 1px solid #000; padding: 3px; text-align: center;">Kilograms</th>
             </tr>
           </thead>
@@ -154,7 +153,6 @@ const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean 
             <td style="border: 1px solid #000; padding: 3px;">${summary.classification}</td>
             <td style="border: 1px solid #000; padding: 3px; text-align: center;">${summary.bags.toFixed(2)}</td>
             <td style="border: 1px solid #000; padding: 3px; text-align: center;">${summary.heads.toFixed(0)}</td>
-            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${summary.kilograms.toFixed(2)}</td>
           </tr>
         `;
       });
@@ -164,7 +162,6 @@ const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean 
             <td style="border: 1px solid #000; padding: 3px;">TOTAL</td>
             <td style="border: 1px solid #000; padding: 3px; text-align: center;">${page.total_byproduct_bags.toFixed(2)}</td>
             <td style="border: 1px solid #000; padding: 3px; text-align: center;">${page.total_byproduct_heads.toFixed(0)}</td>
-            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${page.total_byproduct_kilograms.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
