@@ -976,7 +976,7 @@ function TallyTabScreen() {
                           handleLongPress(index, evt);
                         }
                       }}
-                      delayLongPress={1000}
+                      delayLongPress={500}
                       activeOpacity={0.7}
                     >
                       <Text
@@ -1039,7 +1039,7 @@ function TallyTabScreen() {
                           handleLongPress(index, evt);
                         }
                       }}
-                      delayLongPress={1000}
+                      delayLongPress={500}
                       activeOpacity={0.7}
                     >
                       <Text

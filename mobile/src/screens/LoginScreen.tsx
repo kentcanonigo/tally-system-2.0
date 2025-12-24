@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,72 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
+import { setApiBaseUrl } from '../services/api';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [apiUrl, setApiUrl] = useState<string>('');
+  const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const { login, loading, error } = useAuth();
+
+  // Load current API URL from storage on mount
+  useEffect(() => {
+    const loadApiUrl = async () => {
+      try {
+        const storedUrl = await AsyncStorage.getItem('API_BASE_URL');
+        setApiUrl(storedUrl || '');
+      } catch (error) {
+        console.error('Error loading API URL:', error);
+      }
+    };
+    loadApiUrl();
+  }, []);
+
+  const handleApiUrlChange = async (url: string) => {
+    setApiUrl(url);
+  };
+
+  const handleApiUrlBlur = async () => {
+    if (isSavingApiUrl) return;
+    
+    setIsSavingApiUrl(true);
+    try {
+      const urlToSave = apiUrl.trim() || null;
+      await setApiBaseUrl(urlToSave);
+      // Update local state to reflect what was saved
+      setApiUrl(urlToSave || '');
+    } catch (error: any) {
+      console.error('Error saving API URL:', error);
+      // Revert to stored value on error
+      const storedUrl = await AsyncStorage.getItem('API_BASE_URL');
+      setApiUrl(storedUrl || '');
+      Alert.alert('Error', error.message || 'Failed to save API URL');
+    } finally {
+      setIsSavingApiUrl(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('Error', 'Please enter username and password');
       return;
+    }
+
+    // Save API URL if it was changed
+    if (isSavingApiUrl === false) {
+      const urlToSave = apiUrl.trim() || null;
+      const currentStoredUrl = await AsyncStorage.getItem('API_BASE_URL');
+      if (urlToSave !== currentStoredUrl) {
+        try {
+          await setApiBaseUrl(urlToSave);
+        } catch (error: any) {
+          Alert.alert('Error', error.message || 'Failed to save API URL');
+          return;
+        }
+      }
     }
 
     try {
@@ -75,10 +130,30 @@ export default function LoginScreen() {
           />
         </View>
 
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Backend URL (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={apiUrl}
+            onChangeText={handleApiUrlChange}
+            onBlur={handleApiUrlBlur}
+            placeholder="https://example.com/api/v1"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading && !isSavingApiUrl}
+          />
+          {apiUrl.trim() && (
+            <Text style={styles.helperText}>
+              Leave empty to use default URL
+            </Text>
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || isSavingApiUrl}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -177,6 +252,12 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 4,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 
