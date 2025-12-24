@@ -225,10 +225,9 @@ const generateCustomerHTML = (data: TallySheetResponse): string => {
     if (page_number === total_pages) {
       html += `
         <div style="margin-top: 20px;">
-          <h3 style="font-size: 14px; font-weight: bold;">Grand Total:</h3>
-          <div>Bags: ${grand_total_bags.toFixed(2)}</div>
-          <div>Heads: ${grand_total_heads.toFixed(2)}</div>
-          <div>Kilograms: ${grand_total_kilograms.toFixed(2)}</div>
+          <div style="font-size: 14px; font-weight: bold;">
+            Grand Total: Bags: ${grand_total_bags.toFixed(2)} - Heads: ${grand_total_heads.toFixed(2)} - Kilograms: ${grand_total_kilograms.toFixed(2)}
+          </div>
         </div>
       `;
     }

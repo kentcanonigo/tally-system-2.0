@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi } from '../services/api';
+import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi, tallyLogEntriesApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
 import { TallySessionStatus } from '../types';
 import { useResponsive } from '../utils/responsive';
@@ -308,6 +308,10 @@ function TallyTabScreen() {
       setExportSessionIds([selectedSessionId]);
       setExportTitle(getSelectedCustomerName());
     } else {
+      if (activeSessionIds.length === 0) {
+        Alert.alert('No Sessions', 'There are no active sessions to export.');
+        return;
+      }
       setExportSessionIds(activeSessionIds);
       setExportTitle(`All Active Sessions (${activeSessionIds.length})`);
     }
@@ -407,14 +411,102 @@ function TallyTabScreen() {
     }
   };
 
+  const checkSessionsForTallyEntries = async (sessionIds: number[]): Promise<{ sessionsWithoutEntries: string[]; validSessionIds: number[] }> => {
+    const sessionsWithoutEntries: string[] = [];
+    const validSessionIds: number[] = [];
+    
+    try {
+      // Check each session for tally log entries
+      const checkPromises = sessionIds.map(async (sessionId) => {
+        try {
+          // Try to fetch tally log entries for this session (TALLY role only)
+          const entriesRes = await tallyLogEntriesApi.getBySession(sessionId, 'tally');
+          const entries = entriesRes.data;
+          
+          if (entries.length === 0) {
+            // No tally entries found - get session info for display
+            const session = sessions.find(s => s.id === sessionId);
+            const customer = session ? customers.find(c => c.id === session.customer_id) : null;
+            const sessionName = customer ? `${customer.name} - Session #${session?.session_number || sessionId}` : `Session #${session?.session_number || sessionId}`;
+            return { sessionId, hasEntries: false, sessionName };
+          }
+          
+          return { sessionId, hasEntries: true, sessionName: null };
+        } catch (error: any) {
+          // If 404 or other error, assume no entries
+          console.error(`Error checking tally entries for session ${sessionId}:`, error);
+          const session = sessions.find(s => s.id === sessionId);
+          const customer = session ? customers.find(c => c.id === session.customer_id) : null;
+          const sessionName = customer ? `${customer.name} - Session #${session?.session_number || sessionId}` : `Session #${session?.session_number || sessionId}`;
+          return { sessionId, hasEntries: false, sessionName };
+        }
+      });
+      
+      const results = await Promise.all(checkPromises);
+      
+      results.forEach(result => {
+        if (result.hasEntries) {
+          validSessionIds.push(result.sessionId);
+        } else if (result.sessionName) {
+          sessionsWithoutEntries.push(result.sessionName);
+        }
+      });
+      
+      return { sessionsWithoutEntries, validSessionIds };
+    } catch (error) {
+      console.error('Error checking sessions for tally entries:', error);
+      // If we can't check, allow all sessions to proceed
+      return { sessionsWithoutEntries: [], validSessionIds: sessionIds };
+    }
+  };
+
   const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
     if (exportSessionIds.length === 0) {
       Alert.alert('No Sessions', 'There are no sessions to export.');
       return;
     }
 
+    // Check for sessions without tally entries
+    const { sessionsWithoutEntries, validSessionIds } = await checkSessionsForTallyEntries(exportSessionIds);
+    
+    if (sessionsWithoutEntries.length > 0) {
+      const sessionList = sessionsWithoutEntries.join('\n• ');
+      Alert.alert(
+        'Sessions Without Tally Entries',
+        `The following session(s) do not have any tally log entries yet:\n\n• ${sessionList}\n\nThese sessions will be excluded from the export. Do you want to proceed with exporting the remaining ${validSessionIds.length} session(s)?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setShowTallySheetFormatModal(false);
+            }
+          },
+          {
+            text: 'Proceed',
+            onPress: () => {
+              if (validSessionIds.length === 0) {
+                Alert.alert('No Valid Sessions', 'None of the selected sessions have tally entries to export.');
+                setShowTallySheetFormatModal(false);
+                return;
+              }
+              // Store valid session IDs and proceed with export
+              setExportSessionIds(validSessionIds);
+              performExportWithChecks(format, validSessionIds);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    // All sessions have entries, proceed with checks
+    performExportWithChecks(format, exportSessionIds);
+  };
+
+  const performExportWithChecks = async (format: 'pdf' | 'excel', sessionIdsToExport: number[]) => {
     // Check for allocation mismatches
-    const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(exportSessionIds);
+    const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(sessionIdsToExport);
     
     if (hasMismatches) {
       const sessionList = mismatchedSessions.join('\n• ');
@@ -431,7 +523,7 @@ function TallyTabScreen() {
           },
           {
             text: 'Proceed',
-            onPress: () => performExport(format)
+            onPress: () => performExport(format, sessionIdsToExport)
           }
         ]
       );
@@ -439,17 +531,26 @@ function TallyTabScreen() {
     }
 
     // No mismatches, proceed with export
-    performExport(format);
+    performExport(format, sessionIdsToExport);
   };
 
-  const performExport = async (format: 'pdf' | 'excel') => {
+  const performExport = async (format: 'pdf' | 'excel', sessionIdsToExport?: number[]) => {
     try {
       setIsExporting(true);
       setShowTallySheetFormatModal(false);
       setShowExportTypeModal(false);
 
+      // Use provided session IDs or fall back to exportSessionIds
+      const sessionIds = sessionIdsToExport || exportSessionIds;
+
+      // Validate that we have valid session IDs
+      if (sessionIds.length === 0) {
+        Alert.alert('No Sessions', 'There are no valid sessions to export.');
+        return;
+      }
+
       const response = await exportApi.exportTallySheet({
-        session_ids: exportSessionIds
+        session_ids: sessionIds
       });
 
       if (format === 'pdf') {
@@ -496,9 +597,24 @@ function TallyTabScreen() {
       } else {
         await generateTallySheetExcel(response.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Tally sheet export error:', error);
-      Alert.alert('Error', 'Failed to export tally sheet');
+      let errorMessage = 'Failed to export tally sheet';
+      
+      if (error.response?.status === 404) {
+        const detail = error.response?.data?.detail || '';
+        if (detail.includes('not found')) {
+          errorMessage = 'One or more sessions were not found. Please refresh and try again.';
+        } else if (detail.includes('No tally entries')) {
+          errorMessage = 'The selected sessions do not have any tally entries. Please ensure sessions have tally data before exporting.';
+        } else {
+          errorMessage = 'No valid data found for export. Please ensure the selected sessions have tally entries.';
+        }
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.detail || 'Invalid request. Please try again.';
+      }
+      
+      Alert.alert('Export Error', errorMessage);
     } finally {
       setIsExporting(false);
     }
