@@ -113,7 +113,8 @@ const formatDate = (dateString: string): string => {
 
 const generateWorksheetForCustomer = (
   data: TallySheetResponse,
-  workbook: XLSX.WorkBook
+  workbook: XLSX.WorkBook,
+  showGrandTotal: boolean = true
 ) => {
   const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
 
@@ -276,27 +277,29 @@ const generateWorksheetForCustomer = (
     currentRow++;
   });
 
-  // Grand Total table (only once at the end)
-  const emptyRow4: any[] = Array(SUMMARY_START_COL + 3).fill('');
-  worksheetData.push(emptyRow4);
-  currentRow++;
-  
-  // Grand Total header row
-  const grandTotalHeaderRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
-  grandTotalHeaderRow[0] = 'Grand Total';
-  grandTotalHeaderRow[1] = 'Bags';
-  grandTotalHeaderRow[2] = 'Heads';
-  grandTotalHeaderRow[3] = 'Kilograms';
-  worksheetData.push(grandTotalHeaderRow);
-  currentRow++;
-  
-  // Grand Total data row
-  const grandTotalRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
-  grandTotalRow[0] = 'TOTAL';
-  grandTotalRow[1] = grand_total_bags;
-  grandTotalRow[2] = grand_total_heads;
-  grandTotalRow[3] = grand_total_kilograms;
-  worksheetData.push(grandTotalRow);
+  // Grand Total table (only once at the end and if showGrandTotal is true)
+  if (showGrandTotal) {
+    const emptyRow4: any[] = Array(SUMMARY_START_COL + 3).fill('');
+    worksheetData.push(emptyRow4);
+    currentRow++;
+    
+    // Grand Total header row
+    const grandTotalHeaderRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
+    grandTotalHeaderRow[0] = 'Grand Total';
+    grandTotalHeaderRow[1] = 'Bags';
+    grandTotalHeaderRow[2] = 'Heads';
+    grandTotalHeaderRow[3] = 'Kilograms';
+    worksheetData.push(grandTotalHeaderRow);
+    currentRow++;
+    
+    // Grand Total data row
+    const grandTotalRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
+    grandTotalRow[0] = 'TOTAL';
+    grandTotalRow[1] = grand_total_bags;
+    grandTotalRow[2] = grand_total_heads;
+    grandTotalRow[3] = grand_total_kilograms;
+    worksheetData.push(grandTotalRow);
+  }
 
   // Create worksheet
   const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
@@ -328,9 +331,12 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   const isMultiCustomer = 'customers' in data;
   const customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
   
+  // Only show grand total if there are multiple customers
+  const showGrandTotal = customers.length > 1;
+  
   // Generate a worksheet for each customer
   customers.forEach((customerData) => {
-    generateWorksheetForCustomer(customerData, workbook);
+    generateWorksheetForCustomer(customerData, workbook, showGrandTotal);
   });
 
   // Generate filename based on number of customers

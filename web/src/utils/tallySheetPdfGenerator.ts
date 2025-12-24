@@ -57,7 +57,7 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-export const generateTallySheetPDF = (data: TallySheetResponse) => {
+export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: boolean = true) => {
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
   const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
@@ -274,8 +274,8 @@ export const generateTallySheetPDF = (data: TallySheetResponse) => {
     doc.text('Approved by: _______________', MARGIN + 5 + (signatureSpacing * 2), signatureStartY);
     doc.text('Received by: _______________', MARGIN + 5 + (signatureSpacing * 3), signatureStartY);
 
-    // ========== GRAND TOTAL (only on last page) ==========
-    if (page_number === total_pages) {
+    // ========== GRAND TOTAL (only on last page and if showGrandTotal is true) ==========
+    if (page_number === total_pages && showGrandTotal) {
       const grandTotalY = signatureStartY + 15;
       
       // Draw a line above grand total

@@ -208,10 +208,11 @@ function TallySessionDetail() {
       // Backend returns TallySheetMultiCustomerResponse with a customers array
       // For a single session, there should be only one customer
       const customerData = response.data.customers?.[0] || response.data;
+      // Single customer, so don't show grand total
       if (format === 'pdf') {
-        generateTallySheetPDF(customerData);
+        generateTallySheetPDF(customerData, false);
       } else {
-        await generateTallySheetExcel(customerData);
+        await generateTallySheetExcel(customerData, false);
       }
     } catch (error) {
       console.error('Tally sheet export error:', error);

@@ -57,7 +57,7 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-export const generateTallySheetExcel = async (data: TallySheetResponse) => {
+export const generateTallySheetExcel = async (data: TallySheetResponse, showGrandTotal: boolean = true) => {
   const workbook = new ExcelJS.Workbook();
   const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
 
@@ -372,37 +372,39 @@ export const generateTallySheetExcel = async (data: TallySheetResponse) => {
     currentRow++;
   });
 
-  // Grand Total table (only once at the end)
-  worksheet.addRow([]);
-  currentRow++;
-  
-  // Grand Total header row
-  const grandTotalHeaderRow = worksheet.addRow([]);
-  grandTotalHeaderRow.height = 20;
-  grandTotalHeaderRow.getCell(1).value = 'Grand Total';
-  grandTotalHeaderRow.getCell(1).style = summaryHeaderStyle;
-  grandTotalHeaderRow.getCell(2).value = 'Bags';
-  grandTotalHeaderRow.getCell(2).style = summaryHeaderStyle;
-  grandTotalHeaderRow.getCell(3).value = 'Heads';
-  grandTotalHeaderRow.getCell(3).style = summaryHeaderStyle;
-  grandTotalHeaderRow.getCell(4).value = 'Kilograms';
-  grandTotalHeaderRow.getCell(4).style = summaryHeaderStyle;
-  currentRow++;
-  
-  // Grand Total data row
-  const grandTotalRow = worksheet.addRow([]);
-  grandTotalRow.height = 22;
-  grandTotalRow.getCell(1).value = 'TOTAL';
-  grandTotalRow.getCell(1).style = summaryTotalLeftStyle;
-  grandTotalRow.getCell(2).value = grand_total_bags;
-  grandTotalRow.getCell(2).numFmt = '0.00';
-  grandTotalRow.getCell(2).style = summaryTotalStyle;
-  grandTotalRow.getCell(3).value = grand_total_heads;
-  grandTotalRow.getCell(3).numFmt = '0.00';
-  grandTotalRow.getCell(3).style = summaryTotalStyle;
-  grandTotalRow.getCell(4).value = grand_total_kilograms;
-  grandTotalRow.getCell(4).numFmt = '0.00';
-  grandTotalRow.getCell(4).style = summaryTotalStyle;
+  // Grand Total table (only once at the end and if showGrandTotal is true)
+  if (showGrandTotal) {
+    worksheet.addRow([]);
+    currentRow++;
+    
+    // Grand Total header row
+    const grandTotalHeaderRow = worksheet.addRow([]);
+    grandTotalHeaderRow.height = 20;
+    grandTotalHeaderRow.getCell(1).value = 'Grand Total';
+    grandTotalHeaderRow.getCell(1).style = summaryHeaderStyle;
+    grandTotalHeaderRow.getCell(2).value = 'Bags';
+    grandTotalHeaderRow.getCell(2).style = summaryHeaderStyle;
+    grandTotalHeaderRow.getCell(3).value = 'Heads';
+    grandTotalHeaderRow.getCell(3).style = summaryHeaderStyle;
+    grandTotalHeaderRow.getCell(4).value = 'Kilograms';
+    grandTotalHeaderRow.getCell(4).style = summaryHeaderStyle;
+    currentRow++;
+    
+    // Grand Total data row
+    const grandTotalRow = worksheet.addRow([]);
+    grandTotalRow.height = 22;
+    grandTotalRow.getCell(1).value = 'TOTAL';
+    grandTotalRow.getCell(1).style = summaryTotalLeftStyle;
+    grandTotalRow.getCell(2).value = grand_total_bags;
+    grandTotalRow.getCell(2).numFmt = '0.00';
+    grandTotalRow.getCell(2).style = summaryTotalStyle;
+    grandTotalRow.getCell(3).value = grand_total_heads;
+    grandTotalRow.getCell(3).numFmt = '0.00';
+    grandTotalRow.getCell(3).style = summaryTotalStyle;
+    grandTotalRow.getCell(4).value = grand_total_kilograms;
+    grandTotalRow.getCell(4).numFmt = '0.00';
+    grandTotalRow.getCell(4).style = summaryTotalStyle;
+  }
 
   // Set column widths
   worksheet.getColumn(1).width = 8; // Row number column

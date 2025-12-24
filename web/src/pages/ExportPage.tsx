@@ -131,15 +131,17 @@ function ExportPage() {
       
       // Generate separate files for each customer
       // Add a small delay between downloads to avoid browser blocking multiple downloads
+      // Only show grand total if there are multiple customers
+      const showGrandTotal = customers.length > 1;
       for (let i = 0; i < customers.length; i++) {
         if (i > 0) {
           // Wait 500ms between downloads
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         if (format === 'pdf') {
-          generateTallySheetPDF(customers[i]);
+          generateTallySheetPDF(customers[i], showGrandTotal);
         } else {
-          await generateTallySheetExcel(customers[i]);
+          await generateTallySheetExcel(customers[i], showGrandTotal);
         }
       }
     } catch (error) {

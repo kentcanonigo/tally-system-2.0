@@ -59,7 +59,7 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-const generateCustomerHTML = (data: TallySheetResponse): string => {
+const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean = true): string => {
   const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
   const ROWS_PER_PAGE = 20;
 
@@ -221,8 +221,8 @@ const generateCustomerHTML = (data: TallySheetResponse): string => {
       </div>
     `;
 
-    // Grand totals (only on last page)
-    if (page_number === total_pages) {
+    // Grand totals (only on last page and if showGrandTotal is true)
+    if (page_number === total_pages && showGrandTotal) {
       html += `
         <div style="margin-top: 20px;">
           <div style="font-size: 14px; font-weight: bold;">
@@ -246,9 +246,12 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
   const isMultiCustomer = 'customers' in data;
   const customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
   
+  // Only show grand total if there are multiple customers
+  const showGrandTotal = customers.length > 1;
+  
   // Generate HTML for each customer with a page break between customers
   const customersHTML = customers.map((customerData, index) => {
-    const customerHTML = generateCustomerHTML(customerData);
+    const customerHTML = generateCustomerHTML(customerData, showGrandTotal);
     // Add a page break before each customer except the first
     if (index > 0) {
       return `<div style="page-break-before: always;"></div>${customerHTML}`;
