@@ -1632,8 +1632,8 @@ function TallyScreen(props?: TallyScreenProps) {
                       <View style={dynamicStyles.summaryHeader}>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.2 }]}>Class</Text>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total Heads</Text>
-                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total Weight</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total{'\n'}Heads</Text>
+                        <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total{'\n'}Weight</Text>
                       </View>
                       {dressedAllocations.map((allocation: AllocationDetails) => {
                         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
