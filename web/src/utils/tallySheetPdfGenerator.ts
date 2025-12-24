@@ -185,7 +185,6 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     const summaryCol1Width = 25; // Classification column width
     const summaryCol2Width = 20; // Bags column width
     const summaryCol3Width = is_byproduct ? 0 : 20; // Heads column width (not used for byproducts)
-    const summaryCol4Width = is_byproduct ? 25 : 25; // Kilograms column width (or Kilograms for byproducts)
 
     // Calculate table height (header + rows + total row)
     const numSummaryRows = summaries.length;

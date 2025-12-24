@@ -47,6 +47,7 @@ function TallyTabScreen() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const dragStartPos = useRef({ x: 0, y: 0, index: -1 });
+  const isLongPressActive = useRef<Map<number, boolean>>(new Map());
 
   // Calculate sidebar width and determine layout mode
   const sidebarWidth = responsive.isTablet ? 200 : 150;
@@ -189,24 +190,51 @@ function TallyTabScreen() {
     await persistSelectedSessionId(sessionId);
   };
 
+
+  // Handle long press to activate drag mode
+  const handleLongPress = useCallback((index: number, evt: any) => {
+    // Activate drag mode
+    isLongPressActive.current.set(index, true);
+    setDraggedIndex(index);
+    dragStartPos.current = {
+      x: evt?.nativeEvent?.pageX || 0,
+      y: evt?.nativeEvent?.pageY || 0,
+      index: index,
+    };
+    setDragOffset({ x: 0, y: 0 });
+  }, []);
+
   const createPanResponder = useCallback((index: number) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Start dragging if moved more than 10 pixels
-        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+        // Only activate drag if long press was detected
+        if (!isLongPressActive.current.get(index) || draggedIndex !== index) {
+          return false;
+        }
+        // Long press is active, allow dragging
+        return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
       },
-      onPanResponderGrant: (evt) => {
-        setDraggedIndex(index);
-        dragStartPos.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY,
-          index: index,
-        };
-        setDragOffset({ x: 0, y: 0 });
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Only capture if long press is active
+        if (!isLongPressActive.current.get(index) || draggedIndex !== index) {
+          return false;
+        }
+        // Capture the gesture to prevent ScrollView from handling it
+        // Only capture if movement is primarily in the drag direction
+        if (useVerticalLayout) {
+          // For horizontal layout, capture if horizontal movement is greater
+          return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 5;
+        } else {
+          // For vertical layout, capture if vertical movement is greater
+          return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 5;
+        }
       },
       onPanResponderMove: (evt, gestureState) => {
-        if (draggedIndex === null) return;
+        if (draggedIndex === null || draggedIndex !== index) {
+          return;
+        }
         
         const currentPos = useVerticalLayout 
           ? evt.nativeEvent.pageX 
@@ -237,7 +265,9 @@ function TallyTabScreen() {
         }
       },
       onPanResponderRelease: async () => {
-        if (draggedIndex === null) return;
+        if (draggedIndex === null || draggedIndex !== index) {
+          return;
+        }
         
         try {
           const newOrderedIds = sessions.map(s => s.id);
@@ -249,10 +279,18 @@ function TallyTabScreen() {
         } finally {
           setDraggedIndex(null);
           setDragOffset({ x: 0, y: 0 });
+          isLongPressActive.current.set(index, false);
+        }
+      },
+      onPanResponderTerminate: () => {
+        if (draggedIndex === index) {
+          setDraggedIndex(null);
+          setDragOffset({ x: 0, y: 0 });
+          isLongPressActive.current.set(index, false);
         }
       },
     });
-  }, [draggedIndex, sessions, useVerticalLayout]);
+  }, [draggedIndex, sessions, useVerticalLayout, handleLongPress]);
 
   const handleRemoveCurrentSession = async () => {
     if (!selectedSessionId) return;
@@ -900,6 +938,8 @@ function TallyTabScreen() {
               horizontal
               showsHorizontalScrollIndicator={true}
               contentContainerStyle={dynamicStyles.sessionsTopBarContainer}
+              scrollEnabled={draggedIndex === null}
+              scrollEventThrottle={16}
             >
               {sessions.map((session, index) => {
                 const isSelected = selectedSessionId === session.id;
@@ -931,6 +971,12 @@ function TallyTabScreen() {
                           handleSessionSelect(session.id);
                         }
                       }}
+                      onLongPress={(evt) => {
+                        if (draggedIndex === null) {
+                          handleLongPress(index, evt);
+                        }
+                      }}
+                      delayLongPress={1000}
                       activeOpacity={0.7}
                     >
                       <Text
@@ -955,6 +1001,8 @@ function TallyTabScreen() {
               showsVerticalScrollIndicator={true}
               style={styles.sessionsScrollView}
               contentContainerStyle={dynamicStyles.sessionsContainer}
+              scrollEnabled={draggedIndex === null}
+              scrollEventThrottle={16}
             >
               {sessions.map((session, index) => {
                 const isSelected = selectedSessionId === session.id;
@@ -986,6 +1034,12 @@ function TallyTabScreen() {
                           handleSessionSelect(session.id);
                         }
                       }}
+                      onLongPress={(evt) => {
+                        if (draggedIndex === null) {
+                          handleLongPress(index, evt);
+                        }
+                      }}
+                      delayLongPress={1000}
                       activeOpacity={0.7}
                     >
                       <Text
