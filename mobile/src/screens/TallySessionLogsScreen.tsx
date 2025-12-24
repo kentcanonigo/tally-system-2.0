@@ -76,7 +76,8 @@ function TallySessionLogsScreen() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (fromTallyTab && sessionId) {
+        // Only navigate to Tally tab if we explicitly came from there
+        if (fromTallyTab === true && sessionId) {
           // Navigate back to Tally tab if we came from there, preserving the session selection
           const parent = navigation.getParent();
           const tabNavigator = parent?.getParent();
@@ -88,7 +89,7 @@ function TallySessionLogsScreen() {
           }
           return true; // Prevent default back behavior
         }
-        return false; // Allow default back behavior
+        return false; // Allow default back behavior (go back in stack)
       });
 
       return () => backHandler.remove();
@@ -730,19 +731,8 @@ function TallySessionLogsScreen() {
       <View style={dynamicStyles.header}>
         <TouchableOpacity 
           onPress={() => {
-            if (fromTallyTab && sessionId) {
-              // Navigate back to Tally tab if we came from there, preserving the session selection
-              const parent = navigation.getParent();
-              const tabNavigator = parent?.getParent();
-              if (tabNavigator) {
-                // Use navigate instead of jumpTo to pass params
-                (tabNavigator as any).navigate('Tally', { restoreSessionId: sessionId });
-              } else {
-                (navigation as any).navigate('Tally', { restoreSessionId: sessionId });
-              }
-            } else {
-              navigation.goBack();
-            }
+            // UI back button always goes back to previous screen (e.g., TallySessionDetail)
+            navigation.goBack();
           }} 
           style={styles.backButton}
         >
