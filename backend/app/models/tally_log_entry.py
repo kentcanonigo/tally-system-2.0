@@ -21,9 +21,19 @@ class TallyLogEntry(Base):
     heads = Column(Float, nullable=True, default=15.0)
     notes = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    original_session_id = Column(Integer, ForeignKey("tally_sessions.id"), nullable=True, index=True)
+    transferred_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     # Relationships
-    tally_session = relationship("TallySession", back_populates="tally_log_entries")
+    tally_session = relationship(
+        "TallySession", 
+        back_populates="tally_log_entries",
+        foreign_keys=[tally_session_id]
+    )
+    original_session = relationship(
+        "TallySession",
+        foreign_keys=[original_session_id]
+    )
     weight_classification = relationship("WeightClassification")
 
     # Indexes for common queries

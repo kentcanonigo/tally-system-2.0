@@ -6,6 +6,7 @@ from ..models.tally_session import TallySession
 from ..schemas.tally_log_entry import TallyLogEntryCreate
 from ..crud import tally_session as session_crud
 from ..crud import weight_classification as wc_crud
+from ..models.utils import utcnow
 
 
 def create_tally_log_entry(db: Session, log_entry: TallyLogEntryCreate) -> TallyLogEntry:
@@ -225,6 +226,13 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
             if source_allocation.heads is None:
                 source_allocation.heads = 0.0
             source_allocation.heads = max(0.0, source_allocation.heads - heads_value)
+        
+        # Track transfer: set original_session_id if this is the first transfer
+        if entry.original_session_id is None:
+            entry.original_session_id = entry.tally_session_id
+        
+        # Set transferred_at timestamp
+        entry.transferred_at = utcnow()
         
         # Update entry's tally_session_id
         entry.tally_session_id = target_session_id

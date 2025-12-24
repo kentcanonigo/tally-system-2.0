@@ -40,6 +40,8 @@ class TallyLogEntryResponse(TallyLogEntryBase):
     tally_session_id: int
     weight_classification_id: int
     created_at: datetime
+    original_session_id: Optional[int] = None
+    transferred_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
