@@ -387,8 +387,12 @@ function TallySessionLogs() {
               {filteredEntries.length > 0 ? (
                 filteredEntries.map((entry) => {
                   const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
+                  const isTransferred = entry.original_session_id !== null && entry.original_session_id !== undefined;
                   return (
-                    <tr key={entry.id}>
+                    <tr 
+                      key={entry.id}
+                      style={isTransferred ? { backgroundColor: '#ffe0b2' } : {}}
+                    >
                       <td>{entry.id}</td>
                       <td>
                         <span

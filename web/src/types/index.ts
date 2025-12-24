@@ -69,6 +69,8 @@ export interface TallyLogEntry {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  original_session_id?: number | null;
+  transferred_at?: string | null;
 }
 
 export interface ExportItem {

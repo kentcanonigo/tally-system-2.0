@@ -966,10 +966,14 @@ function TallySessionLogsScreen() {
         {filteredEntries.length > 0 ? (
           filteredEntries.map((entry) => {
             const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
+            const isTransferred = entry.original_session_id !== null && entry.original_session_id !== undefined;
             return (
               <TouchableOpacity
                 key={entry.id}
-                style={dynamicStyles.tableRow}
+                style={[
+                  dynamicStyles.tableRow,
+                  isTransferred && { backgroundColor: '#ffe0b2' } // Orange background for transferred entries
+                ]}
                 onPress={() => selectionMode ? toggleSelection(entry.id) : null}
                 activeOpacity={selectionMode ? 0.7 : 1}
               >
