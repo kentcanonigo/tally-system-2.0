@@ -97,6 +97,59 @@ export interface ExportRequest {
   plant_id?: number;
 }
 
+// Tally Sheet Export Types
+export interface TallySheetColumnHeader {
+  classification: string;
+  classification_id: number;
+  index: number;
+}
+
+export interface TallySheetSummary {
+  classification: string;
+  classification_id: number;
+  bags: number;
+  heads: number;
+  kilograms: number;
+}
+
+export interface TallySheetPage {
+  page_number: number;
+  total_pages: number;
+  columns: TallySheetColumnHeader[];
+  entries: Array<{
+    row: number;
+    column: number;
+    weight: number;
+    classification: string;
+    classification_id: number;
+  }>;
+  grid: (number | null)[][];
+  summary_dressed: TallySheetSummary[];
+  summary_byproduct: TallySheetSummary[];
+  total_dressed_bags: number;
+  total_dressed_heads: number;
+  total_dressed_kilograms: number;
+  total_byproduct_bags: number;
+  total_byproduct_heads: number;
+  total_byproduct_kilograms: number;
+  is_byproduct: boolean;
+  product_type: string;
+}
+
+export interface TallySheetResponse {
+  customer_name: string;
+  product_type: string;
+  date: string;
+  pages: TallySheetPage[];
+  grand_total_bags: number;
+  grand_total_heads: number;
+  grand_total_kilograms: number;
+}
+
+export interface TallySheetMultiCustomerResponse {
+  customers: TallySheetResponse[];
+}
+
 // Authentication types
 export enum UserRole {
   SUPERADMIN = "superadmin",

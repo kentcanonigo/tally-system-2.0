@@ -126,10 +126,21 @@ function ExportPage() {
     setShowTallySheetFormatModal(false);
     try {
       const response = await exportApi.exportTallySheet({ session_ids: selectedIds });
-      if (format === 'pdf') {
-        generateTallySheetPDF(response.data);
-      } else {
-        await generateTallySheetExcel(response.data);
+      // Backend returns TallySheetMultiCustomerResponse with a customers array
+      const customers = response.data.customers || [response.data];
+      
+      // Generate separate files for each customer
+      // Add a small delay between downloads to avoid browser blocking multiple downloads
+      for (let i = 0; i < customers.length; i++) {
+        if (i > 0) {
+          // Wait 500ms between downloads
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        if (format === 'pdf') {
+          generateTallySheetPDF(customers[i]);
+        } else {
+          await generateTallySheetExcel(customers[i]);
+        }
       }
     } catch (error) {
       console.error('Tally sheet export failed', error);

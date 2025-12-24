@@ -205,10 +205,13 @@ function TallySessionDetail() {
     setShowTallySheetFormatModal(false);
     try {
       const response = await exportApi.exportTallySheet({ session_ids: [Number(id)] });
+      // Backend returns TallySheetMultiCustomerResponse with a customers array
+      // For a single session, there should be only one customer
+      const customerData = response.data.customers?.[0] || response.data;
       if (format === 'pdf') {
-        generateTallySheetPDF(response.data);
+        generateTallySheetPDF(customerData);
       } else {
-        await generateTallySheetExcel(response.data);
+        await generateTallySheetExcel(customerData);
       }
     } catch (error) {
       console.error('Tally sheet export error:', error);
