@@ -93,6 +93,8 @@ function TallyScreen(props?: TallyScreenProps) {
   const [quantityInput, setQuantityInput] = useState('1');
   const [byproductHeadsInput, setByproductHeadsInput] = useState('15');
   const [quantityModalHeadsInput, setQuantityModalHeadsInput] = useState('15');
+  const [useCustomHeads, setUseCustomHeads] = useState(false);
+  const [quantityModalUseCustomHeads, setQuantityModalUseCustomHeads] = useState(false);
   
   // Manual input state for dressed mode
   const [showManualInput, setShowManualInput] = useState(false);
@@ -460,10 +462,8 @@ function TallyScreen(props?: TallyScreenProps) {
       }
       
       if (allocation.required_bags > 0) {
-        // Use role-specific allocation count (tally or dispatcher)
-        const currentAllocated = tallyRole === 'tally' 
-          ? (allocation.allocated_bags_tally ?? 0)
-          : (allocation.allocated_bags_dispatcher ?? 0);
+        // Use log entry counts as the source of truth (not allocation values which can drift)
+        const currentAllocated = getEntryCountForWeightClassification(selectedWeightClassId);
         const newAllocated = currentAllocated + 1;
         
         if (newAllocated > allocation.required_bags) {
@@ -589,10 +589,8 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (currentAllocation.required_bags > 0) {
-      // Use role-specific allocation count (tally or dispatcher)
-      const currentAllocated = tallyRole === 'tally'
-        ? (currentAllocation.allocated_bags_tally ?? 0)
-        : (currentAllocation.allocated_bags_dispatcher ?? 0);
+      // Use log entry counts as the source of truth (not allocation values which can drift)
+      const currentAllocated = getEntryCountForWeightClassification(matchedWCId);
       const newAllocated = currentAllocated + 1; // We increment by 1
       
       if (newAllocated > currentAllocation.required_bags) {
@@ -699,11 +697,26 @@ function TallyScreen(props?: TallyScreenProps) {
       return;
     }
 
-    // Validate heads input
-    const heads = parseFloat(byproductHeadsInput);
-    if (isNaN(heads) || heads < 0) {
-      Alert.alert('Error', 'Please enter a valid heads amount');
+    // Get the weight classification to access default_heads
+    const wc = weightClassifications.find((wc) => wc.id === wcId);
+    if (!wc) {
+      Alert.alert('Error', 'Weight classification not found');
       return;
+    }
+
+    // Use custom heads if toggle is enabled, otherwise use weight classification's default_heads
+    let heads: number;
+    if (useCustomHeads) {
+      // Validate heads input when using custom heads
+      const parsedHeads = parseFloat(byproductHeadsInput);
+      if (isNaN(parsedHeads) || parsedHeads < 0) {
+        Alert.alert('Error', 'Please enter a valid heads amount');
+        return;
+      }
+      heads = parsedHeads;
+    } else {
+      // Use weight classification's default_heads
+      heads = wc.default_heads ?? 15;
     }
 
     const allocation = getCurrentAllocation(wcId);
@@ -731,10 +744,8 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      // Use role-specific allocation count (tally or dispatcher)
-      const currentAllocated = tallyRole === 'tally'
-        ? (allocation.allocated_bags_tally ?? 0)
-        : (allocation.allocated_bags_dispatcher ?? 0);
+      // Use log entry counts as the source of truth (not allocation values which can drift)
+      const currentAllocated = getEntryCountForWeightClassification(wcId);
       const newAllocated = currentAllocated + 1;
 
       if (newAllocated > allocation.required_bags) {
@@ -807,11 +818,26 @@ function TallyScreen(props?: TallyScreenProps) {
       return;
     }
 
-    // Validate heads input
-    const heads = parseFloat(quantityModalHeadsInput);
-    if (isNaN(heads) || heads < 0) {
-      Alert.alert('Error', 'Please enter a valid heads amount');
+    // Get the weight classification to access default_heads
+    const wc = weightClassifications.find((wc) => wc.id === selectedByproductId);
+    if (!wc) {
+      Alert.alert('Error', 'Weight classification not found');
       return;
+    }
+
+    // Use custom heads if toggle is enabled, otherwise use weight classification's default_heads
+    let heads: number;
+    if (quantityModalUseCustomHeads) {
+      // Validate heads input when using custom heads
+      const parsedHeads = parseFloat(quantityModalHeadsInput);
+      if (isNaN(parsedHeads) || parsedHeads < 0) {
+        Alert.alert('Error', 'Please enter a valid heads amount');
+        return;
+      }
+      heads = parsedHeads;
+    } else {
+      // Use weight classification's default_heads
+      heads = wc.default_heads ?? 15;
     }
 
     if (!sessionId) {
@@ -844,10 +870,8 @@ function TallyScreen(props?: TallyScreenProps) {
 
     // Check for over-allocation before proceeding
     if (allocation.required_bags > 0) {
-      // Use role-specific allocation count (tally or dispatcher)
-      const currentAllocated = tallyRole === 'tally'
-        ? (allocation.allocated_bags_tally ?? 0)
-        : (allocation.allocated_bags_dispatcher ?? 0);
+      // Use log entry counts as the source of truth (not allocation values which can drift)
+      const currentAllocated = getEntryCountForWeightClassification(selectedByproductId);
       const newAllocated = currentAllocated + quantity;
 
       if (newAllocated > allocation.required_bags) {
@@ -980,10 +1004,8 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      // Use role-specific allocation count (tally or dispatcher)
-      const currentAllocated = tallyRole === 'tally'
-        ? (allocation.allocated_bags_tally ?? 0)
-        : (allocation.allocated_bags_dispatcher ?? 0);
+      // Use log entry counts as the source of truth (not allocation values which can drift)
+      const currentAllocated = getEntryCountForWeightClassification(selectedWeightClassId);
       const newAllocated = currentAllocated + 1;
       
       if (newAllocated > allocation.required_bags) {
@@ -1196,31 +1218,65 @@ function TallyScreen(props?: TallyScreenProps) {
               </View>
             </TouchableOpacity>
           </View>
-          {/* Heads input for byproducts */}
-          <View style={{ marginBottom: responsive.spacing.md, flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
-            <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
-              Heads:
-            </Text>
-            <TextInput
-              style={[
-                {
-                  flex: 1,
-                  borderWidth: 1,
-                  borderColor: '#bdc3c7',
-                  borderRadius: 4,
-                  padding: responsive.padding.small,
-                  backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
-                  fontSize: responsive.fontSize.medium,
-                  color: '#2c3e50',
-                },
-                disabledInputStyle
-              ]}
-              value={byproductHeadsInput}
-              onChangeText={setByproductHeadsInput}
-              keyboardType="numeric"
-              placeholder="15"
-              editable={canStartTally}
-            />
+          {/* Custom Heads Toggle and Input for byproducts */}
+          <View style={{ marginBottom: responsive.spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: useCustomHeads ? responsive.spacing.sm : 0 }}>
+              <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', flex: 1 }}>
+                Use Custom Heads:
+              </Text>
+              <TouchableOpacity
+                style={[
+                  {
+                    width: responsive.isTablet ? 50 : 40,
+                    height: responsive.isTablet ? 28 : 22,
+                    borderRadius: responsive.isTablet ? 14 : 11,
+                    backgroundColor: useCustomHeads ? '#27ae60' : '#95a5a6',
+                    justifyContent: 'center',
+                    alignItems: useCustomHeads ? 'flex-end' : 'flex-start',
+                    paddingHorizontal: 3,
+                  },
+                  disabledButtonStyle
+                ]}
+                onPress={() => canStartTally && setUseCustomHeads(!useCustomHeads)}
+                disabled={!canStartTally}
+              >
+                <View
+                  style={{
+                    width: responsive.isTablet ? 20 : 16,
+                    height: responsive.isTablet ? 20 : 16,
+                    borderRadius: responsive.isTablet ? 10 : 8,
+                    backgroundColor: '#fff',
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
+            {useCustomHeads && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
+                <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
+                  Heads:
+                </Text>
+                <TextInput
+                  style={[
+                    {
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: '#bdc3c7',
+                      borderRadius: 4,
+                      padding: responsive.padding.small,
+                      backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
+                      fontSize: responsive.fontSize.medium,
+                      color: '#2c3e50',
+                    },
+                    disabledInputStyle
+                  ]}
+                  value={byproductHeadsInput}
+                  onChangeText={setByproductHeadsInput}
+                  keyboardType="numeric"
+                  placeholder="15"
+                  editable={canStartTally}
+                />
+              </View>
+            )}
           </View>
           <View style={[dynamicStyles.summaryTable, { flex: 1 }]}>
             <View style={dynamicStyles.summaryHeader}>
@@ -1243,8 +1299,8 @@ function TallyScreen(props?: TallyScreenProps) {
                   const totalEntryCount = getTotalEntryCountForWeightClassification(allocation.weight_classification_id);
                   const requiredBags = allocation.required_bags;
                   
-                  const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
-                  const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
+                  const isOverAllocated = requiredBags > 0 && roleEntryCount > requiredBags;
+                  const isFulfilled = requiredBags > 0 && roleEntryCount >= requiredBags;
 
                   return (
                     <View key={allocation.id} style={dynamicStyles.summaryRow}>
@@ -1269,9 +1325,6 @@ function TallyScreen(props?: TallyScreenProps) {
                         <TouchableOpacity
                           style={[styles.incrementButton, disabledButtonStyle, isSubmitting && { opacity: 0.6 }]}
                           onPress={() => {
-                            // Update heads input to this classification's default_heads when clicking +1
-                            const defaultHeads = wc.default_heads ?? 15;
-                            setByproductHeadsInput(defaultHeads.toString());
                             handleByproductIncrement(wc.id);
                           }}
                           disabled={isSubmitting || !canStartTally}
@@ -1372,11 +1425,11 @@ function TallyScreen(props?: TallyScreenProps) {
                 if (!allocation) return {};
                 
                 const wcId = allocation.weight_classification_id;
-                const totalEntryCount = getTotalEntryCountForWeightClassification(wcId);
+                const roleEntryCount = getEntryCountForWeightClassification(wcId);
                 const requiredBags = allocation.required_bags;
                 
-                const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
-                const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
+                const isOverAllocated = requiredBags > 0 && roleEntryCount > requiredBags;
+                const isFulfilled = requiredBags > 0 && roleEntryCount >= requiredBags;
                 
                 if (isOverAllocated) return { color: '#e67e22' };
                 if (isFulfilled) return { color: '#27ae60' };
@@ -1660,8 +1713,8 @@ function TallyScreen(props?: TallyScreenProps) {
                         const totalEntryCount = getTotalEntryCountForWeightClassification(allocation.weight_classification_id);
                         const requiredBags = Number(allocation.required_bags ?? 0);
 
-                        const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
-                        const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
+                        const isOverAllocated = requiredBags > 0 && roleEntryCount > requiredBags;
+                        const isFulfilled = requiredBags > 0 && roleEntryCount >= requiredBags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1725,9 +1778,9 @@ function TallyScreen(props?: TallyScreenProps) {
                         const requiredBags = Number(allocation.required_bags ?? 0);
                         
                         // Check over-allocation first (takes priority) - must be strictly greater than required
-                        const isOverAllocated = requiredBags > 0 && totalEntryCount > requiredBags;
-                        // Fulfilled means met requirement exactly (equals required, not over-allocated)
-                        const isFulfilled = requiredBags > 0 && totalEntryCount === requiredBags;
+                        const isOverAllocated = requiredBags > 0 && roleEntryCount > requiredBags;
+                        // Fulfilled means met or exceeded requirement for this role
+                        const isFulfilled = requiredBags > 0 && roleEntryCount >= requiredBags;
                         const sum = getSumForWeightClassification(allocation.weight_classification_id);
                         const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                         
@@ -1802,6 +1855,7 @@ function TallyScreen(props?: TallyScreenProps) {
           setSelectedByproductId(null);
           setQuantityInput('1');
           setQuantityModalHeadsInput('15');
+          setQuantityModalUseCustomHeads(false);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1827,9 +1881,11 @@ function TallyScreen(props?: TallyScreenProps) {
                     ]}
                     onPress={() => {
                       setSelectedByproductId(wc.id);
-                      // Update heads input to this classification's default_heads
-                      const defaultHeads = wc.default_heads ?? 15;
-                      setQuantityModalHeadsInput(defaultHeads.toString());
+                      // Update heads input to this classification's default_heads when custom heads is enabled
+                      if (quantityModalUseCustomHeads) {
+                        const defaultHeads = wc.default_heads ?? 15;
+                        setQuantityModalHeadsInput(defaultHeads.toString());
+                      }
                     }}
                   >
                     <Text style={[
@@ -1855,16 +1911,47 @@ function TallyScreen(props?: TallyScreenProps) {
               keyboardType="numeric"
             />
 
-            <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
-              Heads:
-            </Text>
-            <TextInput
-              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
-              placeholder="Enter heads"
-              value={quantityModalHeadsInput}
-              onChangeText={setQuantityModalHeadsInput}
-              keyboardType="numeric"
-            />
+            {/* Custom Heads Toggle */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: quantityModalUseCustomHeads ? responsive.spacing.sm : responsive.spacing.lg }}>
+              <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, flex: 1 }]}>
+                Use Custom Heads:
+              </Text>
+              <TouchableOpacity
+                style={{
+                  width: responsive.isTablet ? 50 : 40,
+                  height: responsive.isTablet ? 28 : 22,
+                  borderRadius: responsive.isTablet ? 14 : 11,
+                  backgroundColor: quantityModalUseCustomHeads ? '#27ae60' : '#95a5a6',
+                  justifyContent: 'center',
+                  alignItems: quantityModalUseCustomHeads ? 'flex-end' : 'flex-start',
+                  paddingHorizontal: 3,
+                }}
+                onPress={() => setQuantityModalUseCustomHeads(!quantityModalUseCustomHeads)}
+              >
+                <View
+                  style={{
+                    width: responsive.isTablet ? 20 : 16,
+                    height: responsive.isTablet ? 20 : 16,
+                    borderRadius: responsive.isTablet ? 10 : 8,
+                    backgroundColor: '#fff',
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
+            {quantityModalUseCustomHeads && (
+              <>
+                <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
+                  Heads:
+                </Text>
+                <TextInput
+                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+                  placeholder="Enter heads"
+                  value={quantityModalHeadsInput}
+                  onChangeText={setQuantityModalHeadsInput}
+                  keyboardType="numeric"
+                />
+              </>
+            )}
 
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: responsive.spacing.sm }}>
               <TouchableOpacity
@@ -1874,6 +1961,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   setSelectedByproductId(null);
                   setQuantityInput('1');
                   setQuantityModalHeadsInput('15');
+                  setQuantityModalUseCustomHeads(false);
                 }}
               >
                 <Text style={[styles.modalButtonText, { fontSize: responsive.fontSize.small }]}>Cancel</Text>
