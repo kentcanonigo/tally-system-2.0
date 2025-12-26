@@ -460,7 +460,10 @@ function TallyScreen(props?: TallyScreenProps) {
       }
       
       if (allocation.required_bags > 0) {
-        const currentAllocated = getTotalEntryCountForWeightClassification(selectedWeightClassId);
+        // Use role-specific allocation count (tally or dispatcher)
+        const currentAllocated = tallyRole === 'tally' 
+          ? (allocation.allocated_bags_tally ?? 0)
+          : (allocation.allocated_bags_dispatcher ?? 0);
         const newAllocated = currentAllocated + 1;
         
         if (newAllocated > allocation.required_bags) {
@@ -586,7 +589,10 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (currentAllocation.required_bags > 0) {
-      const currentAllocated = getTotalEntryCountForWeightClassification(matchedWCId);
+      // Use role-specific allocation count (tally or dispatcher)
+      const currentAllocated = tallyRole === 'tally'
+        ? (currentAllocation.allocated_bags_tally ?? 0)
+        : (currentAllocation.allocated_bags_dispatcher ?? 0);
       const newAllocated = currentAllocated + 1; // We increment by 1
       
       if (newAllocated > currentAllocation.required_bags) {
@@ -621,7 +627,8 @@ function TallyScreen(props?: TallyScreenProps) {
       try {
         // Create log entry - this will also increment the allocation
         // Use weight classification's default_heads or fallback to 15
-        const defaultHeads = matchedWC.default_heads ?? 15;
+        // matchedWC is guaranteed to be non-null here because we check it before calling this function
+        const defaultHeads = matchedWC!.default_heads ?? 15;
         await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: matchedWCId,
           role: tallyRole as TallyLogEntryRole,
@@ -724,7 +731,10 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      const currentAllocated = getTotalEntryCountForWeightClassification(wcId);
+      // Use role-specific allocation count (tally or dispatcher)
+      const currentAllocated = tallyRole === 'tally'
+        ? (allocation.allocated_bags_tally ?? 0)
+        : (allocation.allocated_bags_dispatcher ?? 0);
       const newAllocated = currentAllocated + 1;
 
       if (newAllocated > allocation.required_bags) {
@@ -834,7 +844,10 @@ function TallyScreen(props?: TallyScreenProps) {
 
     // Check for over-allocation before proceeding
     if (allocation.required_bags > 0) {
-      const currentAllocated = getTotalEntryCountForWeightClassification(selectedByproductId);
+      // Use role-specific allocation count (tally or dispatcher)
+      const currentAllocated = tallyRole === 'tally'
+        ? (allocation.allocated_bags_tally ?? 0)
+        : (allocation.allocated_bags_dispatcher ?? 0);
       const newAllocated = currentAllocated + quantity;
 
       if (newAllocated > allocation.required_bags) {
@@ -967,7 +980,10 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     if (allocation.required_bags > 0) {
-      const currentAllocated = getTotalEntryCountForWeightClassification(selectedWeightClassId);
+      // Use role-specific allocation count (tally or dispatcher)
+      const currentAllocated = tallyRole === 'tally'
+        ? (allocation.allocated_bags_tally ?? 0)
+        : (allocation.allocated_bags_dispatcher ?? 0);
       const newAllocated = currentAllocated + 1;
       
       if (newAllocated > allocation.required_bags) {
