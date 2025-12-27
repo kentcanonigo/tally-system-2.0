@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import date
+from ..models.tally_log_entry import TallyLogEntryRole
 
 class ExportItem(BaseModel):
     category: str
@@ -23,6 +24,7 @@ class ExportRequest(BaseModel):
     date_to: Optional[date] = None
     customer_id: Optional[int] = None
     plant_id: Optional[int] = None
+    role: Optional[TallyLogEntryRole] = TallyLogEntryRole.TALLY  # Default to TALLY for backward compatibility
 
 # Tally Sheet Export Schemas
 class TallySheetEntry(BaseModel):
@@ -68,6 +70,7 @@ class TallySheetPage(BaseModel):
 class TallySheetRequest(BaseModel):
     """Request model for tally sheet export"""
     session_ids: List[int]
+    role: Optional[TallyLogEntryRole] = TallyLogEntryRole.TALLY  # Default to TALLY for backward compatibility
 
 class TallySheetResponse(BaseModel):
     """Response model for tally sheet export (single customer)"""

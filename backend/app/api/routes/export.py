@@ -27,11 +27,18 @@ def export_sessions_data(
     request: ExportRequest,
     db: Session = Depends(get_db)
 ):
+    # Determine which field to use based on role
+    role = request.role or TallyLogEntryRole.TALLY
+    if role == TallyLogEntryRole.TALLY:
+        bags_field = AllocationDetails.allocated_bags_tally
+    else:
+        bags_field = AllocationDetails.allocated_bags_dispatcher
+    
     query = db.query(
         Customer.name.label("customer_name"),
         WeightClassification.category,
         WeightClassification.classification,
-        func.sum(AllocationDetails.allocated_bags_tally).label("total_bags")
+        func.sum(bags_field).label("total_bags")
     ).select_from(AllocationDetails)\
     .join(TallySession, AllocationDetails.tally_session_id == TallySession.id)\
     .join(Customer, TallySession.customer_id == Customer.id)\
@@ -51,7 +58,7 @@ def export_sessions_data(
             query = query.filter(TallySession.plant_id == request.plant_id)
 
     # Filter out 0 bags
-    query = query.filter(AllocationDetails.allocated_bags_tally > 0)
+    query = query.filter(bags_field > 0)
 
     # Group by
     query = query.group_by(
@@ -118,7 +125,8 @@ def export_sessions_data(
 
 def process_sessions_for_customer(
     customer_sessions: List[TallySession],
-    db: Session
+    db: Session,
+    role: TallyLogEntryRole = TallyLogEntryRole.TALLY
 ) -> TallySheetResponse:
     """
     Process tally sheet data for sessions belonging to a single customer.
@@ -133,10 +141,10 @@ def process_sessions_for_customer(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
-    # Get all tally log entries for these sessions (only TALLY role)
+    # Get all tally log entries for these sessions (filter by role)
     entries = db.query(TallyLogEntry).join(WeightClassification).filter(
         TallyLogEntry.tally_session_id.in_(session_ids),
-        TallyLogEntry.role == TallyLogEntryRole.TALLY
+        TallyLogEntry.role == role
     ).order_by(TallyLogEntry.created_at.asc()).all()
     
     if not entries:
@@ -497,6 +505,9 @@ def export_tally_sheet(
     if not request.session_ids:
         raise HTTPException(status_code=400, detail="At least one session ID is required")
     
+    # Get role (default to TALLY for backward compatibility)
+    role = request.role or TallyLogEntryRole.TALLY
+    
     # Get all sessions and validate they exist
     sessions = db.query(TallySession).filter(
         TallySession.id.in_(request.session_ids)
@@ -514,7 +525,7 @@ def export_tally_sheet(
     customer_responses: List[TallySheetResponse] = []
     for customer_id, customer_sessions in sessions_by_customer.items():
         try:
-            response = process_sessions_for_customer(customer_sessions, db)
+            response = process_sessions_for_customer(customer_sessions, db, role)
             customer_responses.append(response)
         except HTTPException:
             raise

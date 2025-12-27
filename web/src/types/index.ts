@@ -59,6 +59,8 @@ export enum TallyLogEntryRole {
   DISPATCHER = "dispatcher",
 }
 
+export type TallyLogEntryRoleType = TallyLogEntryRole | "tally" | "dispatcher";
+
 export interface TallyLogEntry {
   id: number;
   tally_session_id: number;
@@ -97,6 +99,7 @@ export interface ExportRequest {
   date_to?: string;
   customer_id?: number;
   plant_id?: number;
+  role?: TallyLogEntryRoleType;
 }
 
 // Tally Sheet Export Types
@@ -136,6 +139,11 @@ export interface TallySheetPage {
   total_byproduct_kilograms: number;
   is_byproduct: boolean;
   product_type: string;
+}
+
+export interface TallySheetRequest {
+  session_ids: number[];
+  role?: TallyLogEntryRoleType;
 }
 
 export interface TallySheetResponse {

@@ -5,7 +5,8 @@ import { generateSessionReportPDF } from '../utils/pdfGenerator';
 import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
 import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 import { useAuth } from '../contexts/AuthContext';
-import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
+import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry, TallyLogEntryRole } from '../types';
+import { TallyLogEntryRole as RoleEnum } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
@@ -21,7 +22,9 @@ function TallySessionDetail() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
+  const [showAllocationReportRoleModal, setShowAllocationReportRoleModal] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationDetails | null>(null);
+  const [exportRole, setExportRole] = useState<TallyLogEntryRole>(RoleEnum.TALLY);
   const [formData, setFormData] = useState({
     weight_classification_id: 0,
     required_bags: 0,
@@ -185,38 +188,78 @@ function TallySessionDetail() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = async (role?: TallyLogEntryRole) => {
     if (!id) return;
+    const selectedRole = role || exportRole;
     setLoading(true);
+    setShowAllocationReportRoleModal(false);
     try {
-      const response = await exportApi.exportSessions({ session_ids: [Number(id)] });
-      generateSessionReportPDF(response.data);
-    } catch (error) {
+      const response = await exportApi.exportSessions({ session_ids: [Number(id)], role: selectedRole });
+      const data = response.data;
+      
+      // Check if the report is empty
+      if (!data.customers || data.customers.length === 0) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for this session.`);
+        return;
+      }
+      
+      // Check if all customers have no items
+      const hasAnyItems = data.customers.some(customer => 
+        customer.items && customer.items.length > 0
+      );
+      
+      if (!hasAnyItems) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for this session.`);
+        return;
+      }
+      
+      generateSessionReportPDF(data);
+    } catch (error: any) {
       console.error('Export error:', error);
-      alert('Failed to export PDF');
+      // Check if the error is from the backend about empty data
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No') && (errorMessage.includes('data') || errorMessage.includes('allocation'))) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for this session.`);
+      } else {
+        alert(`Failed to export PDF: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole) => {
     if (!id) return;
+    const selectedRole = role || exportRole;
     setLoading(true);
     setShowTallySheetFormatModal(false);
     try {
-      const response = await exportApi.exportTallySheet({ session_ids: [Number(id)] });
+      const response = await exportApi.exportTallySheet({ session_ids: [Number(id)], role: selectedRole });
       // Backend returns TallySheetMultiCustomerResponse with a customers array
       // For a single session, there should be only one customer
       const customerData = response.data.customers?.[0] || response.data;
+      
+      // Check if the tally sheet is empty
+      if (!customerData.pages || customerData.pages.length === 0) {
+        alert(`Cannot export tally sheet: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} data found for this session.`);
+        return;
+      }
+      
       // Single customer, so don't show grand total
       if (format === 'pdf') {
         generateTallySheetPDF(customerData, false);
       } else {
         await generateTallySheetExcel(customerData, false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Tally sheet export error:', error);
-      alert('Failed to export tally sheet');
+      // Check if the error is from the backend about empty data
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No tally entries found') || errorMessage.includes('No valid data found')) {
+        alert(`Cannot export tally sheet: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} data found for this session.`);
+      } else {
+        alert(`Failed to export tally sheet: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -329,7 +372,7 @@ function TallySessionDetail() {
           <>
             <button 
               className="btn btn-info" 
-              onClick={handleExport}
+              onClick={() => setShowAllocationReportRoleModal(true)}
               style={{ backgroundColor: '#17a2b8', color: 'white' }}
             >
               Export Allocation Report
@@ -538,19 +581,39 @@ function TallySessionDetail() {
             borderRadius: '8px',
             minWidth: '300px'
           }}>
-            <h3 style={{ marginTop: 0 }}>Select Export Format</h3>
-            <p>Choose the format for the tally sheet export:</p>
+            <h3 style={{ marginTop: 0 }}>Select Export Options</h3>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Role:</label>
+              <select
+                value={exportRole}
+                onChange={(e) => setExportRole(e.target.value as TallyLogEntryRole)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={RoleEnum.TALLY}>Tally-er</option>
+                <option value={RoleEnum.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Format:</label>
+              <p style={{ marginTop: '5px', color: '#666' }}>Choose the format for the tally sheet export:</p>
+            </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button
                 className="btn btn-primary"
-                onClick={() => handleExportTallySheet('pdf')}
+                onClick={() => handleExportTallySheet('pdf', exportRole)}
                 disabled={loading}
               >
                 PDF
               </button>
               <button
                 className="btn btn-primary"
-                onClick={() => handleExportTallySheet('excel')}
+                onClick={() => handleExportTallySheet('excel', exportRole)}
                 disabled={loading}
               >
                 Excel
@@ -558,6 +621,64 @@ function TallySessionDetail() {
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowTallySheetFormatModal(false)}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAllocationReportRoleModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Select Role for Allocation Report</h3>
+            <p style={{ marginBottom: '15px' }}>Choose which role's allocation data to export:</p>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Role:</label>
+              <select
+                value={exportRole}
+                onChange={(e) => setExportRole(e.target.value as TallyLogEntryRole)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={RoleEnum.TALLY}>Tally-er</option>
+                <option value={RoleEnum.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExport(exportRole)}
+                disabled={loading}
+              >
+                Export
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAllocationReportRoleModal(false)}
                 disabled={loading}
               >
                 Cancel
