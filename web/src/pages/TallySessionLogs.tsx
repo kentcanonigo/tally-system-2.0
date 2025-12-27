@@ -4,10 +4,12 @@ import { tallySessionsApi, customersApi, plantsApi, weightClassificationsApi, ta
 import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
+import { useAuth } from '../contexts/AuthContext';
 
 function TallySessionLogs() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -26,6 +28,14 @@ function TallySessionLogs() {
   const [sortBy, setSortBy] = useState<'class' | 'weight' | 'time' | 'id'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [threshold, setThreshold] = useState<number>(0);
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
+  const [availableSessions, setAvailableSessions] = useState<TallySession[]>([]);
+  const [selectedTargetCustomerId, setSelectedTargetCustomerId] = useState<number | null>(null);
+  const [selectedTargetSessionId, setSelectedTargetSessionId] = useState<number | null>(null);
+  const [loadingTransferData, setLoadingTransferData] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -200,6 +210,94 @@ function TallySessionLogs() {
     };
   }, [filteredEntries]);
 
+  const loadTransferData = async () => {
+    if (!plant) return;
+    setLoadingTransferData(true);
+    try {
+      const customersRes = await customersApi.getAll();
+      setAvailableCustomers(customersRes.data);
+      setSelectedTargetCustomerId(null);
+      setSelectedTargetSessionId(null);
+      setAvailableSessions([]);
+    } catch (error) {
+      console.error('Error loading transfer data:', error);
+      alert('Error loading customers');
+    } finally {
+      setLoadingTransferData(false);
+    }
+  };
+
+  const loadSessionsForCustomer = async (customerId: number) => {
+    if (!plant) return;
+    try {
+      const sessionsRes = await tallySessionsApi.getAll({
+        customer_id: customerId,
+        plant_id: plant.id,
+        status: 'ongoing',
+      });
+      // Filter out the current session and only show ongoing sessions
+      setAvailableSessions(sessionsRes.data.filter(s => s.id !== Number(id) && s.status === 'ongoing'));
+      setSelectedTargetSessionId(null);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      alert('Error loading sessions');
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (selectedEntryIds.size === 0) {
+      alert('Please select entries to transfer');
+      return;
+    }
+    
+    if (!selectedTargetSessionId) {
+      alert('Please select a target session');
+      return;
+    }
+    
+    if (!hasPermission('can_tally')) {
+      alert('Permission Denied: You do not have permission to transfer tally log entries.');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await tallyLogEntriesApi.transfer(Array.from(selectedEntryIds), selectedTargetSessionId);
+      alert(`Successfully transferred ${response.data.count} log entries`);
+      setShowTransferModal(false);
+      setSelectionMode(false);
+      setSelectedEntryIds(new Set());
+      setSelectedTargetCustomerId(null);
+      setSelectedTargetSessionId(null);
+      setAvailableSessions([]);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error transferring logs:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to transfer log entries';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleEntrySelection = (entryId: number) => {
+    const newSelection = new Set(selectedEntryIds);
+    if (newSelection.has(entryId)) {
+      newSelection.delete(entryId);
+    } else {
+      newSelection.add(entryId);
+    }
+    setSelectedEntryIds(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedEntryIds.size === filteredEntries.length) {
+      setSelectedEntryIds(new Set());
+    } else {
+      setSelectedEntryIds(new Set(filteredEntries.map(e => e.id)));
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -366,11 +464,60 @@ function TallySessionLogs() {
 
       {/* Log Entries Table */}
       <div>
-        <h2>Log Entries ({filteredEntries.length})</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h2>Log Entries ({filteredEntries.length})</h2>
+          {hasPermission('can_tally') && (
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {!selectionMode ? (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSelectionMode(true);
+                    setSelectedEntryIds(new Set());
+                  }}
+                >
+                  Select Entries
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setShowTransferModal(true);
+                      loadTransferData();
+                    }}
+                    disabled={selectedEntryIds.size === 0}
+                    style={{ opacity: selectedEntryIds.size === 0 ? 0.5 : 1 }}
+                  >
+                    Transfer Selected ({selectedEntryIds.size})
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setSelectionMode(false);
+                      setSelectedEntryIds(new Set());
+                    }}
+                  >
+                    Cancel Selection
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <div className="table-container">
           <table>
             <thead>
               <tr>
+                {selectionMode && (
+                  <th style={{ width: '50px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedEntryIds.size === filteredEntries.length && filteredEntries.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 <th>ID</th>
                 <th>Role</th>
                 <th>Weight Classification</th>
@@ -388,11 +535,26 @@ function TallySessionLogs() {
                 filteredEntries.map((entry) => {
                   const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
                   const isTransferred = entry.original_session_id !== null && entry.original_session_id !== undefined;
+                  const isSelected = selectedEntryIds.has(entry.id);
                   return (
                     <tr 
                       key={entry.id}
-                      style={isTransferred ? { backgroundColor: '#ffe0b2' } : {}}
+                      style={{
+                        ...(isTransferred ? { backgroundColor: '#ffe0b2' } : {}),
+                        ...(isSelected && selectionMode ? { backgroundColor: '#cfe2ff' } : {}),
+                        cursor: selectionMode ? 'pointer' : 'default'
+                      }}
+                      onClick={() => selectionMode && toggleEntrySelection(entry.id)}
                     >
+                      {selectionMode && (
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleEntrySelection(entry.id)}
+                          />
+                        </td>
+                      )}
                       <td>{entry.id}</td>
                       <td>
                         <span
@@ -420,7 +582,7 @@ function TallySessionLogs() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center' }}>
+                  <td colSpan={selectionMode ? 11 : 10} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>
@@ -429,6 +591,139 @@ function TallySessionLogs() {
           </table>
         </div>
       </div>
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '400px',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Transfer Log Entries</h3>
+            <p style={{ marginBottom: '20px' }}>
+              Transfer {selectedEntryIds.size} selected log entry/entries to another session.
+            </p>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Target Customer:
+              </label>
+              <select
+                value={selectedTargetCustomerId || ''}
+                onChange={(e) => {
+                  const customerId = e.target.value ? Number(e.target.value) : null;
+                  setSelectedTargetCustomerId(customerId);
+                  if (customerId) {
+                    loadSessionsForCustomer(customerId);
+                  } else {
+                    setAvailableSessions([]);
+                    setSelectedTargetSessionId(null);
+                  }
+                }}
+                disabled={loadingTransferData}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">Select a customer...</option>
+                {availableCustomers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Target Session:
+              </label>
+              <select
+                value={selectedTargetSessionId || ''}
+                onChange={(e) => setSelectedTargetSessionId(e.target.value ? Number(e.target.value) : null)}
+                disabled={!selectedTargetCustomerId || availableSessions.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px',
+                  opacity: !selectedTargetCustomerId || availableSessions.length === 0 ? 0.6 : 1
+                }}
+              >
+                <option value="">
+                  {!selectedTargetCustomerId 
+                    ? 'Select a customer first...' 
+                    : availableSessions.length === 0 
+                    ? 'No ongoing sessions available for this customer'
+                    : 'Select a session...'}
+                </option>
+                {availableSessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ 
+              padding: '10px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '4px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#666'
+            }}>
+              <strong>Note:</strong> Entries can only be transferred to ongoing sessions in the same plant.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setSelectedTargetCustomerId(null);
+                  setSelectedTargetSessionId(null);
+                  setAvailableSessions([]);
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleTransfer}
+                disabled={loading || !selectedTargetSessionId || selectedEntryIds.size === 0}
+                style={{ 
+                  opacity: (!selectedTargetSessionId || selectedEntryIds.size === 0) ? 0.5 : 1 
+                }}
+              >
+                {loading ? 'Transferring...' : 'Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
