@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { customersApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate } from '../utils/dateFormat';
 import type { Customer } from '../types';
 
 function Customers() {
   const { hasPermission } = useAuth();
+  const timezone = useTimezone();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -103,7 +106,7 @@ function Customers() {
               <tr key={customer.id}>
                 <td>{customer.id}</td>
                 <td>{customer.name}</td>
-                <td>{new Date(customer.created_at).toLocaleDateString()}</td>
+                <td>{formatDate(customer.created_at, timezone)}</td>
                 {hasPermission('can_manage_customers') && (
                   <td>
                     <button 

@@ -4,6 +4,8 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate } from '../utils/dateFormat';
 import type { Customer, Plant, TallySession } from '../types';
 
 // Type for react-calendar's onChange value
@@ -11,6 +13,7 @@ type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
 
 function TallySessions() {
   const { hasPermission } = useAuth();
+  const timezone = useTimezone();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
@@ -280,7 +283,7 @@ function TallySessions() {
           style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
         >
           <span className="material-icons">calendar_today</span>
-          {selectedDate ? `Filtered: ${selectedDate.toLocaleDateString()}` : 'Calendar'}
+          {selectedDate ? `Filtered: ${formatDate(selectedDate.toISOString().split('T')[0], timezone)}` : 'Calendar'}
         </button>
         {selectedDate && (
           <button className="btn btn-secondary" onClick={clearDateFilter}>
@@ -375,7 +378,7 @@ function TallySessions() {
                 <td>{session.id}</td>
                 <td>{getCustomerName(session.customer_id)}</td>
                 <td>{getPlantName(session.plant_id)}</td>
-                <td>{new Date(session.date).toLocaleDateString()}</td>
+                <td>{formatDate(session.date, timezone)}</td>
                 <td>{getStatusBadge(session.status)}</td>
                 {hasPermission('can_edit_tally_session') && (
                   <td>

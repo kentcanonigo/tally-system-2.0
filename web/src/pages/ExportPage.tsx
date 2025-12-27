@@ -3,10 +3,13 @@ import { customersApi, plantsApi, tallySessionsApi, exportApi } from '../service
 import { generateSessionReportPDF } from '../utils/pdfGenerator';
 import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
 import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate } from '../utils/dateFormat';
 import type { Customer, Plant, TallySession, TallyLogEntryRole } from '../types';
 import { TallyLogEntryRole as RoleEnum } from '../types';
 
 function ExportPage() {
+  const timezone = useTimezone();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -432,7 +435,7 @@ function ExportPage() {
                 <td>{session.id}</td>
                 <td>{getCustomerName(session.customer_id)}</td>
                 <td>{getPlantName(session.plant_id)}</td>
-                <td>{new Date(session.date).toLocaleDateString()}</td>
+                <td>{formatDate(session.date, timezone)}</td>
                 <td>{getStatusBadge(session.status)}</td>
               </tr>
             ))}

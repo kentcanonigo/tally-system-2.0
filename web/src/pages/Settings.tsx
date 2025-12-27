@@ -1,15 +1,53 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { consoleApi } from '../services/api';
+import { consoleApi, authApi } from '../services/api';
 
 const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = 'tally_system_acceptable_difference_threshold';
 const DEFAULT_THRESHOLD = 0;
 
+// Common timezones list
+const COMMON_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Phoenix',
+  'America/Anchorage',
+  'Pacific/Honolulu',
+  'America/Toronto',
+  'America/Vancouver',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Rome',
+  'Europe/Madrid',
+  'Europe/Amsterdam',
+  'Europe/Stockholm',
+  'Europe/Moscow',
+  'Asia/Dubai',
+  'Asia/Karachi',
+  'Asia/Kolkata',
+  'Asia/Bangkok',
+  'Asia/Singapore',
+  'Asia/Hong_Kong',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Pacific/Auckland',
+];
+
+const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 function Settings() {
-  const { isAdmin, isSuperadmin } = useAuth();
+  const { isAdmin, isSuperadmin, user, refetchUser } = useAuth();
   const [threshold, setThreshold] = useState<string>('0');
   const [currentThreshold, setCurrentThreshold] = useState<number>(0);
   const [saved, setSaved] = useState(false);
+  const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
+  const [timezoneSaved, setTimezoneSaved] = useState(false);
+  const [savingTimezone, setSavingTimezone] = useState(false);
   
   // Console modal state
   const [showConsoleModal, setShowConsoleModal] = useState(false);
@@ -20,7 +58,16 @@ function Settings() {
 
   useEffect(() => {
     loadThreshold();
-  }, []);
+    loadTimezone();
+  }, [user]);
+
+  const loadTimezone = () => {
+    if (user?.timezone) {
+      setTimezone(user.timezone);
+    } else {
+      setTimezone(DEFAULT_TIMEZONE);
+    }
+  };
 
   const loadThreshold = () => {
     try {
@@ -56,6 +103,22 @@ function Settings() {
   };
 
   const hasChanges = parseFloat(threshold) !== currentThreshold && !isNaN(parseFloat(threshold)) && parseFloat(threshold) >= 0;
+  const hasTimezoneChanges = timezone !== (user?.timezone || DEFAULT_TIMEZONE);
+
+  const handleSaveTimezone = async () => {
+    try {
+      setSavingTimezone(true);
+      await authApi.updatePreferences({ timezone });
+      await refetchUser();
+      setTimezoneSaved(true);
+      setTimeout(() => setTimezoneSaved(false), 3000);
+    } catch (error) {
+      console.error('Error saving timezone:', error);
+      alert('Error saving timezone preference');
+    } finally {
+      setSavingTimezone(false);
+    }
+  };
 
   const handleConsoleCommand = async () => {
     const command = consoleCommand.trim().toLowerCase();
@@ -165,6 +228,50 @@ function Settings() {
             When viewing session logs, differences within this threshold will be displayed in orange (acceptable).
             Exact matches (0) will be green, and differences beyond the threshold will be red (unacceptable).
           </p>
+        </div>
+
+        <h2 style={{ marginBottom: '20px', marginTop: '40px', color: '#2c3e50' }}>Timezone</h2>
+        <div className="form-group">
+          <label>Timezone</label>
+          <p style={{ color: '#7f8c8d', fontSize: '14px', marginBottom: '10px' }}>
+            Set your preferred timezone for displaying dates and times:
+          </p>
+          <select
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            style={{
+              maxWidth: '300px',
+              padding: '8px',
+              fontSize: '14px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+            }}
+          >
+            {COMMON_TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+          <p style={{ color: '#666', fontSize: '14px', marginTop: '8px', fontStyle: 'italic' }}>
+            Current: {user?.timezone || DEFAULT_TIMEZONE}
+          </p>
+          {hasTimezoneChanges && (
+            <div style={{ marginTop: '15px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveTimezone}
+                disabled={savingTimezone}
+              >
+                {savingTimezone ? 'Saving...' : 'Save Timezone'}
+              </button>
+              {timezoneSaved && (
+                <span style={{ marginLeft: '15px', color: '#27ae60', fontWeight: '500' }}>
+                  ✓ Saved successfully!
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {(isAdmin || isSuperadmin) && (

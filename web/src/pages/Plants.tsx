@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { plantsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate } from '../utils/dateFormat';
 import type { Plant } from '../types';
 
 function Plants() {
   const { hasPermission } = useAuth();
+  const timezone = useTimezone();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -144,7 +147,7 @@ function Plants() {
               <tr key={plant.id}>
                 <td>{plant.id}</td>
                 <td>{plant.name}</td>
-                <td>{new Date(plant.created_at).toLocaleDateString()}</td>
+                <td>{formatDate(plant.created_at, timezone)}</td>
                 {hasPermission('can_manage_plants') && (
                   <td>
                     <button 

@@ -1,0 +1,167 @@
+/**
+ * Utility functions for formatting dates with timezone support
+ */
+
+/**
+ * Format a date string to a localized date string in the specified timezone
+ */
+export function formatDate(dateString: string, timezone: string): string {
+  try {
+    let date: Date;
+    
+    // Check if it's a date-only string (YYYY-MM-DD format)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Date-only string - parse as local date to avoid timezone shifts
+      // Split the date string and create a date in local timezone
+      const [year, month, day] = dateString.split('-').map(Number);
+      // Create date at noon local time to avoid timezone boundary issues
+      // Then format it in the target timezone
+      date = new Date(year, month - 1, day, 12, 0, 0);
+    } else if (dateString.includes('Z') || dateString.includes('+') || (dateString.includes('-') && dateString.includes('T'))) {
+      // Already has timezone info or is ISO datetime format
+      date = new Date(dateString);
+    } else if (dateString.includes('T')) {
+      // ISO datetime without timezone - assume UTC
+      date = new Date(dateString + 'Z');
+    } else {
+      // Fallback: try parsing as-is
+      date = new Date(dateString);
+    }
+    
+    // Verify date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return new Date(dateString).toLocaleDateString();
+    }
+    
+    // For date-only strings, format without timezone conversion to preserve the date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Use the original date components to avoid timezone shifts
+      const [year, month, day] = dateString.split('-').map(Number);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[month - 1]} ${day}, ${year}`;
+    }
+    
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date:', error, 'dateString:', dateString, 'timezone:', timezone);
+    return new Date(dateString).toLocaleDateString();
+  }
+}
+
+/**
+ * Format a date string to a localized time string in the specified timezone
+ */
+export function formatTime(dateString: string, timezone: string): string {
+  try {
+    let date: Date;
+    
+    // Check if it's a date-only string (YYYY-MM-DD format with no time component)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Date-only string - this shouldn't be used for time formatting, but handle gracefully
+      date = new Date(dateString + 'T00:00:00Z');
+    } else if (dateString.includes('Z')) {
+      // Has UTC timezone indicator - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('+') || /-\d{2}:\d{2}$/.test(dateString)) {
+      // Has timezone offset (e.g., +08:00 or -05:00) - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('T')) {
+      // ISO datetime without timezone indicator - backend stores in UTC, so treat as UTC
+      date = new Date(dateString + 'Z');
+    } else {
+      // Fallback: try parsing as-is (might be in local timezone, but we'll convert)
+      date = new Date(dateString);
+    }
+    
+    // Verify date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return new Date(dateString).toLocaleTimeString();
+    }
+    
+    // Use Intl.DateTimeFormat to convert to the specified timezone
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting time:', error, 'dateString:', dateString, 'timezone:', timezone);
+    return new Date(dateString).toLocaleTimeString();
+  }
+}
+
+/**
+ * Format a date string to a localized date and time string in the specified timezone
+ */
+export function formatDateTime(dateString: string, timezone: string): string {
+  try {
+    let date: Date;
+    
+    // Check if it's a date-only string (YYYY-MM-DD format with no time component)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Date-only string - treat as UTC midnight
+      date = new Date(dateString + 'T00:00:00Z');
+    } else if (dateString.includes('Z')) {
+      // Has UTC timezone indicator - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('+') || /-\d{2}:\d{2}$/.test(dateString)) {
+      // Has timezone offset (e.g., +08:00 or -05:00) - parse directly
+      date = new Date(dateString);
+    } else if (dateString.includes('T')) {
+      // ISO datetime without timezone indicator - backend stores in UTC, so treat as UTC
+      date = new Date(dateString + 'Z');
+    } else {
+      // Fallback: try parsing as-is
+      date = new Date(dateString);
+    }
+    
+    // Verify date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return new Date(dateString).toLocaleString();
+    }
+    
+    // Use Intl.DateTimeFormat to convert to the specified timezone
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting datetime:', error, 'dateString:', dateString, 'timezone:', timezone);
+    return new Date(dateString).toLocaleString();
+  }
+}
+
+/**
+ * Get timezone abbreviation (e.g., EST, PST) for a given timezone
+ */
+export function getTimezoneAbbreviation(timezone: string): string {
+  try {
+    const date = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'short',
+    });
+    const parts = formatter.formatToParts(date);
+    const tzPart = parts.find((part) => part.type === 'timeZoneName');
+    return tzPart?.value || timezone;
+  } catch (error) {
+    console.error('Error getting timezone abbreviation:', error);
+    return timezone;
+  }
+}
+

@@ -5,11 +5,14 @@ import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry
 import { TallyLogEntryRole } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 function TallySessionLogs() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  const timezone = useTimezone();
   const [session, setSession] = useState<TallySession | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -481,7 +484,7 @@ function TallySessionLogs() {
         <button className="btn btn-secondary" onClick={() => navigate(`/tally-sessions/${id}`)} style={{ marginBottom: '20px' }}>
           ← Back to Session Details
         </button>
-        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}</h1>
+        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {formatDate(session.date, timezone)}</h1>
         <p>
           Plant: {plant?.name}
         </p>
@@ -758,7 +761,7 @@ function TallySessionLogs() {
                       <td>{entry.weight.toFixed(2)}</td>
                       <td>{entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}</td>
                       <td>{entry.notes || '-'}</td>
-                      <td>{new Date(entry.created_at).toLocaleString()}</td>
+                      <td>{formatDateTime(entry.created_at, timezone)}</td>
                       {hasPermission('can_tally') && (
                         <td>
                           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
@@ -925,7 +928,7 @@ function TallySessionLogs() {
                 </option>
                 {availableSessions.map((session) => (
                   <option key={session.id} value={session.id}>
-                    Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}
+                    Session #{session.session_number} - {formatDate(session.date, timezone)}
                   </option>
                 ))}
               </select>
@@ -1177,7 +1180,7 @@ function TallySessionLogs() {
                           <strong>Edit #{auditHistory.length - index}</strong>
                         </div>
                         <div style={{ fontSize: '13px', color: '#666' }}>
-                          {new Date(audit.edited_at).toLocaleString()}
+                          {formatDateTime(audit.edited_at, timezone)}
                         </div>
                       </div>
                       <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>

@@ -5,12 +5,15 @@ import { generateSessionReportPDF } from '../utils/pdfGenerator';
 import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
 import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
 import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatDate } from '../utils/dateFormat';
 import type { TallySession, AllocationDetails, Customer, Plant, WeightClassification, TallyLogEntry, TallyLogEntryRole } from '../types';
 import { TallyLogEntryRole as RoleEnum } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
   const { hasPermission } = useAuth();
+  const timezone = useTimezone();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [session, setSession] = useState<TallySession | null>(null);
@@ -322,7 +325,7 @@ function TallySessionDetail() {
         <button className="btn btn-secondary" onClick={() => navigate('/tally-sessions')} style={{ marginBottom: '20px' }}>
           ← Back to Sessions
         </button>
-        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {new Date(session.date).toLocaleDateString()}</h1>
+        <h1>{customer?.name || 'Unknown'} - Session #{session.session_number} - {formatDate(session.date, timezone)}</h1>
         <p>
           Plant: {plant?.name}
         </p>
