@@ -6,6 +6,7 @@ from ..models.tally_session import TallySession
 from ..schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate
 from ..crud import tally_session as session_crud
 from ..crud import weight_classification as wc_crud
+from ..crud import tally_log_entry_audit as audit_crud
 from ..models.utils import utcnow
 
 
@@ -144,7 +145,7 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
     return log_entry
 
 
-def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEntryUpdate) -> Optional[TallyLogEntry]:
+def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEntryUpdate, user_id: int) -> Optional[TallyLogEntry]:
     """
     Update a tally log entry and adjust the corresponding allocation details.
     Handles changes to weight, role, heads, notes, weight_classification_id, and tally_session_id.
@@ -154,14 +155,21 @@ def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEnt
     if not log_entry:
         return None
 
-    # Get old values before update
+    # Get old values before update (for audit trail)
     old_session_id = log_entry.tally_session_id
     old_wc_id = log_entry.weight_classification_id
     old_role = log_entry.role
     old_heads = log_entry.heads
+    old_weight = log_entry.weight
+    old_notes = log_entry.notes
     old_wc = wc_crud.get_weight_classification(db, wc_id=old_wc_id)
     old_default_heads = old_wc.default_heads if old_wc and old_wc.default_heads is not None else 15.0
     old_heads_value = old_heads if old_heads is not None else old_default_heads
+    
+    # Get old session for display name
+    old_session = session_crud.get_tally_session(db, session_id=old_session_id)
+    old_session_display = f"Session #{old_session.session_number}" if old_session else f"Session ID {old_session_id}"
+    old_wc_display = f"{old_wc.classification} ({old_wc.category})" if old_wc else f"WC ID {old_wc_id}"
 
     # Get update data
     update_data = entry_update.model_dump(exclude_unset=True)
@@ -202,6 +210,51 @@ def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEnt
     new_wc = wc_crud.get_weight_classification(db, wc_id=new_wc_id)
     new_default_heads = new_wc.default_heads if new_wc and new_wc.default_heads is not None else 15.0
     new_heads_value = new_heads if new_heads is not None else new_default_heads
+    
+    # Get new values for audit trail
+    new_weight = update_data.get('weight', old_weight)
+    new_notes = update_data.get('notes', old_notes)
+    new_session = session_crud.get_tally_session(db, session_id=new_session_id) if new_session_id != old_session_id else old_session
+    new_session_display = f"Session #{new_session.session_number}" if new_session else f"Session ID {new_session_id}"
+    new_wc_display = f"{new_wc.classification} ({new_wc.category})" if new_wc else f"WC ID {new_wc_id}"
+    
+    # Build changes dictionary for audit trail
+    changes = {}
+    
+    # Track weight changes
+    if 'weight' in update_data and new_weight != old_weight:
+        changes['weight'] = {"old": old_weight, "new": new_weight}
+    
+    # Track role changes
+    if 'role' in update_data and new_role != old_role:
+        changes['role'] = {"old": old_role.value, "new": new_role.value}
+    
+    # Track heads changes
+    if 'heads' in update_data:
+        # Compare the actual values that will be stored
+        old_heads_final = old_heads if old_heads is not None else old_default_heads
+        new_heads_final = new_heads if new_heads is not None else new_default_heads
+        if new_heads_final != old_heads_final:
+            changes['heads'] = {"old": old_heads_final, "new": new_heads_final}
+    elif new_wc_id != old_wc_id:
+        # Heads changed due to weight classification change
+        if new_heads_value != old_heads_value:
+            changes['heads'] = {"old": old_heads_value, "new": new_heads_value}
+    
+    # Track notes changes
+    if 'notes' in update_data:
+        old_notes_str = old_notes if old_notes is not None else ""
+        new_notes_str = new_notes if new_notes is not None else ""
+        if new_notes_str != old_notes_str:
+            changes['notes'] = {"old": old_notes_str, "new": new_notes_str}
+    
+    # Track weight classification changes
+    if 'weight_classification_id' in update_data and new_wc_id != old_wc_id:
+        changes['weight_classification'] = {"old": old_wc_display, "new": new_wc_display}
+    
+    # Track session changes
+    if 'tally_session_id' in update_data and new_session_id != old_session_id:
+        changes['tally_session'] = {"old": old_session_display, "new": new_session_display}
 
     # Get old allocation (for decrementing)
     old_allocation = db.query(AllocationDetails).filter(
@@ -266,6 +319,12 @@ def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEnt
     # Commit all changes atomically
     db.commit()
     db.refresh(log_entry)
+    
+    # Create audit entry if any changes were made
+    if changes:
+        audit_crud.create_audit_entry(db, entry_id, user_id, changes)
+        db.commit()  # Commit audit entry
+    
     return log_entry
 
 

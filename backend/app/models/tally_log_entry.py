@@ -35,6 +35,7 @@ class TallyLogEntry(Base):
         foreign_keys=[original_session_id]
     )
     weight_classification = relationship("WeightClassification")
+    audit_entries = relationship("TallyLogEntryAudit", back_populates="tally_log_entry", cascade="all, delete-orphan")
 
     # Indexes for common queries
     __table_args__ = (

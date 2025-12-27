@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tallySessionsApi, customersApi, plantsApi, weightClassificationsApi, tallyLogEntriesApi } from '../services/api';
-import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
+import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry, TallyLogEntryAudit } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,6 +45,10 @@ function TallySessionLogs() {
     notes: '',
     weight_classification_id: 0,
   });
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [selectedEntryForAudit, setSelectedEntryForAudit] = useState<TallyLogEntry | null>(null);
+  const [auditHistory, setAuditHistory] = useState<TallyLogEntryAudit[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -418,6 +422,51 @@ function TallySessionLogs() {
     }
   };
 
+  const loadAuditHistory = async (entry: TallyLogEntry) => {
+    setSelectedEntryForAudit(entry);
+    setLoadingAudit(true);
+    setShowAuditModal(true);
+    try {
+      const response = await tallyLogEntriesApi.getAuditHistory(entry.id);
+      setAuditHistory(response.data);
+    } catch (error: any) {
+      console.error('Error loading audit history:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load audit history';
+      alert(`Error: ${errorMessage}`);
+      setShowAuditModal(false);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const formatFieldName = (fieldName: string): string => {
+    const fieldMap: Record<string, string> = {
+      'weight': 'Weight',
+      'role': 'Role',
+      'heads': 'Heads',
+      'notes': 'Notes',
+      'weight_classification': 'Weight Classification',
+      'tally_session': 'Tally Session',
+    };
+    return fieldMap[fieldName] || fieldName;
+  };
+
+  const formatFieldValue = (fieldName: string, value: any): string => {
+    if (value === null || value === undefined) {
+      return '(empty)';
+    }
+    if (fieldName === 'role') {
+      return value === 'tally' ? 'Tally-er' : 'Dispatcher';
+    }
+    if (fieldName === 'weight') {
+      return `${value} kg`;
+    }
+    if (fieldName === 'heads') {
+      return value.toString();
+    }
+    return String(value);
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -712,7 +761,7 @@ function TallySessionLogs() {
                       <td>{new Date(entry.created_at).toLocaleString()}</td>
                       {hasPermission('can_tally') && (
                         <td>
-                          <div style={{ display: 'flex', gap: '5px' }}>
+                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                             <button
                               className="btn btn-secondary"
                               onClick={(e) => {
@@ -731,6 +780,25 @@ function TallySessionLogs() {
                               }}
                             >
                               Edit
+                            </button>
+                            <button
+                              className="btn btn-info"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadAuditHistory(entry);
+                              }}
+                              disabled={loading || loadingAudit}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                backgroundColor: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: (loading || loadingAudit) ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              History
                             </button>
                             <button
                               className="btn btn-danger"
@@ -1051,6 +1119,104 @@ function TallySessionLogs() {
                 disabled={loading}
               >
                 {loading ? 'Updating...' : 'Update'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit History Modal */}
+      {showAuditModal && selectedEntryForAudit && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '600px',
+            maxWidth: '900px',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Edit History - Entry #{selectedEntryForAudit.id}</h3>
+            
+            {loadingAudit ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading audit history...</div>
+            ) : auditHistory.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                No edit history found for this entry.
+              </div>
+            ) : (
+              <div>
+                <div style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}>
+                  This entry has been edited {auditHistory.length} time{auditHistory.length !== 1 ? 's' : ''}.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {auditHistory.map((audit, index) => (
+                    <div
+                      key={audit.id}
+                      style={{
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        padding: '15px',
+                        backgroundColor: '#f9f9f9'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div>
+                          <strong>Edit #{auditHistory.length - index}</strong>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>
+                          {new Date(audit.edited_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
+                        Edited by: <strong>{audit.user_username || `User ID ${audit.user_id}`}</strong>
+                      </div>
+                      <div style={{ marginTop: '10px' }}>
+                        <strong>Changes:</strong>
+                        <ul style={{ marginTop: '8px', marginBottom: 0, paddingLeft: '20px' }}>
+                          {Object.entries(audit.changes).map(([fieldName, change]) => (
+                            <li key={fieldName} style={{ marginBottom: '5px' }}>
+                              <strong>{formatFieldName(fieldName)}:</strong>{' '}
+                              <span style={{ color: '#e74c3c' }}>
+                                {formatFieldValue(fieldName, change.old)}
+                              </span>
+                              {' → '}
+                              <span style={{ color: '#27ae60' }}>
+                                {formatFieldValue(fieldName, change.new)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowAuditModal(false);
+                  setSelectedEntryForAudit(null);
+                  setAuditHistory([]);
+                }}
+                disabled={loadingAudit}
+              >
+                Close
               </button>
             </div>
           </div>

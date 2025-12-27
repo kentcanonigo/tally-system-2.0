@@ -4,6 +4,7 @@ from .weight_classification import WeightClassification
 from .tally_session import TallySession
 from .allocation_details import AllocationDetails
 from .tally_log_entry import TallyLogEntry
+from .tally_log_entry_audit import TallyLogEntryAudit
 from .user import User, UserRole
 from .plant_permission import PlantPermission
 from .role import Role
@@ -18,6 +19,7 @@ __all__ = [
     "TallySession",
     "AllocationDetails",
     "TallyLogEntry",
+    "TallyLogEntryAudit",
     "User",
     "UserRole",
     "PlantPermission",

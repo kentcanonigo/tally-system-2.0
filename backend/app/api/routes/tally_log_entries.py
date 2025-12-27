@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from ...database import get_db
 from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer
+from ...schemas.tally_log_entry_audit import TallyLogEntryAuditResponse
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
+from ...crud import tally_log_entry_audit as audit_crud
 from ...auth.dependencies import get_current_user, require_permission
 from ...models import User
 
@@ -102,12 +104,49 @@ def update_tally_log_entry(
     Updates the corresponding allocation details based on changes.
     """
     try:
-        entry = crud.update_tally_log_entry(db, entry_id=entry_id, entry_update=entry_update)
+        entry = crud.update_tally_log_entry(db, entry_id=entry_id, entry_update=entry_update, user_id=current_user.id)
         if entry is None:
             raise HTTPException(status_code=404, detail="Tally log entry not found")
         return entry
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/log-entries/{entry_id}/audit",
+    response_model=List[TallyLogEntryAuditResponse]
+)
+def get_tally_log_entry_audit(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_view_tally_logs"))
+):
+    """
+    Get audit history for a tally log entry.
+    Requires 'can_view_tally_logs' permission.
+    Returns list of audit entries ordered by edited_at descending (newest first).
+    """
+    # Verify entry exists
+    entry = crud.get_tally_log_entry(db, entry_id=entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Tally log entry not found")
+    
+    audit_entries = audit_crud.get_audit_entries_by_entry_id(db, entry_id=entry_id)
+    
+    # Convert to response models with user information
+    result = []
+    for audit_entry in audit_entries:
+        audit_dict = {
+            "id": audit_entry.id,
+            "tally_log_entry_id": audit_entry.tally_log_entry_id,
+            "user_id": audit_entry.user_id,
+            "edited_at": audit_entry.edited_at,
+            "changes": audit_entry.changes,
+            "user_username": audit_entry.user.username if audit_entry.user else None
+        }
+        result.append(TallyLogEntryAuditResponse(**audit_dict))
+    
+    return result
 
 
 @router.delete(
