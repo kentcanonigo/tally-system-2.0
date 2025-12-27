@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ...database import get_db
-from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer
+from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
 from ...auth.dependencies import get_current_user, require_permission
@@ -85,6 +85,29 @@ def get_tally_log_entry(
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")
     return entry
+
+
+@router.put(
+    "/log-entries/{entry_id}",
+    response_model=TallyLogEntryResponse
+)
+def update_tally_log_entry(
+    entry_id: int,
+    entry_update: TallyLogEntryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_tally"))
+):
+    """
+    Update a tally log entry. Requires 'can_tally' permission.
+    Updates the corresponding allocation details based on changes.
+    """
+    try:
+        entry = crud.update_tally_log_entry(db, entry_id=entry_id, entry_update=entry_update)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Tally log entry not found")
+        return entry
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete(

@@ -3,7 +3,7 @@ from typing import List, Optional
 from ..models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
 from ..models.allocation_details import AllocationDetails
 from ..models.tally_session import TallySession
-from ..schemas.tally_log_entry import TallyLogEntryCreate
+from ..schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate
 from ..crud import tally_session as session_crud
 from ..crud import weight_classification as wc_crud
 from ..models.utils import utcnow
@@ -141,6 +141,131 @@ def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry
 
     db.delete(log_entry)
     db.commit()
+    return log_entry
+
+
+def update_tally_log_entry(db: Session, entry_id: int, entry_update: TallyLogEntryUpdate) -> Optional[TallyLogEntry]:
+    """
+    Update a tally log entry and adjust the corresponding allocation details.
+    Handles changes to weight, role, heads, notes, weight_classification_id, and tally_session_id.
+    """
+    # Get the existing entry
+    log_entry = get_tally_log_entry(db, entry_id)
+    if not log_entry:
+        return None
+
+    # Get old values before update
+    old_session_id = log_entry.tally_session_id
+    old_wc_id = log_entry.weight_classification_id
+    old_role = log_entry.role
+    old_heads = log_entry.heads
+    old_wc = wc_crud.get_weight_classification(db, wc_id=old_wc_id)
+    old_default_heads = old_wc.default_heads if old_wc and old_wc.default_heads is not None else 15.0
+    old_heads_value = old_heads if old_heads is not None else old_default_heads
+
+    # Get update data
+    update_data = entry_update.model_dump(exclude_unset=True)
+    
+    # Determine new values (use old values if not being updated)
+    new_session_id = update_data.get('tally_session_id', old_session_id)
+    new_wc_id = update_data.get('weight_classification_id', old_wc_id)
+    new_role = update_data.get('role', old_role)
+    
+    # Validate new session if it's being changed
+    if new_session_id != old_session_id:
+        new_session = session_crud.get_tally_session(db, session_id=new_session_id)
+        if new_session is None:
+            raise ValueError("Target session not found")
+        
+        # Validate sessions are in the same plant
+        old_session = session_crud.get_tally_session(db, session_id=old_session_id)
+        if old_session and old_session.plant_id != new_session.plant_id:
+            raise ValueError("Cannot change session to a different plant")
+        
+        # Validate target session is ongoing
+        from ..models.tally_session import TallySessionStatus
+        if new_session.status != TallySessionStatus.ONGOING:
+            raise ValueError("Target session must be ongoing to update log entries")
+    
+    # Validate new weight classification if it's being changed
+    if new_wc_id != old_wc_id:
+        new_wc = wc_crud.get_weight_classification(db, wc_id=new_wc_id)
+        if new_wc is None:
+            raise ValueError("Weight classification not found")
+        
+        # Validate weight classification is in the same plant
+        if old_wc and old_wc.plant_id != new_wc.plant_id:
+            raise ValueError("Cannot change weight classification to a different plant")
+    
+    # Get new heads value
+    new_heads = update_data.get('heads', old_heads)
+    new_wc = wc_crud.get_weight_classification(db, wc_id=new_wc_id)
+    new_default_heads = new_wc.default_heads if new_wc and new_wc.default_heads is not None else 15.0
+    new_heads_value = new_heads if new_heads is not None else new_default_heads
+
+    # Get old allocation (for decrementing)
+    old_allocation = db.query(AllocationDetails).filter(
+        AllocationDetails.tally_session_id == old_session_id,
+        AllocationDetails.weight_classification_id == old_wc_id
+    ).first()
+
+    # Decrement old allocation
+    if old_allocation:
+        if old_role == TallyLogEntryRole.TALLY:
+            old_allocation.allocated_bags_tally = max(0.0, old_allocation.allocated_bags_tally - 1)
+        elif old_role == TallyLogEntryRole.DISPATCHER:
+            old_allocation.allocated_bags_dispatcher = max(0.0, old_allocation.allocated_bags_dispatcher - 1)
+        
+        if old_allocation.heads is None:
+            old_allocation.heads = 0.0
+        old_allocation.heads = max(0.0, old_allocation.heads - old_heads_value)
+
+    # Update the log entry fields
+    for field, value in update_data.items():
+        if field == 'heads' and value is None:
+            # If heads is explicitly set to None, use default from weight classification
+            setattr(log_entry, field, new_default_heads)
+        else:
+            setattr(log_entry, field, value)
+
+    # If heads wasn't explicitly updated but weight classification changed, update heads to new default
+    if 'heads' not in update_data and new_wc_id != old_wc_id:
+        log_entry.heads = new_default_heads
+        new_heads_value = new_default_heads
+
+    # Get or create new allocation (for incrementing)
+    new_allocation = db.query(AllocationDetails).filter(
+        AllocationDetails.tally_session_id == new_session_id,
+        AllocationDetails.weight_classification_id == new_wc_id
+    ).first()
+
+    if not new_allocation:
+        # Create new allocation detail if it doesn't exist
+        from ..schemas.allocation_details import AllocationDetailsCreate
+        allocation_create = AllocationDetailsCreate(
+            tally_session_id=new_session_id,
+            weight_classification_id=new_wc_id,
+            required_bags=0.0,
+            allocated_bags_tally=0.0,
+            allocated_bags_dispatcher=0.0
+        )
+        new_allocation = AllocationDetails(**allocation_create.model_dump())
+        db.add(new_allocation)
+        db.flush()  # Flush to get the ID without committing
+
+    # Increment new allocation
+    if new_role == TallyLogEntryRole.TALLY:
+        new_allocation.allocated_bags_tally += 1
+    elif new_role == TallyLogEntryRole.DISPATCHER:
+        new_allocation.allocated_bags_dispatcher += 1
+
+    if new_allocation.heads is None:
+        new_allocation.heads = 0.0
+    new_allocation.heads += new_heads_value
+
+    # Commit all changes atomically
+    db.commit()
+    db.refresh(log_entry)
     return log_entry
 
 

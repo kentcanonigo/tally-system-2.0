@@ -35,6 +35,30 @@ class TallyLogEntryCreate(TallyLogEntryBase):
     weight_classification_id: int
 
 
+class TallyLogEntryUpdate(BaseModel):
+    """Update schema for tally log entries. All fields are optional."""
+    weight: Optional[float] = None
+    role: Optional[TallyLogEntryRole] = None
+    heads: Optional[float] = None
+    notes: Optional[str] = None
+    weight_classification_id: Optional[int] = None
+    tally_session_id: Optional[int] = None
+
+    @field_validator('weight')
+    @classmethod
+    def validate_weight(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('weight must be greater than 0')
+        return v
+
+    @field_validator('heads')
+    @classmethod
+    def validate_heads(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('heads must be non-negative')
+        return v
+
+
 class TallyLogEntryResponse(TallyLogEntryBase):
     id: int
     tally_session_id: int

@@ -36,6 +36,15 @@ function TallySessionLogs() {
   const [selectedTargetCustomerId, setSelectedTargetCustomerId] = useState<number | null>(null);
   const [selectedTargetSessionId, setSelectedTargetSessionId] = useState<number | null>(null);
   const [loadingTransferData, setLoadingTransferData] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TallyLogEntry | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    weight: 0,
+    role: TallyLogEntryRole.TALLY,
+    heads: 0,
+    notes: '',
+    weight_classification_id: 0,
+  });
 
   useEffect(() => {
     if (id) {
@@ -355,6 +364,60 @@ function TallySessionLogs() {
     }
   };
 
+  const handleEditEntry = (entry: TallyLogEntry) => {
+    setEditingEntry(entry);
+    setEditFormData({
+      weight: entry.weight,
+      role: entry.role,
+      heads: entry.heads || 0,
+      notes: entry.notes || '',
+      weight_classification_id: entry.weight_classification_id,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEntry = async () => {
+    if (!editingEntry) return;
+
+    if (!hasPermission('can_tally')) {
+      alert('Permission Denied: You do not have permission to edit tally log entries.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Only send fields that have changed
+      const updateData: any = {};
+      if (editFormData.weight !== editingEntry.weight) {
+        updateData.weight = editFormData.weight;
+      }
+      if (editFormData.role !== editingEntry.role) {
+        updateData.role = editFormData.role;
+      }
+      if (editFormData.heads !== (editingEntry.heads || 0)) {
+        updateData.heads = editFormData.heads;
+      }
+      if (editFormData.notes !== (editingEntry.notes || '')) {
+        updateData.notes = editFormData.notes || null;
+      }
+      if (editFormData.weight_classification_id !== editingEntry.weight_classification_id) {
+        updateData.weight_classification_id = editFormData.weight_classification_id;
+      }
+
+      await tallyLogEntriesApi.update(editingEntry.id, updateData);
+      alert('Log entry updated successfully');
+      setShowEditModal(false);
+      setEditingEntry(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating log entry:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to update log entry';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -649,25 +712,46 @@ function TallySessionLogs() {
                       <td>{new Date(entry.created_at).toLocaleString()}</td>
                       {hasPermission('can_tally') && (
                         <td>
-                          <button
-                            className="btn btn-danger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteEntry(entry.id);
-                            }}
-                            disabled={loading}
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              backgroundColor: '#dc3545',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: loading ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            Delete
-                          </button>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button
+                              className="btn btn-secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditEntry(entry);
+                              }}
+                              disabled={loading}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                backgroundColor: '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: loading ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-danger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEntry(entry.id);
+                              }}
+                              disabled={loading}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                backgroundColor: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: loading ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -812,6 +896,161 @@ function TallySessionLogs() {
                 }}
               >
                 {loading ? 'Transferring...' : 'Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingEntry && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '400px',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Edit Log Entry</h3>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Weight Classification:
+              </label>
+              <select
+                value={editFormData.weight_classification_id}
+                onChange={(e) => setEditFormData({ ...editFormData, weight_classification_id: Number(e.target.value) })}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                {weightClassifications.map((wc) => (
+                  <option key={wc.id} value={wc.id}>
+                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Role:
+              </label>
+              <select
+                value={editFormData.role}
+                onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as TallyLogEntryRole })}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={TallyLogEntryRole.TALLY}>Tally-er</option>
+                <option value={TallyLogEntryRole.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Weight (kg):
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={editFormData.weight}
+                onChange={(e) => setEditFormData({ ...editFormData, weight: parseFloat(e.target.value) || 0 })}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Heads:
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={editFormData.heads}
+                onChange={(e) => setEditFormData({ ...editFormData, heads: parseFloat(e.target.value) || 0 })}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Notes:
+              </label>
+              <textarea
+                value={editFormData.notes}
+                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                disabled={loading}
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingEntry(null);
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleUpdateEntry}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update'}
               </button>
             </div>
           </div>
