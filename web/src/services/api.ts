@@ -133,6 +133,8 @@ export const tallyLogEntriesApi = {
     }),
   getById: (entryId: number) =>
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
+  delete: (entryId: number) =>
+    api.delete(`/log-entries/${entryId}`),
   transfer: (entryIds: number[], targetSessionId: number) =>
     api.post<{ message: string; count: number }>(`/log-entries/transfer`, { entry_ids: entryIds, target_session_id: targetSessionId }),
 };

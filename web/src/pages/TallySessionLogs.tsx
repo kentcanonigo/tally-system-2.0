@@ -298,6 +298,63 @@ function TallySessionLogs() {
     }
   };
 
+  const handleDeleteEntry = async (entryId: number) => {
+    if (!hasPermission('can_tally')) {
+      alert('Permission Denied: You do not have permission to delete tally log entries.');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this log entry? This action cannot be undone and will update the allocation counts.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await tallyLogEntriesApi.delete(entryId);
+      alert('Log entry deleted successfully');
+      fetchData();
+    } catch (error: any) {
+      console.error('Error deleting log entry:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete log entry';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedEntryIds.size === 0) {
+      alert('Please select entries to delete');
+      return;
+    }
+
+    if (!hasPermission('can_tally')) {
+      alert('Permission Denied: You do not have permission to delete tally log entries.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedEntryIds.size} log entry/entries? This action cannot be undone and will update the allocation counts.`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Delete entries one by one (backend doesn't support bulk delete)
+      const deletePromises = Array.from(selectedEntryIds).map(id => tallyLogEntriesApi.delete(id));
+      await Promise.all(deletePromises);
+      alert(`Successfully deleted ${selectedEntryIds.size} log entry/entries`);
+      setSelectionMode(false);
+      setSelectedEntryIds(new Set());
+      fetchData();
+    } catch (error: any) {
+      console.error('Error deleting log entries:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete log entries';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -492,6 +549,18 @@ function TallySessionLogs() {
                     Transfer Selected ({selectedEntryIds.size})
                   </button>
                   <button
+                    className="btn btn-danger"
+                    onClick={handleDeleteSelected}
+                    disabled={selectedEntryIds.size === 0}
+                    style={{ 
+                      opacity: selectedEntryIds.size === 0 ? 0.5 : 1,
+                      backgroundColor: '#dc3545',
+                      color: 'white'
+                    }}
+                  >
+                    Delete Selected ({selectedEntryIds.size})
+                  </button>
+                  <button
                     className="btn btn-secondary"
                     onClick={() => {
                       setSelectionMode(false);
@@ -528,6 +597,7 @@ function TallySessionLogs() {
                 <th>Heads</th>
                 <th>Notes</th>
                 <th>Timestamp</th>
+                {hasPermission('can_tally') && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -577,12 +647,35 @@ function TallySessionLogs() {
                       <td>{entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}</td>
                       <td>{entry.notes || '-'}</td>
                       <td>{new Date(entry.created_at).toLocaleString()}</td>
+                      {hasPermission('can_tally') && (
+                        <td>
+                          <button
+                            className="btn btn-danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteEntry(entry.id);
+                            }}
+                            disabled={loading}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              backgroundColor: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={selectionMode ? 11 : 10} style={{ textAlign: 'center' }}>
+                  <td colSpan={selectionMode ? (hasPermission('can_tally') ? 12 : 11) : (hasPermission('can_tally') ? 11 : 10)} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>
