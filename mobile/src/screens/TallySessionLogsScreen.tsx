@@ -363,7 +363,7 @@ function TallySessionLogsScreen() {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_delete_tally_log_entries')) {
       Alert.alert('Permission Denied', 'You do not have permission to delete tally log entries.');
       return;
     }
@@ -449,7 +449,7 @@ function TallySessionLogsScreen() {
       return;
     }
     
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_transfer_tally_log_entries')) {
       Alert.alert('Permission Denied', 'You do not have permission to transfer tally log entries.');
       return;
     }
@@ -481,7 +481,7 @@ function TallySessionLogsScreen() {
   };
 
   const handleDeleteEntry = async (entryId: number) => {
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_delete_tally_log_entries')) {
       Alert.alert('Permission Denied', 'You do not have permission to delete tally log entries.');
       return;
     }
@@ -528,7 +528,7 @@ function TallySessionLogsScreen() {
   const handleUpdateEntry = async () => {
     if (!editingEntry) return;
 
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_edit_tally_log_entries')) {
       Alert.alert('Permission Denied', 'You do not have permission to edit tally log entries.');
       return;
     }
@@ -1041,21 +1041,21 @@ function TallySessionLogsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {selectionMode ? (
             <>
-              {hasPermission('can_tally') && (
-                <>
-                  <TouchableOpacity
-                    style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
-                    onPress={openTransferModal}
-                  >
-                    <MaterialIcons name="swap-horiz" size={20} color="#3498db" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
-                    onPress={handleDeleteSelected}
-                  >
-                    <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
-                  </TouchableOpacity>
-                </>
+              {hasPermission('can_transfer_tally_log_entries') && (
+                <TouchableOpacity
+                  style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                  onPress={openTransferModal}
+                >
+                  <MaterialIcons name="swap-horiz" size={20} color="#3498db" />
+                </TouchableOpacity>
+              )}
+              {hasPermission('can_delete_tally_log_entries') && (
+                <TouchableOpacity
+                  style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
+                  onPress={handleDeleteSelected}
+                >
+                  <MaterialIcons name="delete-forever" size={20} color="#e74c3c" />
+                </TouchableOpacity>
               )}
               <TouchableOpacity
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
@@ -1074,7 +1074,7 @@ function TallySessionLogsScreen() {
             </>
           ) : (
             <>
-              {hasPermission('can_tally') && (
+              {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries') || hasPermission('can_transfer_tally_log_entries')) && (
                 <TouchableOpacity
                   style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                   onPress={toggleSelectionMode}
@@ -1109,7 +1109,7 @@ function TallySessionLogsScreen() {
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Heads</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
-          {hasPermission('can_tally') && !selectionMode && (
+          {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) && !selectionMode && (
             <Text style={[dynamicStyles.tableHeaderText, { flex: 1.5 }]}>Actions</Text>
           )}
         </View>
@@ -1181,23 +1181,25 @@ function TallySessionLogsScreen() {
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}
                 </Text>
-                {hasPermission('can_tally') && !selectionMode && (
+                {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) && !selectionMode && (
                   <View style={{ flex: 1.5, flexDirection: 'row', gap: 4, paddingHorizontal: 4 }}>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleEditEntry(entry);
-                      }}
-                      disabled={loading}
-                      style={{
-                        padding: 4,
-                        backgroundColor: '#6c757d',
-                        borderRadius: 4,
-                        opacity: loading ? 0.5 : 1,
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Edit</Text>
-                    </TouchableOpacity>
+                    {hasPermission('can_edit_tally_log_entries') && (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleEditEntry(entry);
+                        }}
+                        disabled={loading}
+                        style={{
+                          padding: 4,
+                          backgroundColor: '#6c757d',
+                          borderRadius: 4,
+                          opacity: loading ? 0.5 : 1,
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Edit</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
@@ -1213,21 +1215,23 @@ function TallySessionLogsScreen() {
                     >
                       <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>History</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleDeleteEntry(entry.id);
-                      }}
-                      disabled={loading}
-                      style={{
-                        padding: 4,
-                        backgroundColor: '#dc3545',
-                        borderRadius: 4,
-                        opacity: loading ? 0.5 : 1,
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Del</Text>
-                    </TouchableOpacity>
+                    {hasPermission('can_delete_tally_log_entries') && (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEntry(entry.id);
+                        }}
+                        disabled={loading}
+                        style={{
+                          padding: 4,
+                          backgroundColor: '#dc3545',
+                          borderRadius: 4,
+                          opacity: loading ? 0.5 : 1,
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Del</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </TouchableOpacity>

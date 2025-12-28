@@ -271,7 +271,7 @@ function TallySessionLogs() {
       return;
     }
     
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_transfer_tally_log_entries')) {
       alert('Permission Denied: You do not have permission to transfer tally log entries.');
       return;
     }
@@ -315,7 +315,7 @@ function TallySessionLogs() {
   };
 
   const handleDeleteEntry = async (entryId: number) => {
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_delete_tally_log_entries')) {
       alert('Permission Denied: You do not have permission to delete tally log entries.');
       return;
     }
@@ -344,7 +344,7 @@ function TallySessionLogs() {
       return;
     }
 
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_delete_tally_log_entries')) {
       alert('Permission Denied: You do not have permission to delete tally log entries.');
       return;
     }
@@ -386,7 +386,7 @@ function TallySessionLogs() {
   const handleUpdateEntry = async () => {
     if (!editingEntry) return;
 
-    if (!hasPermission('can_tally')) {
+    if (!hasPermission('can_edit_tally_log_entries')) {
       alert('Permission Denied: You do not have permission to edit tally log entries.');
       return;
     }
@@ -639,7 +639,7 @@ function TallySessionLogs() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <h2>Log Entries ({filteredEntries.length})</h2>
-          {hasPermission('can_tally') && (
+          {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries') || hasPermission('can_transfer_tally_log_entries')) && (
             <div style={{ display: 'flex', gap: '10px' }}>
               {!selectionMode ? (
                 <button
@@ -653,29 +653,33 @@ function TallySessionLogs() {
                 </button>
               ) : (
                 <>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setShowTransferModal(true);
-                      loadTransferData();
-                    }}
-                    disabled={selectedEntryIds.size === 0}
-                    style={{ opacity: selectedEntryIds.size === 0 ? 0.5 : 1 }}
-                  >
-                    Transfer Selected ({selectedEntryIds.size})
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={handleDeleteSelected}
-                    disabled={selectedEntryIds.size === 0}
-                    style={{ 
-                      opacity: selectedEntryIds.size === 0 ? 0.5 : 1,
-                      backgroundColor: '#dc3545',
-                      color: 'white'
-                    }}
-                  >
-                    Delete Selected ({selectedEntryIds.size})
-                  </button>
+                  {hasPermission('can_transfer_tally_log_entries') && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setShowTransferModal(true);
+                        loadTransferData();
+                      }}
+                      disabled={selectedEntryIds.size === 0}
+                      style={{ opacity: selectedEntryIds.size === 0 ? 0.5 : 1 }}
+                    >
+                      Transfer Selected ({selectedEntryIds.size})
+                    </button>
+                  )}
+                  {hasPermission('can_delete_tally_log_entries') && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleDeleteSelected}
+                      disabled={selectedEntryIds.size === 0}
+                      style={{ 
+                        opacity: selectedEntryIds.size === 0 ? 0.5 : 1,
+                        backgroundColor: '#dc3545',
+                        color: 'white'
+                      }}
+                    >
+                      Delete Selected ({selectedEntryIds.size})
+                    </button>
+                  )}
                   <button
                     className="btn btn-secondary"
                     onClick={() => {
@@ -713,7 +717,7 @@ function TallySessionLogs() {
                 <th>Heads</th>
                 <th>Notes</th>
                 <th>Timestamp</th>
-                {hasPermission('can_tally') && <th>Actions</th>}
+                {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -763,28 +767,30 @@ function TallySessionLogs() {
                       <td>{entry.heads !== undefined && entry.heads !== null ? entry.heads.toFixed(0) : '-'}</td>
                       <td>{entry.notes || '-'}</td>
                       <td>{formatDateTime(entry.created_at, timezone)}</td>
-                      {hasPermission('can_tally') && (
+                      {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) && (
                         <td>
                           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                            <button
-                              className="btn btn-secondary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditEntry(entry);
-                              }}
-                              disabled={loading}
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                backgroundColor: '#6c757d',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: loading ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              Edit
-                            </button>
+                            {hasPermission('can_edit_tally_log_entries') && (
+                              <button
+                                className="btn btn-secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditEntry(entry);
+                                }}
+                                disabled={loading}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  backgroundColor: '#6c757d',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: loading ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                Edit
+                              </button>
+                            )}
                             <button
                               className="btn btn-info"
                               onClick={(e) => {
@@ -804,25 +810,27 @@ function TallySessionLogs() {
                             >
                               History
                             </button>
-                            <button
-                              className="btn btn-danger"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteEntry(entry.id);
-                              }}
-                              disabled={loading}
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                backgroundColor: '#dc3545',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: loading ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              Delete
-                            </button>
+                            {hasPermission('can_delete_tally_log_entries') && (
+                              <button
+                                className="btn btn-danger"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteEntry(entry.id);
+                                }}
+                                disabled={loading}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  backgroundColor: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: loading ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -831,7 +839,7 @@ function TallySessionLogs() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={selectionMode ? (hasPermission('can_tally') ? 12 : 11) : (hasPermission('can_tally') ? 11 : 10)} style={{ textAlign: 'center' }}>
+                  <td colSpan={selectionMode ? ((hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) ? 12 : 11) : ((hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries')) ? 11 : 10)} style={{ textAlign: 'center' }}>
                     No log entries found
                   </td>
                 </tr>

@@ -97,10 +97,10 @@ def update_tally_log_entry(
     entry_id: int,
     entry_update: TallyLogEntryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_tally"))
+    current_user: User = Depends(require_permission("can_edit_tally_log_entries"))
 ):
     """
-    Update a tally log entry. Requires 'can_tally' permission.
+    Update a tally log entry. Requires 'can_edit_tally_log_entries' permission.
     Updates the corresponding allocation details based on changes.
     """
     try:
@@ -156,9 +156,9 @@ def get_tally_log_entry_audit(
 def delete_tally_log_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_tally"))
+    current_user: User = Depends(require_permission("can_delete_tally_log_entries"))
 ):
-    """Delete a tally log entry. Requires 'can_tally' permission."""
+    """Delete a tally log entry. Requires 'can_delete_tally_log_entries' permission."""
     entry = crud.delete_tally_log_entry(db, entry_id=entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Tally log entry not found")
@@ -172,11 +172,11 @@ def delete_tally_log_entry(
 def transfer_tally_log_entries(
     transfer_request: TallyLogEntryTransfer,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_tally"))
+    current_user: User = Depends(require_permission("can_transfer_tally_log_entries"))
 ):
     """
     Transfer tally log entries from their current sessions to a target session.
-    Requires 'can_tally' permission.
+    Requires 'can_transfer_tally_log_entries' permission.
     Updates AllocationDetails for both source and target sessions atomically.
     """
     try:
