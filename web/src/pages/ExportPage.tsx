@@ -18,7 +18,9 @@ function ExportPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
   const [showAllocationReportRoleModal, setShowAllocationReportRoleModal] = useState(false);
+  const [showDateExportModal, setShowDateExportModal] = useState(false);
   const [exportRole, setExportRole] = useState<TallyLogEntryRole>(RoleEnum.TALLY);
+  const [exportDate, setExportDate] = useState<string>('');
   
   const [filters, setFilters] = useState({
     customer_id: '',
@@ -152,13 +154,14 @@ function ExportPage() {
     }
   };
 
-  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole) => {
-    if (selectedIds.length === 0) return;
+  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole, sessionIds?: number[]) => {
+    const idsToUse = sessionIds || selectedIds;
+    if (idsToUse.length === 0) return;
     const selectedRole = role || exportRole;
     setExporting(true);
     setShowTallySheetFormatModal(false);
     try {
-      const response = await exportApi.exportTallySheet({ session_ids: selectedIds, role: selectedRole });
+      const response = await exportApi.exportTallySheet({ session_ids: idsToUse, role: selectedRole });
       // Backend returns TallySheetMultiCustomerResponse with a customers array
       const customers = response.data.customers || [response.data];
       
@@ -201,6 +204,82 @@ function ExportPage() {
     }
   };
 
+  const handleExportByDate = async (exportType: 'allocation' | 'tally-sheet', format?: 'pdf' | 'excel') => {
+    if (!exportDate) {
+      alert('Please select a date');
+      return;
+    }
+
+    setExporting(true);
+    setShowDateExportModal(false);
+    
+    try {
+      // Fetch all sessions for the selected date
+      const response = await tallySessionsApi.getAll({});
+      const allSessions = response.data;
+      
+      // Filter sessions by the selected date
+      const dateStr = exportDate; // YYYY-MM-DD format
+      const sessionsForDate = allSessions.filter(session => {
+        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        return sessionDate === dateStr;
+      });
+
+      if (sessionsForDate.length === 0) {
+        alert(`No sessions found for ${formatDate(exportDate, timezone)}`);
+        setExporting(false);
+        return;
+      }
+
+      const sessionIds = sessionsForDate.map(s => s.id);
+
+      if (exportType === 'allocation') {
+        // Export allocation details using date filter
+        const selectedRole = exportRole;
+        const exportResponse = await exportApi.exportSessions({ 
+          date_from: exportDate, 
+          date_to: exportDate, 
+          role: selectedRole 
+        });
+        const data = exportResponse.data;
+        
+        // Check if the report is empty
+        if (!data.customers || data.customers.length === 0) {
+          alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for ${formatDate(exportDate, timezone)}.`);
+          setExporting(false);
+          return;
+        }
+        
+        // Check if all customers have no items
+        const hasAnyItems = data.customers.some(customer => 
+          customer.items && customer.items.length > 0
+        );
+        
+        if (!hasAnyItems) {
+          alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for ${formatDate(exportDate, timezone)}.`);
+          setExporting(false);
+          return;
+        }
+        
+        generateSessionReportPDF(data);
+      } else if (exportType === 'tally-sheet' && format) {
+        // Export tally sheet using session IDs
+        await handleExportTallySheet(format, exportRole, sessionIds);
+        return; // handleExportTallySheet handles setExporting(false)
+      }
+    } catch (error: any) {
+      console.error('Export by date failed', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No') && (errorMessage.includes('data') || errorMessage.includes('allocation') || errorMessage.includes('tally entries'))) {
+        alert(`Cannot export: No data found for ${formatDate(exportDate, timezone)}.`);
+      } else {
+        alert(`Export failed: ${errorMessage}`);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && sessions.length === 0) {
     return <div>Loading...</div>;
   }
@@ -229,6 +308,16 @@ function ExportPage() {
         >
           Export Tally Sheet ({selectedIds.length})
         </button>
+        <div style={{ marginLeft: '20px', paddingLeft: '20px', borderLeft: '2px solid #ddd', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <span style={{ fontWeight: 'bold', color: '#666' }}>Export by Date:</span>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setShowDateExportModal(true)}
+            disabled={exporting}
+          >
+            Export All for Date
+          </button>
+        </div>
       </div>
 
       {showTallySheetFormatModal && (
@@ -348,6 +437,108 @@ function ExportPage() {
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowAllocationReportRoleModal(false)}
+                disabled={exporting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDateExportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '350px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Export All Sessions for Date</h3>
+            <p style={{ marginBottom: '15px', color: '#666' }}>
+              Export all allocation details or tally sheets for all sessions on a specific date.
+            </p>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Date:</label>
+              <input
+                type="date"
+                value={exportDate}
+                onChange={(e) => setExportDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Role:</label>
+              <select
+                value={exportRole}
+                onChange={(e) => setExportRole(e.target.value as TallyLogEntryRole)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={RoleEnum.TALLY}>Tally-er</option>
+                <option value={RoleEnum.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>Export Type:</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleExportByDate('allocation')}
+                  disabled={exporting || !exportDate}
+                  style={{ width: '100%' }}
+                >
+                  Export All Allocation Details
+                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleExportByDate('tally-sheet', 'pdf')}
+                    disabled={exporting || !exportDate}
+                    style={{ flex: 1 }}
+                  >
+                    Export All Tally Sheets (PDF)
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleExportByDate('tally-sheet', 'excel')}
+                    disabled={exporting || !exportDate}
+                    style={{ flex: 1 }}
+                  >
+                    Export All Tally Sheets (Excel)
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowDateExportModal(false);
+                  setExportDate('');
+                }}
                 disabled={exporting}
               >
                 Cancel
