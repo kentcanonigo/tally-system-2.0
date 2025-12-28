@@ -390,12 +390,13 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
         wc_cache[wc_id] = wc
     
     # Group entries by (source_session_id, weight_classification_id) to track required_bags transfer
-    # This allows us to transfer required_bags proportionally (1:1 with entries)
-    allocation_transfers = defaultdict(int)  # (session_id, wc_id) -> count of entries
+    # Only count TALLY entries for required_bags transfer (dispatcher is for verification only)
+    allocation_transfers = defaultdict(int)  # (session_id, wc_id) -> count of TALLY entries
     
-    # First pass: count entries per allocation for required_bags transfer
+    # First pass: count only TALLY entries per allocation for required_bags transfer
     for entry in entries:
-        allocation_transfers[(entry.tally_session_id, entry.weight_classification_id)] += 1
+        if entry.role == TallyLogEntryRole.TALLY:
+            allocation_transfers[(entry.tally_session_id, entry.weight_classification_id)] += 1
     
     # Transfer entries atomically
     for entry in entries:
@@ -462,7 +463,8 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
             target_allocation.heads = 0.0
         target_allocation.heads += heads_value
     
-    # Transfer required_bags proportionally (1:1 with entries transferred)
+    # Transfer required_bags proportionally (1:1 with TALLY entries transferred)
+    # Only TALLY entries affect required_bags; dispatcher entries are for verification only
     # Process each unique (source_session_id, weight_classification_id) combination
     for (source_session_id, wc_id), entry_count in allocation_transfers.items():
         source_allocation = db.query(AllocationDetails).filter(
