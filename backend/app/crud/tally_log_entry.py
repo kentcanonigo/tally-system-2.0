@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from collections import defaultdict
 from ..models.tally_log_entry import TallyLogEntry, TallyLogEntryRole
 from ..models.allocation_details import AllocationDetails
 from ..models.tally_session import TallySession
@@ -388,6 +389,14 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
             raise ValueError(f"Weight classification {wc_id} does not belong to the same plant")
         wc_cache[wc_id] = wc
     
+    # Group entries by (source_session_id, weight_classification_id) to track required_bags transfer
+    # This allows us to transfer required_bags proportionally (1:1 with entries)
+    allocation_transfers = defaultdict(int)  # (session_id, wc_id) -> count of entries
+    
+    # First pass: count entries per allocation for required_bags transfer
+    for entry in entries:
+        allocation_transfers[(entry.tally_session_id, entry.weight_classification_id)] += 1
+    
     # Transfer entries atomically
     for entry in entries:
         wc = wc_cache[entry.weight_classification_id]
@@ -452,6 +461,45 @@ def transfer_tally_log_entries(db: Session, entry_ids: List[int], target_session
         if target_allocation.heads is None:
             target_allocation.heads = 0.0
         target_allocation.heads += heads_value
+    
+    # Transfer required_bags proportionally (1:1 with entries transferred)
+    # Process each unique (source_session_id, weight_classification_id) combination
+    for (source_session_id, wc_id), entry_count in allocation_transfers.items():
+        source_allocation = db.query(AllocationDetails).filter(
+            AllocationDetails.tally_session_id == source_session_id,
+            AllocationDetails.weight_classification_id == wc_id
+        ).first()
+        
+        if source_allocation and source_allocation.required_bags > 0:
+            # Calculate how many required_bags to transfer (1:1 with entries)
+            # Transfer the minimum of: entry_count or available required_bags
+            required_bags_to_transfer = min(float(entry_count), source_allocation.required_bags)
+            
+            # Decrement source required_bags
+            source_allocation.required_bags = max(0.0, source_allocation.required_bags - required_bags_to_transfer)
+            
+            # Get or create target allocation for this weight classification
+            target_allocation = db.query(AllocationDetails).filter(
+                AllocationDetails.tally_session_id == target_session_id,
+                AllocationDetails.weight_classification_id == wc_id
+            ).first()
+            
+            if not target_allocation:
+                # This shouldn't happen as we already created it above, but handle it just in case
+                from ..schemas.allocation_details import AllocationDetailsCreate
+                allocation_create = AllocationDetailsCreate(
+                    tally_session_id=target_session_id,
+                    weight_classification_id=wc_id,
+                    required_bags=0.0,
+                    allocated_bags_tally=0.0,
+                    allocated_bags_dispatcher=0.0
+                )
+                target_allocation = AllocationDetails(**allocation_create.model_dump())
+                db.add(target_allocation)
+                db.flush()
+            
+            # Increment target required_bags
+            target_allocation.required_bags += required_bags_to_transfer
     
     # Commit all changes atomically
     db.commit()
