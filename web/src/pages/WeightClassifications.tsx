@@ -207,12 +207,29 @@ function WeightClassifications() {
       {selectedPlantId && (
         <>
           {hasPermission('can_manage_weight_classes') && (
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
               <button 
                 className="btn btn-primary" 
                 onClick={handleCreate}
               >
                 Add Weight Classification
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={async () => {
+                  if (!selectedPlantId) return;
+                  if (!confirm('This will copy all Dressed weight classifications to Frozen. Continue?')) return;
+                  try {
+                    const response = await weightClassificationsApi.copyFromDressed(selectedPlantId);
+                    alert(response.data.message);
+                    fetchClassifications();
+                  } catch (error: any) {
+                    console.error('Error copying classifications:', error);
+                    alert(error.response?.data?.detail || 'Error copying weight classifications');
+                  }
+                }}
+              >
+                Copy from Dressed to Frozen
               </button>
             </div>
           )}
@@ -317,7 +334,7 @@ function WeightClassifications() {
                   required
                 />
                 <small style={{ color: '#7f8c8d', fontSize: '12px' }}>
-                  Default number of heads for this classification (applies to both Dressed and Byproduct)
+                  Default number of heads for this classification (applies to Dressed, Frozen, and Byproduct)
                 </small>
               </div>
               <div className="form-group">
@@ -341,10 +358,11 @@ function WeightClassifications() {
                 >
                   <option value="">Select a category</option>
                   <option value="Dressed">Dressed</option>
+                  <option value="Frozen">Frozen</option>
                   <option value="Byproduct">Byproduct</option>
                 </select>
               </div>
-              {formData.category === 'Dressed' && (
+              {(formData.category === 'Dressed' || formData.category === 'Frozen') && (
                 <>
                   <div className="form-group">
                     <label>

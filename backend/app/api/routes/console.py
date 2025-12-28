@@ -67,7 +67,7 @@ BYPRODUCT_CLASSIFICATIONS = [
 ]
 
 
-def seed_plant_with_classifications(db: Session, plant_name: str) -> Tuple[Plant, bool, int, int]:
+def seed_plant_with_classifications(db: Session, plant_name: str) -> Tuple[Plant, bool, int, int, int]:
     """Create a plant with standard weight classifications."""
     # Check if plant already exists
     all_plants = plant_crud.get_plants(db, skip=0, limit=1000)
@@ -90,6 +90,7 @@ def seed_plant_with_classifications(db: Session, plant_name: str) -> Tuple[Plant
     existing_classifications = {wc.classification for wc in existing_wcs}
     
     created_dressed = 0
+    created_frozen = 0
     created_byproduct = 0
     
     # Create Dressed classifications
@@ -111,6 +112,28 @@ def seed_plant_with_classifications(db: Session, plant_name: str) -> Tuple[Plant
             except Exception as e:
                 raise ValueError(f"Failed to create Dressed classification {dc['classification']}: {str(e)}")
     
+    # Create Frozen classifications (same as Dressed)
+    # Check existing classifications by category to avoid duplicates
+    existing_frozen = {wc.classification for wc in existing_wcs if wc.category == "Frozen"}
+    for dc in DRESSED_CLASSIFICATIONS:
+        if dc["classification"] not in existing_frozen:
+            try:
+                weight_classification_crud.create_weight_classification(
+                    db,
+                    WeightClassificationCreate(
+                        plant_id=plant.id,
+                        classification=dc["classification"],
+                        min_weight=dc["min_weight"],
+                        max_weight=dc["max_weight"],
+                        description=dc["description"],
+                        category="Frozen"
+                    )
+                )
+                created_frozen += 1
+            except Exception as e:
+                # Skip if it fails (e.g., overlap), but don't raise
+                pass
+    
     # Create Byproduct classifications
     for bp in BYPRODUCT_CLASSIFICATIONS:
         if bp["classification"] not in existing_classifications:
@@ -130,7 +153,7 @@ def seed_plant_with_classifications(db: Session, plant_name: str) -> Tuple[Plant
             except Exception as e:
                 raise ValueError(f"Failed to create Byproduct classification {bp['classification']}: {str(e)}")
     
-    return plant, created, created_dressed, created_byproduct
+    return plant, created, created_dressed, created_frozen, created_byproduct
 
 
 def populate_test_sessions_for_plant(
@@ -158,9 +181,10 @@ def populate_test_sessions_for_plant(
     
     # Separate classifications by category
     dressed_wcs = [wc for wc in weight_classifications if wc.category == "Dressed"]
+    frozen_wcs = [wc for wc in weight_classifications if wc.category == "Frozen"]
     byproduct_wcs = [wc for wc in weight_classifications if wc.category == "Byproduct"]
     
-    if not dressed_wcs and not byproduct_wcs:
+    if not dressed_wcs and not frozen_wcs and not byproduct_wcs:
         raise ValueError(f"Plant '{plant_name}' has no valid weight classifications")
     
     # Generate customers
@@ -225,6 +249,14 @@ def populate_test_sessions_for_plant(
             num_dressed = random.randint(min_dressed, max_dressed)
             selected_dressed = random.sample(dressed_wcs, num_dressed)
             selected_wcs.extend(selected_dressed)
+        
+        # Select at least 3 Frozen classifications (or all if less than 3)
+        if frozen_wcs:
+            min_frozen = min(3, len(frozen_wcs))
+            max_frozen = len(frozen_wcs)
+            num_frozen = random.randint(min_frozen, max_frozen)
+            selected_frozen = random.sample(frozen_wcs, num_frozen)
+            selected_wcs.extend(selected_frozen)
         
         # Select at least 3 Byproduct classifications (or all if less than 3)
         if byproduct_wcs:
@@ -364,13 +396,13 @@ async def execute_console_command(
         plant_name = " ".join(parts[1:])  # Allow plant names with spaces
         
         try:
-            plant, created, created_dressed, created_byproduct = seed_plant_with_classifications(db, plant_name)
+            plant, created, created_dressed, created_frozen, created_byproduct = seed_plant_with_classifications(db, plant_name)
             
             message = f"Plant '{plant_name}' "
             if created:
-                message += f"created with {created_dressed} Dressed and {created_byproduct} Byproduct classifications."
+                message += f"created with {created_dressed} Dressed, {created_frozen} Frozen, and {created_byproduct} Byproduct classifications."
             else:
-                message += f"already exists. Added {created_dressed} Dressed and {created_byproduct} Byproduct classifications."
+                message += f"already exists. Added {created_dressed} Dressed, {created_frozen} Frozen, and {created_byproduct} Byproduct classifications."
             
             return ConsoleCommandResponse(
                 success=True,
@@ -380,6 +412,7 @@ async def execute_console_command(
                     "plant_name": plant.name,
                     "plant_created": created,
                     "dressed_classifications_created": created_dressed,
+                    "frozen_classifications_created": created_frozen,
                     "byproduct_classifications_created": created_byproduct
                 }
             )

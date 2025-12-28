@@ -103,6 +103,7 @@ export interface ExportResponse {
   customers: CustomerExportData[];
   grand_total_dc: number;
   grand_total_bp: number;
+  grand_total_fr: number;
 }
 
 export interface ExportRequest {

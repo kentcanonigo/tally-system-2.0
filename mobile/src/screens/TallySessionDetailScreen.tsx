@@ -356,6 +356,13 @@ function TallySessionDetailScreen() {
     });
   }, [allocations, weightClassifications]);
 
+  const frozenAllocations = useMemo(() => {
+    return allocations.filter((allocation) => {
+      const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+      return wc?.category === 'Frozen';
+    });
+  }, [allocations, weightClassifications]);
+
   const byproductAllocations = useMemo(() => {
     return allocations.filter((allocation) => {
       const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
@@ -749,6 +756,38 @@ function TallySessionDetailScreen() {
                       sessionId: sessionId,
                       tallyRole: 'dispatcher',
                       tallyMode: 'dressed',
+                    });
+                  },
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          },
+        },
+        {
+          text: 'Frozen',
+          onPress: () => {
+            Alert.alert(
+              'Select Role',
+              'Are you a tally-er or dispatcher?',
+              [
+                {
+                  text: 'Tally-er',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'tally',
+                      tallyMode: 'frozen',
+                    });
+                  },
+                },
+                {
+                  text: 'Dispatcher',
+                  onPress: () => {
+                    (navigation as any).navigate('Tally', {
+                      sessionId: sessionId,
+                      tallyRole: 'dispatcher',
+                      tallyMode: 'frozen',
                     });
                   },
                 },
@@ -1155,6 +1194,20 @@ function TallySessionDetailScreen() {
           ) : (
             <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
               {dressedAllocations.map((allocation) => renderAllocationCard(allocation))}
+            </View>
+          )}
+        </View>
+
+        {/* Frozen Allocations Section */}
+        <View style={{ marginBottom: responsive.spacing.lg }}>
+          <Text style={[dynamicStyles.sectionTitle, { marginBottom: responsive.spacing.md, fontSize: responsive.fontSize.medium }]}>
+            Frozen
+          </Text>
+          {frozenAllocations.length === 0 ? (
+            <Text style={styles.emptyText}>No Frozen allocations</Text>
+          ) : (
+            <View style={responsive.isLargeTablet ? styles.allocationGrid : undefined}>
+              {frozenAllocations.map((allocation) => renderAllocationCard(allocation))}
             </View>
           )}
         </View>

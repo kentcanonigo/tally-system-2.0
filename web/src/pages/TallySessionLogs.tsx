@@ -22,7 +22,7 @@ function TallySessionLogs() {
   const [filters, setFilters] = useState<{
     role: TallyLogEntryRole | 'all';
     weight_classification_id: number | 'all';
-    category: 'Dressed' | 'Byproduct' | 'all';
+    category: 'Dressed' | 'Byproduct' | 'Frozen' | 'all';
   }>({
     role: 'all',
     weight_classification_id: 'all',
@@ -536,13 +536,14 @@ function TallySessionLogs() {
             onChange={(e) =>
               setFilters({
                 ...filters,
-                category: e.target.value as 'Dressed' | 'Byproduct' | 'all',
+                category: e.target.value as 'Dressed' | 'Byproduct' | 'Frozen' | 'all',
               })
             }
             style={{ padding: '8px', minWidth: '150px' }}
           >
             <option value="all">All Categories</option>
             <option value="Dressed">Dressed</option>
+            <option value="Frozen">Frozen</option>
             <option value="Byproduct">Byproduct</option>
           </select>
         </div>

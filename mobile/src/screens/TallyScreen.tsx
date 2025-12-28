@@ -52,7 +52,7 @@ const formatApiErrorMessage = (error: any, fallback: string) => {
 interface TallyScreenProps {
   sessionId?: number;
   tallyRole?: 'tally' | 'dispatcher';
-  tallyMode?: 'dressed' | 'byproduct';
+  tallyMode?: 'dressed' | 'frozen' | 'byproduct';
   hideTitle?: boolean; // If true, don't update navigation title
   disableSafeArea?: boolean; // If true, don't wrap with SafeAreaView (for use as child component)
 }
@@ -77,7 +77,7 @@ function TallyScreen(props?: TallyScreenProps) {
   // Use props if provided, otherwise fall back to route params
   const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
   const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
-  const tallyMode = (props?.tallyMode ?? (route.params as any)?.tallyMode) as 'dressed' | 'byproduct' || 'dressed';
+  const tallyMode = (props?.tallyMode ?? (route.params as any)?.tallyMode) as 'dressed' | 'frozen' | 'byproduct' || 'dressed';
   const hideTitle = props?.hideTitle ?? false;
   const disableSafeArea = props?.disableSafeArea ?? false;
   const [session, setSession] = useState<TallySession | null>(null);
@@ -151,12 +151,12 @@ function TallyScreen(props?: TallyScreenProps) {
     
     if (plant && customer && session) {
       const titleParts = [customer.name, `Session #${session.session_number}`, formatDate(session.date, timezone)];
-      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
+      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : tallyMode === 'frozen' ? 'Frozen' : 'Dressed';
       const roleText = tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher';
       const titleText = `${titleParts.join(' - ')} (${modeText} - ${roleText})`;
       navigation.setOptions({ title: titleText });
     } else {
-      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : 'Dressed';
+      const modeText = tallyMode === 'byproduct' ? 'Byproduct' : tallyMode === 'frozen' ? 'Frozen' : 'Dressed';
       navigation.setOptions({ title: `Tally - ${modeText} - ${tallyRole === 'tally' ? 'Tally-er' : 'Dispatcher'}` });
     }
   }, [plant, customer, session, tallyRole, tallyMode, navigation, hideTitle]);
@@ -203,10 +203,21 @@ function TallyScreen(props?: TallyScreenProps) {
   };
 
   const findWeightClassification = (weight: number): WeightClassification | null => {
+    // Filter weight classifications based on mode
+    let filteredWCs = weightClassifications;
+    if (tallyMode === 'byproduct') {
+      filteredWCs = weightClassifications.filter(wc => wc.category === 'Byproduct');
+    } else if (tallyMode === 'frozen') {
+      filteredWCs = weightClassifications.filter(wc => wc.category === 'Frozen');
+    } else {
+      // dressed mode
+      filteredWCs = weightClassifications.filter(wc => wc.category === 'Dressed');
+    }
+    
     // Priority order: regular ranges > "up" ranges > "down" ranges > catch-all
     
     // First, check regular ranges (most specific)
-    for (const wc of weightClassifications) {
+    for (const wc of filteredWCs) {
       if (wc.min_weight !== null && wc.max_weight !== null) {
         if (weight >= wc.min_weight && weight <= wc.max_weight) {
           return wc;
@@ -215,7 +226,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     // Then check "up" ranges (less specific)
-    for (const wc of weightClassifications) {
+    for (const wc of filteredWCs) {
       if (wc.min_weight !== null && wc.max_weight === null) {
         if (weight >= wc.min_weight) {
           return wc;
@@ -224,7 +235,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     // Then check "down" ranges (less specific)
-    for (const wc of weightClassifications) {
+    for (const wc of filteredWCs) {
       if (wc.min_weight === null && wc.max_weight !== null) {
         if (weight <= wc.max_weight) {
           return wc;
@@ -233,7 +244,7 @@ function TallyScreen(props?: TallyScreenProps) {
     }
     
     // Finally, check catch-all (least specific)
-    const catchAll = weightClassifications.find(
+    const catchAll = filteredWCs.find(
       (wc) => wc.min_weight === null && wc.max_weight === null
     );
     return catchAll || null;
@@ -662,12 +673,17 @@ function TallyScreen(props?: TallyScreenProps) {
     }
   };
 
-  // Filter allocations based on mode: byproduct mode shows only byproducts, dressed mode shows only dressed
+  // Filter allocations based on mode: byproduct mode shows only byproducts, dressed mode shows only dressed, frozen mode shows only frozen
   const filteredAllocations = useMemo((): AllocationDetails[] => {
     if (tallyMode === 'byproduct') {
       return allocations.filter((allocation) => {
         const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
         return wc && wc.category === 'Byproduct';
+      });
+    } else if (tallyMode === 'frozen') {
+      return allocations.filter((allocation) => {
+        const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+        return wc && wc.category === 'Frozen';
       });
     } else {
       // dressed mode - show only dressed allocations
@@ -1077,10 +1093,17 @@ function TallyScreen(props?: TallyScreenProps) {
     }
   };
 
-  // Filter weight classifications to only Dressed category for manual input
+  // Filter weight classifications based on mode for manual input
   const dressedWeightClassifications = useMemo(() => {
-    return weightClassifications.filter((wc) => wc.category === 'Dressed');
-  }, [weightClassifications]);
+    if (tallyMode === 'frozen') {
+      return weightClassifications.filter((wc) => wc.category === 'Frozen');
+    } else if (tallyMode === 'dressed') {
+      return weightClassifications.filter((wc) => wc.category === 'Dressed');
+    } else {
+      // byproduct mode - return empty for manual input (byproduct uses different input)
+      return [];
+    }
+  }, [weightClassifications, tallyMode]);
 
   const dynamicStyles = {
     container: {
@@ -1693,10 +1716,16 @@ function TallyScreen(props?: TallyScreenProps) {
                 return wc && wc.category === 'Dressed';
               });
               
-              if (dressedAllocations.length > 0) {
-                return (
-                  <View style={{ marginBottom: responsive.spacing.md }}>
-                    <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Dressed</Text>
+              const frozenAllocations = filteredAllocations.filter((allocation) => {
+                const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                return wc && wc.category === 'Frozen';
+              });
+              
+              return (
+                <>
+                  {dressedAllocations.length > 0 && (
+                    <View style={{ marginBottom: responsive.spacing.md }}>
+                      <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Dressed</Text>
                     <View style={dynamicStyles.summaryTable}>
                       <View style={dynamicStyles.summaryHeader}>
                         <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.2 }]}>Class</Text>
@@ -1745,9 +1774,53 @@ function TallyScreen(props?: TallyScreenProps) {
                       })}
                     </View>
                   </View>
-                );
-              }
-              return null;
+                  )}
+                  
+                  {frozenAllocations.length > 0 && (
+                    <View style={{ marginBottom: responsive.spacing.md }}>
+                      <Text style={[dynamicStyles.summaryTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm, marginTop: 0 }]}>Frozen</Text>
+                      <View style={dynamicStyles.summaryTable}>
+                        <View style={dynamicStyles.summaryHeader}>
+                          <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.2 }]}>Class</Text>
+                          <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.5 }]}>Alloc / Req</Text>
+                          <Text style={[dynamicStyles.summaryHeaderText, { flex: 1 }]}>Total{'\n'}Heads</Text>
+                          <Text style={[dynamicStyles.summaryHeaderText, { flex: 1.3 }]}>Total{'\n'}Weight</Text>
+                        </View>
+                        {frozenAllocations.map((allocation: AllocationDetails) => {
+                          const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
+                          if (!wc) return null;
+                          
+                          const requiredBags = allocation.required_bags || 0;
+                          const roleEntryCount = getEntryCountForWeightClassification(allocation.weight_classification_id);
+                          const sum = getSumForWeightClassification(allocation.weight_classification_id);
+                          const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
+                          
+                          return (
+                            <View key={allocation.id} style={dynamicStyles.summaryRow}>
+                              <Text style={[dynamicStyles.summaryCell, { flex: 1.2, fontWeight: 'bold' }]}>
+                                {wc.classification}
+                              </Text>
+                              <Text style={[
+                                dynamicStyles.summaryCell,
+                                { flex: 1.5 },
+                                roleEntryCount > requiredBags && { color: '#e74c3c' }
+                              ]}>
+                                {requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`}
+                              </Text>
+                              <Text style={[dynamicStyles.summaryCell, { flex: 1 }]}>
+                                {totalHeads.toFixed(0)}
+                              </Text>
+                              <Text style={[dynamicStyles.summaryCell, { flex: 1.3 }]}>
+                                {sum.toFixed(2)}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+                </>
+              );
             })()}
             
             {/* Byproduct Allocations Table */}
@@ -1829,7 +1902,7 @@ function TallyScreen(props?: TallyScreenProps) {
     );
   };
 
-  const content = tallyMode === 'byproduct' ? renderByproductMode() : renderDressedMode();
+  const content = tallyMode === 'byproduct' ? renderByproductMode() : renderDressedMode(); // Frozen uses renderDressedMode since it works the same way
 
   const mainContent = (
     <>

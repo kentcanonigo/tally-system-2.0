@@ -12,7 +12,7 @@ const formatDateForFilename = (date: Date): string => {
 
 export const generateSessionReportPDF = (data: ExportResponse) => {
   const doc = new jsPDF();
-  const { customers, grand_total_dc, grand_total_bp } = data;
+  const { customers, grand_total_dc, grand_total_bp, grand_total_fr } = data;
 
   const tableBody: any[] = [];
 
@@ -21,10 +21,12 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
 
     // Split items by category
     const dcItems = items.filter(item => item.category === 'DC');
+    const frItems = items.filter(item => item.category === 'FR');
     const bpItems = items.filter(item => item.category === 'BP');
     
     // Calculate subtotals
     const dcSubtotal = dcItems.reduce((sum, item) => sum + item.bags, 0);
+    const frSubtotal = frItems.reduce((sum, item) => sum + item.bags, 0);
     const bpSubtotal = bpItems.reduce((sum, item) => sum + item.bags, 0);
 
     let isFirstRow = true;
@@ -54,6 +56,39 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
         },
         { 
           content: dcSubtotal.toString(), 
+          styles: { 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        }
+      ]);
+    }
+
+    // Process FR Items
+    if (frItems.length > 0) {
+      frItems.forEach((item) => {
+        tableBody.push([
+          isFirstRow ? { content: customer_name, styles: { fontStyle: 'bold' } } : '',
+          item.category,
+          item.classification,
+          item.bags
+        ]);
+        isFirstRow = false;
+      });
+
+      // FR Subtotal row
+      tableBody.push([
+        { 
+          content: 'Subtotal:', 
+          colSpan: 3, 
+          styles: { 
+            halign: 'right', 
+            fontStyle: 'bold',
+            lineWidth: { top: 0.1, bottom: 0.1 }
+          } 
+        },
+        { 
+          content: frSubtotal.toString(), 
           styles: { 
             fontStyle: 'bold',
             lineWidth: { top: 0.1, bottom: 0.1 }
@@ -148,20 +183,32 @@ export const generateSessionReportPDF = (data: ExportResponse) => {
   
   doc.setDrawColor(0);
   doc.setLineWidth(0.5);
-  doc.rect(startX, finalY, boxWidth, 24); // Box
-  
-  // Horizontal line inside box
-  doc.line(startX, finalY + 12, startX + boxWidth, finalY + 12);
   
   doc.setFontSize(12);
+  
+  // Adjust box height if FR exists
+  const boxHeight = grand_total_fr > 0 ? 36 : 24;
+  doc.rect(startX, finalY, boxWidth, boxHeight); // Box
+  
+  // Horizontal lines inside box
+  doc.line(startX, finalY + 12, startX + boxWidth, finalY + 12);
+  if (grand_total_fr > 0) {
+    doc.line(startX, finalY + 24, startX + boxWidth, finalY + 24);
+  }
   
   // DC Row
   doc.text('DC', startX + 5, finalY + 8);
   doc.text(grand_total_dc.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), startX + boxWidth - 5, finalY + 8, { align: 'right' });
   
+  // FR Row (if exists)
+  if (grand_total_fr > 0) {
+    doc.text('FR', startX + 5, finalY + 20);
+    doc.text(grand_total_fr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), startX + boxWidth - 5, finalY + 20, { align: 'right' });
+  }
+  
   // BP Row
-  doc.text('BP', startX + 5, finalY + 20);
-  doc.text(grand_total_bp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), startX + boxWidth - 5, finalY + 20, { align: 'right' });
+  doc.text('BP', startX + 5, finalY + (grand_total_fr > 0 ? 32 : 20));
+  doc.text(grand_total_bp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}), startX + boxWidth - 5, finalY + (grand_total_fr > 0 ? 32 : 20), { align: 'right' });
 
   // Generate filename with current date
   const currentDate = new Date();

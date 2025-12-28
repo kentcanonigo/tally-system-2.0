@@ -68,13 +68,17 @@ def export_sessions_data(
     )
 
     # Order by Customer Name, Category, Classification
+    # Category order: Dressed (DC) > Frozen (FR) > Byproduct (BP)
+    # Use CASE to define custom sort order
+    category_order = case(
+        (WeightClassification.category == "Dressed", 1),
+        (WeightClassification.category == "Frozen", 2),
+        (WeightClassification.category == "Byproduct", 3),
+        else_=4
+    )
     query = query.order_by(
         Customer.name,
-        WeightClassification.category.desc(), # Dressed (DC) usually comes before Byproduct (BP) or maybe standard alphabetical? 
-        # Actually Dressed starts with D, Byproduct starts with B.
-        # The image shows DC then BP.
-        # Let's sort by category DESC (Dressed > Byproduct) or specific mapping.
-        # If we want DC first, D > B.
+        category_order,
         WeightClassification.classification
     )
 
@@ -84,6 +88,7 @@ def export_sessions_data(
     customers_map: Dict[str, CustomerExportData] = {}
     grand_total_dc = 0.0
     grand_total_bp = 0.0
+    grand_total_fr = 0.0
 
     for row in results:
         customer_name = row.customer_name
@@ -92,7 +97,14 @@ def export_sessions_data(
         bags = row.total_bags
 
         # Map category
-        category_code = "DC" if category_raw == "Dressed" else "BP" if category_raw == "Byproduct" else category_raw
+        if category_raw == "Dressed":
+            category_code = "DC"
+        elif category_raw == "Byproduct":
+            category_code = "BP"
+        elif category_raw == "Frozen":
+            category_code = "FR"
+        else:
+            category_code = category_raw
 
         if customer_name not in customers_map:
             customers_map[customer_name] = CustomerExportData(
@@ -112,6 +124,8 @@ def export_sessions_data(
             grand_total_dc += bags
         elif category_code == "BP":
             grand_total_bp += bags
+        elif category_code == "FR":
+            grand_total_fr += bags
 
     # Convert map to list
     response_customers = list(customers_map.values())
@@ -119,7 +133,8 @@ def export_sessions_data(
     return ExportResponse(
         customers=response_customers,
         grand_total_dc=grand_total_dc,
-        grand_total_bp=grand_total_bp
+        grand_total_bp=grand_total_bp,
+        grand_total_fr=grand_total_fr
     )
 
 
@@ -175,13 +190,20 @@ def process_sessions_for_customer(
         """Return sort key: (category_order, classification_order)"""
         wc_id, classification = key
         wc = weight_classifications[wc_id]
-        category_order = 0 if wc.category == "Dressed" else 1
+        # Category order: Dressed (0) > Frozen (1) > Byproduct (2)
         if wc.category == "Dressed":
+            category_order = 0
+        elif wc.category == "Frozen":
+            category_order = 1
+        else:  # Byproduct
+            category_order = 2
+        
+        if wc.category == "Dressed" or wc.category == "Frozen":
             try:
                 class_order = dressed_order.index(classification)
             except ValueError:
                 class_order = 999
-        else:
+        else:  # Byproduct
             try:
                 class_order = byproduct_order.index(classification)
             except ValueError:
@@ -191,14 +213,14 @@ def process_sessions_for_customer(
     # Sort classifications
     sorted_classifications = sorted(entries_by_classification.keys(), key=get_classification_sort_key)
     
-    # Separate entries by category (Dressed vs Byproduct), keeping them grouped by classification
+    # Separate entries by category (Dressed/Frozen vs Byproduct), keeping them grouped by classification
     dressed_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
     byproduct_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
     
     for wc_id, classification in sorted_classifications:
         wc = weight_classifications[wc_id]
         entry_list = [(entry, wc_id, classification) for entry in entries_by_classification[(wc_id, classification)]]
-        if wc.category == "Dressed":
+        if wc.category == "Dressed" or wc.category == "Frozen":
             dressed_entries_by_classification[(wc_id, classification)] = entry_list
         else:
             byproduct_entries_by_classification[(wc_id, classification)] = entry_list
@@ -467,11 +489,13 @@ def process_sessions_for_customer(
         for entries in entries_by_classification.values()
     )
     
-    # Determine product type (use "Mixed" if both categories exist, otherwise use the single category)
+    # Determine product type (use "Mixed" if multiple categories exist, otherwise use the single category)
     categories = {wc.category for wc in weight_classifications.values()}
     if len(categories) == 1:
         if "Byproduct" in categories:
             product_type = "Byproduct"
+        elif "Frozen" in categories:
+            product_type = "Frozen Chicken"
         else:
             product_type = "Dressed Chicken"
     else:

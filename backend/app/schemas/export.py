@@ -17,6 +17,7 @@ class ExportResponse(BaseModel):
     customers: List[CustomerExportData]
     grand_total_dc: float
     grand_total_bp: float
+    grand_total_fr: float
 
 class ExportRequest(BaseModel):
     session_ids: List[int] = []

@@ -259,6 +259,8 @@ export const weightClassificationsApi = {
   update: (id: number, data: Partial<Omit<WeightClassification, 'id' | 'plant_id' | 'created_at' | 'updated_at'>>) =>
     api.put<WeightClassification>(`/weight-classifications/${id}`, data),
   delete: (id: number) => api.delete(`/weight-classifications/${id}`),
+  copyFromDressed: (plantId: number) =>
+    api.post<{ created: number; skipped: number; message: string }>(`/plants/${plantId}/weight-classifications/copy-from-dressed`),
 };
 
 // Tally Sessions API

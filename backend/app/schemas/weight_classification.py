@@ -4,7 +4,7 @@ from typing import Optional, Literal
 
 
 # Define allowed category values
-CategoryType = Literal['Dressed', 'Byproduct']
+CategoryType = Literal['Dressed', 'Byproduct', 'Frozen']
 
 
 class WeightClassificationBase(BaseModel):
@@ -18,7 +18,7 @@ class WeightClassificationBase(BaseModel):
     @field_validator('category')
     @classmethod
     def validate_category(cls, v: str) -> str:
-        allowed_categories = ['Dressed', 'Byproduct']
+        allowed_categories = ['Dressed', 'Byproduct', 'Frozen']
         if v not in allowed_categories:
             raise ValueError(f'category must be one of: {", ".join(allowed_categories)}')
         return v
@@ -32,14 +32,14 @@ class WeightClassificationBase(BaseModel):
 
     @model_validator(mode='after')
     def validate_description_and_weights(self):
-        # Validate description: required for Byproduct, optional for Dressed
+        # Validate description: required for Byproduct, optional for Dressed and Frozen
         if self.category == 'Byproduct':
             if not self.description or not self.description.strip():
                 raise ValueError('description is required for Byproduct category')
             # Skip weight validation for byproducts - they don't have weight ranges
             return self
         
-        # Validate weights for Dressed category only
+        # Validate weights for Dressed and Frozen categories (same rules)
         # Catch-all: both min and max must be null
         if self.min_weight is None and self.max_weight is None:
             return self  # Valid catch-all
@@ -78,7 +78,7 @@ class WeightClassificationUpdate(BaseModel):
     def validate_category(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        allowed_categories = ['Dressed', 'Byproduct']
+        allowed_categories = ['Dressed', 'Byproduct', 'Frozen']
         if v not in allowed_categories:
             raise ValueError(f'category must be one of: {", ".join(allowed_categories)}')
         return v
@@ -100,7 +100,7 @@ class WeightClassificationUpdate(BaseModel):
         if self.category == 'Byproduct':
             return self
         
-        # Only validate weights if at least one weight is being set and category is not Byproduct
+        # Only validate weights if at least one weight is being set and category is Dressed or Frozen
         if self.min_weight is None and self.max_weight is None:
             return self  # No weights being updated, skip validation
         

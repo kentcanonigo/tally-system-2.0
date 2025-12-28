@@ -73,8 +73,10 @@ def seed_weight_classes_for_plant(db: Session, plant_name: str) -> dict:
     existing_classifications = {wc.classification for wc in existing_wcs}
     
     created_dressed = 0
+    created_frozen = 0
     created_byproduct = 0
     skipped_dressed = 0
+    skipped_frozen = 0
     skipped_byproduct = 0
     errors = []
     
@@ -111,6 +113,40 @@ def seed_weight_classes_for_plant(db: Session, plant_name: str) -> dict:
             print(error_msg)
             errors.append(error_msg)
     
+    # Create Frozen classifications (same as Dressed)
+    print(f"\nSeeding Frozen classifications for {plant.name}...")
+    existing_frozen = {wc.classification for wc in existing_wcs if wc.category == "Frozen"}
+    for dc in DRESSED_CLASSIFICATIONS:
+        if dc["classification"] in existing_frozen:
+            print(f"  ⊘ Skipped (already exists): {dc['classification']}")
+            skipped_frozen += 1
+            continue
+        
+        try:
+            wc = weight_classification_crud.create_weight_classification(
+                db,
+                WeightClassificationCreate(
+                    plant_id=plant.id,
+                    classification=dc["classification"],
+                    min_weight=dc["min_weight"],
+                    max_weight=dc["max_weight"],
+                    description=dc["description"],
+                    category="Frozen"
+                )
+            )
+            weight_range = (
+                "catch-all" if (dc["min_weight"] is None and dc["max_weight"] is None)
+                else f"{dc['min_weight']} and up" if dc["max_weight"] is None
+                else f"{dc['max_weight']} and below" if dc["min_weight"] is None
+                else f"{dc['min_weight']}-{dc['max_weight']}"
+            )
+            print(f"  ✓ Created: {wc.classification} ({weight_range})")
+            created_frozen += 1
+        except Exception as e:
+            error_msg = f"  ✗ Failed to create {dc['classification']}: {str(e)}"
+            print(error_msg)
+            errors.append(error_msg)
+    
     # Create Byproduct classifications
     print(f"\nSeeding Byproduct classifications for {plant.name}...")
     for bp in BYPRODUCT_CLASSIFICATIONS:
@@ -140,8 +176,10 @@ def seed_weight_classes_for_plant(db: Session, plant_name: str) -> dict:
     
     return {
         "created_dressed": created_dressed,
+        "created_frozen": created_frozen,
         "created_byproduct": created_byproduct,
         "skipped_dressed": skipped_dressed,
+        "skipped_frozen": skipped_frozen,
         "skipped_byproduct": skipped_byproduct,
         "errors": errors
     }
@@ -150,7 +188,7 @@ def seed_weight_classes_for_plant(db: Session, plant_name: str) -> dict:
 def main():
     """Main function to run the seed script."""
     parser = argparse.ArgumentParser(
-        description="Seed standard weight classes (Dressed and Byproduct) for a selected plant."
+        description="Seed standard weight classes (Dressed, Frozen, and Byproduct) for a selected plant."
     )
     parser.add_argument(
         "--plant",
@@ -185,6 +223,8 @@ def main():
             print(f"Summary for plant '{args.plant}':")
             print(f"  - Dressed classifications created: {results['created_dressed']}")
             print(f"  - Dressed classifications skipped: {results['skipped_dressed']}")
+            print(f"  - Frozen classifications created: {results['created_frozen']}")
+            print(f"  - Frozen classifications skipped: {results['skipped_frozen']}")
             print(f"  - Byproduct classifications created: {results['created_byproduct']}")
             print(f"  - Byproduct classifications skipped: {results['skipped_byproduct']}")
             if results['errors']:

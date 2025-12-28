@@ -32,7 +32,7 @@ function TallyTabScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct'>('dressed');
+  const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct' | 'frozen'>('dressed');
   const [tallyRole, setTallyRole] = useState<'tally' | 'dispatcher'>('tally');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -869,7 +869,7 @@ function TallyTabScreen() {
               }}
             >
               <Text style={dynamicStyles.dropdownButtonText}>
-                {tallyMode === 'dressed' ? 'Dressed' : 'Byproduct'}
+                {tallyMode === 'dressed' ? 'Dressed' : tallyMode === 'frozen' ? 'Frozen' : 'Byproduct'}
               </Text>
               <MaterialIcons
                 name={showModeDropdown ? 'expand-less' : 'expand-more'}
@@ -1668,6 +1668,30 @@ function TallyTabScreen() {
                 Dressed
               </Text>
               {tallyMode === 'dressed' && (
+                <MaterialIcons name="check" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                tallyMode === 'frozen' && styles.dropdownOptionSelected,
+                { padding: responsive.padding.medium },
+              ]}
+              onPress={() => {
+                setTallyMode('frozen');
+                setShowModeDropdown(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  tallyMode === 'frozen' && styles.dropdownOptionTextSelected,
+                  { fontSize: responsive.fontSize.small },
+                ]}
+              >
+                Frozen
+              </Text>
+              {tallyMode === 'frozen' && (
                 <MaterialIcons name="check" size={20} color="#fff" />
               )}
             </TouchableOpacity>

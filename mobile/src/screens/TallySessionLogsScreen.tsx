@@ -37,7 +37,7 @@ function TallySessionLogsScreen() {
   const [filters, setFilters] = useState<{
     role: TallyLogEntryRole | 'all';
     weight_classification_id: number | 'all';
-    category: 'Dressed' | 'Byproduct' | 'all';
+    category: 'Dressed' | 'Byproduct' | 'Frozen' | 'all';
   }>({
     role: 'all',
     weight_classification_id: 'all',
@@ -201,7 +201,7 @@ function TallySessionLogsScreen() {
     return `${wc.classification} - ${formatWeightRange(wc)}`;
   };
 
-  const getCategoryLabel = (category: 'Dressed' | 'Byproduct' | 'all') => {
+  const getCategoryLabel = (category: 'Dressed' | 'Byproduct' | 'Frozen' | 'all') => {
     if (category === 'all') return 'All Categories';
     return category;
   };
@@ -1442,6 +1442,25 @@ function TallySessionLogsScreen() {
                   ]}
                 >
                   Dressed
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  filters.category === 'Frozen' && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setFilters({ ...filters, category: 'Frozen' });
+                  setShowCategoryDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    filters.category === 'Frozen' && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Frozen
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity

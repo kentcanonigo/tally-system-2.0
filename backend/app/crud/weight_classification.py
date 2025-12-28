@@ -75,7 +75,7 @@ def _check_overlaps(
 ) -> None:
     """
     Check if the given weight range overlaps with any existing classification
-    for the same plant and category. Only applies to Dressed category.
+    for the same plant and category. Applies to Dressed and Frozen categories.
     """
     # Skip weight range checking for byproducts
     if category == 'Byproduct':
@@ -116,7 +116,7 @@ def create_weight_classification(db: Session, weight_classification: WeightClass
             weight_classification.description
         )
     else:
-        # For Dressed category, check for weight range overlaps
+        # For Dressed and Frozen categories, check for weight range overlaps
         _check_overlaps(
             db,
             weight_classification.plant_id,
@@ -169,7 +169,7 @@ def update_weight_classification(db: Session, wc_id: int, wc_update: WeightClass
                 exclude_id=wc_id
             )
     else:
-        # For Dressed category, check for weight range overlaps if weight or category is being changed
+        # For Dressed and Frozen categories, check for weight range overlaps if weight or category is being changed
         if 'min_weight' in update_data or 'max_weight' in update_data or 'category' in update_data:
             _check_overlaps(
                 db,

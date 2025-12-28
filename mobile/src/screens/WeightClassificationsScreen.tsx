@@ -24,7 +24,7 @@ function WeightClassificationsScreen() {
   const [description, setDescription] = useState('');
   const [minWeight, setMinWeight] = useState('');
   const [maxWeight, setMaxWeight] = useState('');
-  const [category, setCategory] = useState<'Dressed' | 'Byproduct'>('Dressed');
+  const [category, setCategory] = useState<'Dressed' | 'Byproduct' | 'Frozen'>('Dressed');
   const [defaultHeads, setDefaultHeads] = useState('15');
 
   useEffect(() => {
@@ -79,7 +79,7 @@ function WeightClassificationsScreen() {
     setDescription(wc.description || '');
     setMinWeight(wc.min_weight?.toString() || '');
     setMaxWeight(wc.max_weight?.toString() || '');
-    setCategory(wc.category as 'Dressed' | 'Byproduct');
+    setCategory(wc.category as 'Dressed' | 'Byproduct' | 'Frozen');
     setDefaultHeads((wc.default_heads ?? 15).toString());
     setModalVisible(true);
   };
@@ -130,8 +130,9 @@ function WeightClassificationsScreen() {
   // Filter and group classifications by category
   const groupedClassifications = useMemo(() => {
     const dressed = weightClassifications.filter(wc => wc.category === 'Dressed');
+    const frozen = weightClassifications.filter(wc => wc.category === 'Frozen');
     const byproducts = weightClassifications.filter(wc => wc.category === 'Byproduct');
-    return { dressed, byproducts };
+    return { dressed, frozen, byproducts };
   }, [weightClassifications]);
 
   const handleSave = async () => {
@@ -159,7 +160,7 @@ function WeightClassificationsScreen() {
       };
 
       // Handle weights based on category
-      if (category === 'Dressed') {
+      if (category === 'Dressed' || category === 'Frozen') {
         // Parse weights - allow empty strings for null values
         data.min_weight = minWeight.trim() === '' ? null : parseFloat(minWeight);
         data.max_weight = maxWeight.trim() === '' ? null : parseFloat(maxWeight);
@@ -296,9 +297,42 @@ function WeightClassificationsScreen() {
         <Text style={dynamicStyles.title}>Weight Classifications</Text>
         {/* Only show add button if user has permission */}
         {hasPermission('can_manage_weight_classes') && (
-          <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
-            <MaterialIcons name="add" size={responsive.fontSize.medium} color="#fff" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity 
+              style={[dynamicStyles.addButton, { backgroundColor: '#95a5a6' }]} 
+              onPress={async () => {
+                if (!activePlantId) {
+                  Alert.alert('Error', 'No active plant selected.');
+                  return;
+                }
+                Alert.alert(
+                  'Copy from Dressed',
+                  'This will copy all Dressed weight classifications to Frozen. Continue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Copy',
+                      onPress: async () => {
+                        try {
+                          const response = await weightClassificationsApi.copyFromDressed(activePlantId);
+                          Alert.alert('Success', response.data.message);
+                          fetchData(false);
+                        } catch (error: any) {
+                          console.error('Error copying classifications:', error);
+                          Alert.alert('Error', error.response?.data?.detail || 'Failed to copy weight classifications');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <MaterialIcons name="content-copy" size={responsive.fontSize.medium} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={dynamicStyles.addButton} onPress={handleAdd}>
+              <MaterialIcons name="add" size={responsive.fontSize.medium} color="#fff" />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -341,6 +375,44 @@ function WeightClassificationsScreen() {
           ) : (
             <View style={styles.emptySectionContainer}>
               <Text style={dynamicStyles.emptySectionText}>No dressed classifications found</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Frozen Section */}
+        <View style={styles.section}>
+          <View style={dynamicStyles.sectionHeader}>
+            <Text style={dynamicStyles.sectionTitle}>Frozen</Text>
+          </View>
+          {groupedClassifications.frozen.length > 0 ? (
+            groupedClassifications.frozen.map((item) => (
+              <View key={item.id.toString()} style={dynamicStyles.card}>
+                <View style={styles.cardContent}>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.classification}>{item.classification}</Text>
+                    <Text style={styles.weightRange}>{formatWeightRange(item)}</Text>
+                    <Text style={styles.defaultHeads}>Default Heads: {item.default_heads ?? 15}</Text>
+                    {item.description && (
+                      <Text style={styles.description}>{item.description}</Text>
+                    )}
+                  </View>
+                  {/* Only show edit/delete buttons if user has permission */}
+                  {hasPermission('can_manage_weight_classes') && (
+                    <View style={styles.actions}>
+                      <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+                        <MaterialIcons name="edit" size={20} color="#3498db" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
+                        <MaterialIcons name="delete" size={20} color="#e74c3c" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptySectionContainer}>
+              <Text style={dynamicStyles.emptySectionText}>No frozen classifications found</Text>
             </View>
           )}
         </View>
@@ -421,6 +493,7 @@ function WeightClassificationsScreen() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Dressed" value="Dressed" />
+                  <Picker.Item label="Frozen" value="Frozen" />
                   <Picker.Item label="Byproduct" value="Byproduct" />
                 </Picker>
               </View>
@@ -444,10 +517,10 @@ function WeightClassificationsScreen() {
                 keyboardType="numeric"
               />
               <Text style={styles.helpText}>
-                Default number of heads for this classification (applies to both Dressed and Byproduct)
+                Default number of heads for this classification (applies to Dressed, Frozen, and Byproduct)
               </Text>
 
-              {category === 'Dressed' && (
+              {(category === 'Dressed' || category === 'Frozen') && (
                 <>
                   <Text style={styles.label}>Min Weight (kg) - Leave empty for "up to" or catch-all</Text>
                   <TextInput

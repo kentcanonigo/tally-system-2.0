@@ -1,17 +1,19 @@
 import { ExportResponse, CustomerExportData } from '../types';
 
 export const generateSessionReportHTML = (data: ExportResponse): string => {
-  const { customers, grand_total_dc, grand_total_bp } = data;
+  const { customers, grand_total_dc, grand_total_bp, grand_total_fr } = data;
 
   const generateCustomerRows = (customer: CustomerExportData) => {
     const { customer_name, items } = customer;
     
     // Split items by category
     const dcItems = items.filter(item => item.category === 'DC');
+    const frItems = items.filter(item => item.category === 'FR');
     const bpItems = items.filter(item => item.category === 'BP');
     
     // Calculate subtotals
     const dcSubtotal = dcItems.reduce((sum, item) => sum + item.bags, 0);
+    const frSubtotal = frItems.reduce((sum, item) => sum + item.bags, 0);
     const bpSubtotal = bpItems.reduce((sum, item) => sum + item.bags, 0);
     
     let rows = '';
@@ -36,6 +38,29 @@ export const generateSessionReportHTML = (data: ExportResponse): string => {
         <tr class="subtotal-row">
           <td colspan="3" class="right-text"><b>Subtotal:</b></td>
           <td class="center-text"><b>${dcSubtotal}</b></td>
+        </tr>
+      `;
+    }
+
+    // Render FR items if any
+    if (frItems.length > 0) {
+      frItems.forEach((item) => {
+        rows += `
+          <tr>
+            <td class="customer-col">${isFirstRow ? `<b>${customer_name}</b>` : ''}</td>
+            <td class="center-text">${item.category}</td>
+            <td class="center-text">${item.classification}</td>
+            <td class="center-text">${item.bags}</td>
+          </tr>
+        `;
+        isFirstRow = false;
+      });
+      
+      // FR Subtotal
+      rows += `
+        <tr class="subtotal-row">
+          <td colspan="3" class="right-text"><b>Subtotal:</b></td>
+          <td class="center-text"><b>${frSubtotal}</b></td>
         </tr>
       `;
     }
@@ -103,7 +128,7 @@ export const generateSessionReportHTML = (data: ExportResponse): string => {
           font-weight: bold;
           font-size: 16px;
         }
-        .grand-total-row:first-child {
+        .grand-total-row:not(:last-child) {
           border-bottom: 1px solid black;
         }
         .grand-total-label {
@@ -136,6 +161,12 @@ export const generateSessionReportHTML = (data: ExportResponse): string => {
             <span>DC</span>
             <span>${grand_total_dc.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
           </div>
+          ${grand_total_fr > 0 ? `
+          <div class="grand-total-row">
+            <span>FR</span>
+            <span>${grand_total_fr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+          </div>
+          ` : ''}
           <div class="grand-total-row">
             <span>BP</span>
             <span>${grand_total_bp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
