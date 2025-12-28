@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVE_SESSIONS_KEY = 'activeSessions';
 const SELECTED_SESSION_KEY = 'selectedSessionId';
-const MAX_ACTIVE_SESSIONS = 10;
+// No limit on active sessions
+const MAX_ACTIVE_SESSIONS = Number.MAX_SAFE_INTEGER;
 
 /**
  * Get all active session IDs from storage
@@ -27,9 +28,8 @@ export const getActiveSessions = async (): Promise<number[]> => {
  */
 export const setActiveSessions = async (sessionIds: number[]): Promise<void> => {
   try {
-    // Ensure we don't exceed max
-    const limitedIds = sessionIds.slice(0, MAX_ACTIVE_SESSIONS);
-    await AsyncStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(limitedIds));
+    // No limit - save all session IDs
+    await AsyncStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(sessionIds));
   } catch (error) {
     console.error('Error setting active sessions:', error);
     throw error;
@@ -37,8 +37,8 @@ export const setActiveSessions = async (sessionIds: number[]): Promise<void> => 
 };
 
 /**
- * Add a session to active sessions (if not already active and under limit)
- * Returns true if added, false if not (already active or at limit)
+ * Add a session to active sessions (if not already active)
+ * Returns true if added, false if not (already active)
  */
 export const addActiveSession = async (sessionId: number): Promise<boolean> => {
   try {
@@ -49,12 +49,7 @@ export const addActiveSession = async (sessionId: number): Promise<boolean> => {
       return false;
     }
     
-    // Check if at limit
-    if (activeSessions.length >= MAX_ACTIVE_SESSIONS) {
-      return false;
-    }
-    
-    // Add the session
+    // Add the session (no limit check)
     activeSessions.push(sessionId);
     await setActiveSessions(activeSessions);
     return true;

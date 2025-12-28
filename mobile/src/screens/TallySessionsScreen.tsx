@@ -15,7 +15,7 @@ import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
-import { getActiveSessions, toggleActiveSession, isActiveSession, getMaxActiveSessions, setActiveSessions } from '../utils/activeSessions';
+import { getActiveSessions, toggleActiveSession, isActiveSession, setActiveSessions } from '../utils/activeSessions';
 import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
@@ -188,29 +188,11 @@ function TallySessionsScreen() {
           );
           return;
         }
-        
-        if (activeSessionIds.length >= getMaxActiveSessions()) {
-          Alert.alert(
-            'Maximum Active Sessions Reached',
-            `You can only have ${getMaxActiveSessions()} active sessions at a time. Please remove an active session first.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
       }
       
       // Allow unstarring (removing from active) regardless of status
-      const newActiveStatus = await toggleActiveSession(sessionId);
+      await toggleActiveSession(sessionId);
       await loadActiveSessions();
-      
-      if (!newActiveStatus && !isActive) {
-        // This means we tried to add but hit the limit (shouldn't happen due to check above, but just in case)
-        Alert.alert(
-          'Maximum Active Sessions Reached',
-          `You can only have ${getMaxActiveSessions()} active sessions at a time.`,
-          [{ text: 'OK' }]
-        );
-      }
     } catch (error) {
       console.error('Error toggling active session:', error);
       Alert.alert('Error', 'Failed to update active session');
