@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal, BackHandler, ViewStyle, TextStyle, DimensionValue } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform, Modal, BackHandler, ViewStyle, TextStyle, DimensionValue, TextInput } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDate, formatTime } from '../utils/dateFormat';
+import { formatDate, formatTime, formatDateTime } from '../utils/dateFormat';
 import { useAcceptableDifference } from '../utils/settings';
 import {
   tallySessionsApi,
@@ -12,7 +12,7 @@ import {
   weightClassificationsApi,
   tallyLogEntriesApi,
 } from '../services/api';
-import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry } from '../types';
+import type { TallySession, Customer, Plant, WeightClassification, TallyLogEntry, TallyLogEntryAudit } from '../types';
 import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
@@ -65,6 +65,21 @@ function TallySessionLogsScreen() {
   const [selectedTargetCustomerId, setSelectedTargetCustomerId] = useState<number | null>(null);
   const [selectedTargetSessionId, setSelectedTargetSessionId] = useState<number | null>(null);
   const [loadingTransferData, setLoadingTransferData] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TallyLogEntry | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    weight: 0,
+    role: TallyLogEntryRole.TALLY,
+    heads: 0,
+    notes: '',
+    weight_classification_id: 0,
+  });
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [selectedEntryForAudit, setSelectedEntryForAudit] = useState<TallyLogEntry | null>(null);
+  const [auditHistory, setAuditHistory] = useState<TallyLogEntryAudit[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [showEditWeightClassDropdown, setShowEditWeightClassDropdown] = useState(false);
+  const [showEditRoleDropdown, setShowEditRoleDropdown] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -463,6 +478,138 @@ function TallySessionLogsScreen() {
   const openTransferModal = () => {
     setShowTransferModal(true);
     loadTransferData();
+  };
+
+  const handleDeleteEntry = async (entryId: number) => {
+    if (!hasPermission('can_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to delete tally log entries.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Log Entry',
+      'Are you sure you want to delete this log entry? This action cannot be undone and will update the allocation counts.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await tallyLogEntriesApi.delete(entryId);
+              Alert.alert('Success', 'Log entry deleted successfully');
+              fetchData();
+            } catch (error: any) {
+              console.error('Error deleting log entry:', error);
+              const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete log entry';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEditEntry = (entry: TallyLogEntry) => {
+    setEditingEntry(entry);
+    setEditFormData({
+      weight: entry.weight,
+      role: entry.role,
+      heads: entry.heads || 0,
+      notes: entry.notes || '',
+      weight_classification_id: entry.weight_classification_id,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEntry = async () => {
+    if (!editingEntry) return;
+
+    if (!hasPermission('can_tally')) {
+      Alert.alert('Permission Denied', 'You do not have permission to edit tally log entries.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Only send fields that have changed
+      const updateData: any = {};
+      if (editFormData.weight !== editingEntry.weight) {
+        updateData.weight = editFormData.weight;
+      }
+      if (editFormData.role !== editingEntry.role) {
+        updateData.role = editFormData.role;
+      }
+      if (editFormData.heads !== (editingEntry.heads || 0)) {
+        updateData.heads = editFormData.heads;
+      }
+      if (editFormData.notes !== (editingEntry.notes || '')) {
+        updateData.notes = editFormData.notes || null;
+      }
+      if (editFormData.weight_classification_id !== editingEntry.weight_classification_id) {
+        updateData.weight_classification_id = editFormData.weight_classification_id;
+      }
+
+      await tallyLogEntriesApi.update(editingEntry.id, updateData);
+      Alert.alert('Success', 'Log entry updated successfully');
+      setShowEditModal(false);
+      setEditingEntry(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating log entry:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to update log entry';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAuditHistory = async (entry: TallyLogEntry) => {
+    setSelectedEntryForAudit(entry);
+    setLoadingAudit(true);
+    setShowAuditModal(true);
+    try {
+      const response = await tallyLogEntriesApi.getAuditHistory(entry.id);
+      setAuditHistory(response.data);
+    } catch (error: any) {
+      console.error('Error loading audit history:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load audit history';
+      Alert.alert('Error', errorMessage);
+      setShowAuditModal(false);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const formatFieldName = (fieldName: string): string => {
+    const fieldMap: Record<string, string> = {
+      'weight': 'Weight',
+      'role': 'Role',
+      'heads': 'Heads',
+      'notes': 'Notes',
+      'weight_classification': 'Weight Classification',
+      'tally_session': 'Tally Session',
+    };
+    return fieldMap[fieldName] || fieldName;
+  };
+
+  const formatFieldValue = (fieldName: string, value: any): string => {
+    if (value === null || value === undefined) {
+      return '(empty)';
+    }
+    if (fieldName === 'role') {
+      return value === 'tally' ? 'Tally-er' : 'Dispatcher';
+    }
+    if (fieldName === 'weight') {
+      return `${value} kg`;
+    }
+    if (fieldName === 'heads') {
+      return value.toString();
+    }
+    return String(value);
   };
 
   if (loading) {
@@ -962,6 +1109,9 @@ function TallySessionLogsScreen() {
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Weight</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 0.8 }]}>Heads</Text>
           <Text style={[dynamicStyles.tableHeaderText, { flex: 1.2 }]}>Time</Text>
+          {hasPermission('can_tally') && !selectionMode && (
+            <Text style={[dynamicStyles.tableHeaderText, { flex: 1.5 }]}>Actions</Text>
+          )}
         </View>
         {filteredEntries.length > 0 ? (
           filteredEntries.map((entry) => {
@@ -1031,6 +1181,55 @@ function TallySessionLogsScreen() {
                 <Text style={[dynamicStyles.tableCell, { flex: 1.2, fontSize: 10 }]} numberOfLines={1}>
                   {formatTime(entry.created_at, timezone)}
                 </Text>
+                {hasPermission('can_tally') && !selectionMode && (
+                  <View style={{ flex: 1.5, flexDirection: 'row', gap: 4, paddingHorizontal: 4 }}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleEditEntry(entry);
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: 4,
+                        backgroundColor: '#6c757d',
+                        borderRadius: 4,
+                        opacity: loading ? 0.5 : 1,
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        loadAuditHistory(entry);
+                      }}
+                      disabled={loading || loadingAudit}
+                      style={{
+                        padding: 4,
+                        backgroundColor: '#17a2b8',
+                        borderRadius: 4,
+                        opacity: (loading || loadingAudit) ? 0.5 : 1,
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>History</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteEntry(entry.id);
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: 4,
+                        backgroundColor: '#dc3545',
+                        borderRadius: 4,
+                        opacity: loading ? 0.5 : 1,
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Del</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })
@@ -1716,6 +1915,351 @@ function TallySessionLogsScreen() {
                 </View>
               )}
             </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingEntry && (
+        <Modal
+          transparent
+          visible={showEditModal}
+          animationType="fade"
+          onRequestClose={() => {
+            setShowEditModal(false);
+            setEditingEntry(null);
+          }}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowEditModal(false);
+              setEditingEntry(null);
+            }}
+          >
+            <View 
+              style={dynamicStyles.columnSettingsModal}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={dynamicStyles.columnSettingsTitle}>Edit Log Entry</Text>
+              
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Weight Classification:</Text>
+              <View style={dynamicStyles.pickerWrapper}>
+                <TouchableOpacity
+                  style={dynamicStyles.dropdownButton}
+                  onPress={() => setShowEditWeightClassDropdown(true)}
+                  disabled={loading}
+                >
+                  <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
+                    {(() => {
+                      const selectedWc = weightClassifications.find(wc => wc.id === editFormData.weight_classification_id);
+                      return selectedWc 
+                        ? `${selectedWc.classification} (${selectedWc.category}) - ${formatWeightRange(selectedWc)}`
+                        : 'Select Weight Classification';
+                    })()}
+                  </Text>
+                  <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Role:</Text>
+              <View style={dynamicStyles.pickerWrapper}>
+                <TouchableOpacity
+                  style={dynamicStyles.dropdownButton}
+                  onPress={() => setShowEditRoleDropdown(true)}
+                  disabled={loading}
+                >
+                  <Text style={dynamicStyles.dropdownText}>
+                    {editFormData.role === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'}
+                  </Text>
+                  <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Weight (kg):</Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ddd',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#fff',
+                }}
+                keyboardType="numeric"
+                value={editFormData.weight.toString()}
+                onChangeText={(text) => setEditFormData({ ...editFormData, weight: parseFloat(text) || 0 })}
+                editable={!loading}
+              />
+
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Heads:</Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ddd',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#fff',
+                }}
+                keyboardType="numeric"
+                value={editFormData.heads.toString()}
+                onChangeText={(text) => setEditFormData({ ...editFormData, heads: parseFloat(text) || 0 })}
+                editable={!loading}
+              />
+
+              <Text style={[dynamicStyles.filterLabel, { marginTop: 16, marginBottom: 8 }]}>Notes:</Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ddd',
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: '#fff',
+                  minHeight: 80,
+                  textAlignVertical: 'top',
+                }}
+                multiline
+                numberOfLines={3}
+                value={editFormData.notes}
+                onChangeText={(text) => setEditFormData({ ...editFormData, notes: text })}
+                editable={!loading}
+              />
+
+              <View style={{ flexDirection: 'row', marginTop: responsive.spacing.md, gap: responsive.spacing.sm }}>
+                <TouchableOpacity
+                  style={[dynamicStyles.columnSettingsButton, { flex: 1, backgroundColor: '#95a5a6' }]}
+                  onPress={() => {
+                    setShowEditModal(false);
+                    setEditingEntry(null);
+                  }}
+                  disabled={loading}
+                >
+                  <Text style={dynamicStyles.columnSettingsButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    dynamicStyles.columnSettingsButton,
+                    { flex: 1 },
+                    loading && { opacity: 0.5 }
+                  ]}
+                  onPress={handleUpdateEntry}
+                  disabled={loading}
+                >
+                  <Text style={dynamicStyles.columnSettingsButtonText}>
+                    {loading ? 'Updating...' : 'Update'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Edit Weight Classification Dropdown Modal */}
+      {showEditWeightClassDropdown && (
+        <Modal
+          transparent
+          visible={showEditWeightClassDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowEditWeightClassDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowEditWeightClassDropdown(false)}
+          >
+            <ScrollView 
+              style={dynamicStyles.dropdownMenuScroll}
+              contentContainerStyle={dynamicStyles.dropdownMenu}
+              showsVerticalScrollIndicator
+              onStartShouldSetResponder={() => true}
+            >
+              {weightClassifications.map((wc, index) => (
+                <TouchableOpacity
+                  key={wc.id}
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    index === weightClassifications.length - 1 && dynamicStyles.dropdownOptionLast,
+                    editFormData.weight_classification_id === wc.id && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setEditFormData({ ...editFormData, weight_classification_id: wc.id });
+                    setShowEditWeightClassDropdown(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      dynamicStyles.dropdownOptionText,
+                      editFormData.weight_classification_id === wc.id && dynamicStyles.dropdownOptionTextSelected,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {wc.classification} ({wc.category}) - {formatWeightRange(wc)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Edit Role Dropdown Modal */}
+      {showEditRoleDropdown && (
+        <Modal
+          transparent
+          visible={showEditRoleDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowEditRoleDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowEditRoleDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  editFormData.role === TallyLogEntryRole.TALLY && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setEditFormData({ ...editFormData, role: TallyLogEntryRole.TALLY });
+                  setShowEditRoleDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    editFormData.role === TallyLogEntryRole.TALLY && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Tally-er
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  dynamicStyles.dropdownOption,
+                  dynamicStyles.dropdownOptionLast,
+                  editFormData.role === TallyLogEntryRole.DISPATCHER && dynamicStyles.dropdownOptionSelected,
+                ]}
+                onPress={() => {
+                  setEditFormData({ ...editFormData, role: TallyLogEntryRole.DISPATCHER });
+                  setShowEditRoleDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.dropdownOptionText,
+                    editFormData.role === TallyLogEntryRole.DISPATCHER && dynamicStyles.dropdownOptionTextSelected,
+                  ]}
+                >
+                  Dispatcher
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Audit History Modal */}
+      {showAuditModal && selectedEntryForAudit && (
+        <Modal
+          transparent
+          visible={showAuditModal}
+          animationType="fade"
+          onRequestClose={() => {
+            setShowAuditModal(false);
+            setSelectedEntryForAudit(null);
+            setAuditHistory([]);
+          }}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowAuditModal(false);
+              setSelectedEntryForAudit(null);
+              setAuditHistory([]);
+            }}
+          >
+            <View 
+              style={[dynamicStyles.columnSettingsModal, { maxHeight: '80%', width: responsive.isTablet ? Math.min(responsive.width * 0.7, 600) : '90%' }]}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={dynamicStyles.columnSettingsTitle}>Edit History - Entry #{selectedEntryForAudit.id}</Text>
+              
+              {loadingAudit ? (
+                <Text style={{ textAlign: 'center', padding: 20, color: '#666' }}>Loading audit history...</Text>
+              ) : auditHistory.length === 0 ? (
+                <Text style={{ textAlign: 'center', padding: 20, color: '#666' }}>
+                  No edit history found for this entry.
+                </Text>
+              ) : (
+                <ScrollView style={{ maxHeight: '70%' }}>
+                  <Text style={[dynamicStyles.columnSettingsSubtitle, { marginBottom: 16 }]}>
+                    This entry has been edited {auditHistory.length} time{auditHistory.length !== 1 ? 's' : ''}.
+                  </Text>
+                  {auditHistory.map((audit, index) => (
+                    <View
+                      key={audit.id}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        padding: 12,
+                        marginBottom: 12,
+                        backgroundColor: '#f9f9f9',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#2c3e50' }}>
+                          Edit #{auditHistory.length - index}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#666' }}>
+                          {formatDateTime(audit.edited_at, timezone)}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                        Edited by: <Text style={{ fontWeight: '600' }}>{audit.user_username || `User ID ${audit.user_id}`}</Text>
+                      </Text>
+                      <Text style={{ fontWeight: '600', marginBottom: 8, fontSize: 13 }}>Changes:</Text>
+                      {Object.entries(audit.changes).map(([fieldName, change]) => (
+                        <View key={fieldName} style={{ marginBottom: 6, paddingLeft: 8 }}>
+                          <Text style={{ fontSize: 12, color: '#2c3e50' }}>
+                            <Text style={{ fontWeight: '600' }}>{formatFieldName(fieldName)}:</Text>{' '}
+                            <Text style={{ color: '#e74c3c' }}>
+                              {formatFieldValue(fieldName, change.old)}
+                            </Text>
+                            {' → '}
+                            <Text style={{ color: '#27ae60' }}>
+                              {formatFieldValue(fieldName, change.new)}
+                            </Text>
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              <TouchableOpacity
+                style={[dynamicStyles.columnSettingsButton, { marginTop: responsive.spacing.md }]}
+                onPress={() => {
+                  setShowAuditModal(false);
+                  setSelectedEntryForAudit(null);
+                  setAuditHistory([]);
+                }}
+                disabled={loadingAudit}
+              >
+                <Text style={dynamicStyles.columnSettingsButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </Modal>
       )}

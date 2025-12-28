@@ -73,6 +73,20 @@ export interface TallyLogEntry {
   transferred_at?: string | null;
 }
 
+export interface ChangeDetail {
+  old: any;
+  new: any;
+}
+
+export interface TallyLogEntryAudit {
+  id: number;
+  tally_log_entry_id: number;
+  user_id: number;
+  edited_at: string;
+  changes: Record<string, ChangeDetail>;
+  user_username?: string | null;
+}
+
 export interface ExportItem {
   category: string;
   classification: string;

@@ -9,6 +9,7 @@ import type {
   TallySession,
   AllocationDetails,
   TallyLogEntry,
+  TallyLogEntryAudit,
   TallyLogEntryRole,
   ExportRequest,
   ExportResponse,
@@ -300,6 +301,10 @@ export const tallyLogEntriesApi = {
     }),
   getById: (entryId: number) =>
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
+  getAuditHistory: (entryId: number) =>
+    api.get<TallyLogEntryAudit[]>(`/log-entries/${entryId}/audit`),
+  update: (entryId: number, data: { weight?: number; role?: TallyLogEntryRole; heads?: number; notes?: string | null; weight_classification_id?: number; tally_session_id?: number }) =>
+    api.put<TallyLogEntry>(`/log-entries/${entryId}`, data),
   delete: (entryId: number) =>
     api.delete(`/log-entries/${entryId}`),
   transfer: (entryIds: number[], targetSessionId: number) =>
