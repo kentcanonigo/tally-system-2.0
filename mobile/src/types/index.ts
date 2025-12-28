@@ -97,6 +97,7 @@ export interface ExportRequest {
   date_to?: string;
   customer_id?: number;
   plant_id?: number;
+  role?: TallyLogEntryRole;
 }
 
 // Authentication types

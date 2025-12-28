@@ -310,7 +310,7 @@ export const tallyLogEntriesApi = {
 export const exportApi = {
   exportSessions: (data: ExportRequest) =>
     api.post<ExportResponse>('/export/sessions', data),
-  exportTallySheet: (data: { session_ids: number[] }) =>
+  exportTallySheet: (data: { session_ids: number[]; role?: TallyLogEntryRole }) =>
     api.post<any>('/export/tally-sheet', data),
 };
 

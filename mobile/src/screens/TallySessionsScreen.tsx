@@ -10,7 +10,7 @@ import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { tallySessionsApi, customersApi, plantsApi, exportApi, allocationDetailsApi } from '../services/api';
 import type { TallySession, Customer, Plant } from '../types';
-import { TallySessionStatus } from '../types';
+import { TallySessionStatus, TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePlant } from '../contexts/PlantContext';
@@ -66,6 +66,10 @@ function TallySessionsScreen() {
   const [exporting, setExporting] = useState(false);
   const [showExportTypeModal, setShowExportTypeModal] = useState(false);
   const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
+  const [showDateExportModal, setShowDateExportModal] = useState(false);
+  const [exportDate, setExportDate] = useState<string>('');
+  const [exportRole, setExportRole] = useState<TallyLogEntryRole>(TallyLogEntryRole.TALLY);
+  const [selectingDateForExport, setSelectingDateForExport] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to page 1 when plant changes
@@ -275,12 +279,14 @@ function TallySessionsScreen() {
     setShowExportTypeModal(true);
   };
 
-  const handleExportAllocationSummary = async () => {
+  const handleExportAllocationSummary = async (role?: TallyLogEntryRole) => {
     try {
       setExporting(true);
       
+      const selectedRole = role || TallyLogEntryRole.TALLY;
       const response = await exportApi.exportSessions({
-        session_ids: selectedSessionIds
+        session_ids: selectedSessionIds,
+        role: selectedRole
       });
 
       const html = generateSessionReportHTML(response.data);
@@ -362,14 +368,15 @@ function TallySessionsScreen() {
     }
   };
 
-  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
-    if (selectedSessionIds.length === 0) {
+  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole, sessionIds?: number[]) => {
+    const idsToUse = sessionIds || selectedSessionIds;
+    if (idsToUse.length === 0) {
       Alert.alert('No Sessions Selected', 'Please select at least one session to export.');
       return;
     }
 
     // Check for allocation mismatches
-    const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(selectedSessionIds);
+    const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(idsToUse);
     
     if (hasMismatches) {
       const sessionList = mismatchedSessions.join('\n• ');
@@ -386,7 +393,7 @@ function TallySessionsScreen() {
           },
           {
             text: 'Proceed',
-            onPress: () => performExport(format)
+            onPress: () => performExport(format, role, idsToUse)
           }
         ]
       );
@@ -394,17 +401,20 @@ function TallySessionsScreen() {
     }
 
     // No mismatches, proceed with export
-    performExport(format);
+    performExport(format, role, idsToUse);
   };
 
-  const performExport = async (format: 'pdf' | 'excel') => {
+  const performExport = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole, sessionIds?: number[]) => {
     try {
       setExporting(true);
       setShowTallySheetFormatModal(false);
       setShowExportTypeModal(false);
 
+      const idsToUse = sessionIds || selectedSessionIds;
+      const selectedRole = role || TallyLogEntryRole.TALLY;
       const response = await exportApi.exportTallySheet({
-        session_ids: selectedSessionIds
+        session_ids: idsToUse,
+        role: selectedRole
       });
 
       if (format === 'pdf') {
@@ -454,6 +464,110 @@ function TallySessionsScreen() {
     } catch (error) {
       console.error('Tally sheet export error:', error);
       Alert.alert('Error', 'Failed to export tally sheet');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportByDate = async (exportType: 'allocation' | 'tally-sheet', format?: 'pdf' | 'excel') => {
+    if (!exportDate) {
+      Alert.alert('Date Required', 'Please select a date');
+      return;
+    }
+
+    setExporting(true);
+    setShowDateExportModal(false);
+    
+    try {
+      // Fetch all sessions for the selected date
+      const response = await tallySessionsApi.getAll({});
+      const allSessionsForDate = response.data;
+      
+      // Filter sessions by the selected date
+      const dateStr = exportDate; // YYYY-MM-DD format
+      const sessionsForDate = allSessionsForDate.filter(session => {
+        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        return sessionDate === dateStr;
+      });
+
+      if (sessionsForDate.length === 0) {
+        Alert.alert('No Sessions', `No sessions found for ${formatDate(exportDate, timezone)}`);
+        setExporting(false);
+        return;
+      }
+
+      const sessionIds = sessionsForDate.map(s => s.id);
+      const selectedRole = exportRole;
+
+      if (exportType === 'allocation') {
+        // Export allocation details using date filter
+        const exportResponse = await exportApi.exportSessions({ 
+          date_from: exportDate, 
+          date_to: exportDate, 
+          role: selectedRole 
+        });
+        const data = exportResponse.data;
+        
+        // Check if the report is empty
+        if (!data.customers || data.customers.length === 0) {
+          Alert.alert(
+            'No Data',
+            `Cannot export allocation report: No ${selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for ${formatDate(exportDate, timezone)}.`
+          );
+          setExporting(false);
+          return;
+        }
+        
+        // Check if all customers have no items
+        const hasAnyItems = data.customers.some(customer => 
+          customer.items && customer.items.length > 0
+        );
+        
+        if (!hasAnyItems) {
+          Alert.alert(
+            'No Data',
+            `Cannot export allocation report: No ${selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for ${formatDate(exportDate, timezone)}.`
+          );
+          setExporting(false);
+          return;
+        }
+        
+        const html = generateSessionReportHTML(data);
+        const { uri } = await printToFileAsync({
+          html,
+          base64: false
+        });
+
+        const dateString = formatDateForFilename(new Date(exportDate));
+        const filename = `Allocation Report - ${formatDate(exportDate, timezone)} (${dateString}).pdf`;
+        
+        const fileDir = uri.substring(0, uri.lastIndexOf('/') + 1);
+        const newUri = fileDir + filename;
+        
+        const fileInfo = await FileSystem.getInfoAsync(newUri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(newUri, { idempotent: true });
+        }
+        
+        await FileSystem.moveAsync({
+          from: uri,
+          to: newUri,
+        });
+
+        await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } else if (exportType === 'tally-sheet' && format) {
+        // Export tally sheet using session IDs
+        await handleExportTallySheet(format, selectedRole, sessionIds);
+        return; // handleExportTallySheet handles setExporting(false)
+      }
+    } catch (error: any) {
+      console.error('Export by date failed', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No') && (errorMessage.includes('data') || errorMessage.includes('allocation') || errorMessage.includes('tally entries'))) {
+        Alert.alert('No Data', `Cannot export: No data found for ${formatDate(exportDate, timezone)}.`);
+      } else {
+        Alert.alert('Export Failed', `Export failed: ${errorMessage}`);
+      }
     } finally {
       setExporting(false);
     }
@@ -694,6 +808,15 @@ function TallySessionsScreen() {
   }, [allSessions, dateRange, isSingleDateSelection]);
 
   const handleDateSelect = (day: { dateString: string }) => {
+    // If selecting date for export, handle it differently
+    if (selectingDateForExport) {
+      setExportDate(day.dateString);
+      setSelectingDateForExport(false);
+      setShowCalendar(false);
+      setShowDateExportModal(true);
+      return;
+    }
+
     // If no dates are selected, start a new selection
     if (!dateRange.startDate) {
       setDateRange({ startDate: day.dateString, endDate: day.dateString });
@@ -734,6 +857,7 @@ function TallySessionsScreen() {
   const clearDateFilter = () => {
     setDateRange({ startDate: null, endDate: null });
     setShowCalendar(false);
+    setSelectingDateForExport(false);
   };
 
   const getDateRangeText = () => {
@@ -1025,6 +1149,15 @@ function TallySessionsScreen() {
             </>
           ) : (
             <>
+              {hasPermission('can_export_data') && (
+                <TouchableOpacity
+                  style={[dynamicStyles.calendarButton, { backgroundColor: '#27ae60' }]}
+                  onPress={() => setShowDateExportModal(true)}
+                  disabled={exporting}
+                >
+                  <MaterialIcons name="event" size={responsive.fontSize.large} color="#fff" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[dynamicStyles.calendarButton, (dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId) && styles.calendarButtonActive]}
                 onPress={() => setShowFilters(true)}
@@ -1221,7 +1354,13 @@ function TallySessionsScreen() {
         visible={showCalendar}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowCalendar(false)}
+        onRequestClose={() => {
+          setShowCalendar(false);
+          if (selectingDateForExport) {
+            setSelectingDateForExport(false);
+            setShowDateExportModal(true);
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={dynamicStyles.calendarModal}>
@@ -1244,7 +1383,17 @@ function TallySessionsScreen() {
                     })}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                <TouchableOpacity onPress={() => {
+                  const wasSelectingForExport = selectingDateForExport;
+                  setShowCalendar(false);
+                  setSelectingDateForExport(false);
+                  if (wasSelectingForExport) {
+                    // Small delay to ensure calendar modal closes first
+                    setTimeout(() => {
+                      setShowDateExportModal(true);
+                    }, 300);
+                  }
+                }}>
                   <Text style={styles.closeButton}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -1398,6 +1547,129 @@ function TallySessionsScreen() {
 
       {/* Filter Modal */}
       {renderFilterModal()}
+
+      {/* Date Export Modal */}
+      {hasPermission('can_export_data') && (
+        <Modal
+          transparent
+          visible={showDateExportModal}
+          animationType="slide"
+          onRequestClose={() => {
+            setShowDateExportModal(false);
+            setExportDate('');
+          }}
+        >
+          <View style={styles.filterModalOverlay}>
+            <View style={styles.dateExportModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Export All Sessions for Date</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowDateExportModal(false);
+                  setExportDate('');
+                }}>
+                  <MaterialIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                style={styles.modalBody} 
+                contentContainerStyle={[styles.modalBodyContent, { paddingBottom: 20 }]}
+                showsVerticalScrollIndicator={true}
+              >
+                <Text style={styles.filterLabel}>Date</Text>
+                <TouchableOpacity
+                  style={styles.datePickerButton}
+                  onPress={() => {
+                    // Use the existing calendar modal for date selection
+                    setSelectingDateForExport(true);
+                    setShowDateExportModal(false);
+                    setShowCalendar(true);
+                  }}
+                >
+                  <Text style={styles.datePickerButtonText}>
+                    {exportDate ? formatDate(exportDate, timezone) : 'Select Date'}
+                  </Text>
+                  <MaterialIcons name="calendar-today" size={20} color="#3498db" />
+                </TouchableOpacity>
+
+                <Text style={styles.filterLabel}>Role</Text>
+                <View style={styles.filterPickerContainer}>
+                  <Picker
+                    selectedValue={exportRole}
+                    onValueChange={(itemValue) => setExportRole(itemValue)}
+                  >
+                    <Picker.Item label="Tally-er" value={TallyLogEntryRole.TALLY} />
+                    <Picker.Item label="Dispatcher" value={TallyLogEntryRole.DISPATCHER} />
+                  </Picker>
+                </View>
+
+                <Text style={styles.filterLabel}>Export Type</Text>
+                <TouchableOpacity
+                  style={[styles.exportTypeOption, styles.exportTypeOptionPrimary, { marginBottom: 10 }]}
+                  onPress={() => handleExportByDate('allocation')}
+                  disabled={exporting || !exportDate}
+                >
+                  <MaterialIcons
+                    name="description"
+                    size={24}
+                    color="#fff"
+                    style={styles.exportTypeOptionIcon}
+                  />
+                  <View style={styles.exportTypeOptionContent}>
+                    <Text style={styles.exportTypeOptionTitleLight}>Allocation Details</Text>
+                    <Text style={styles.exportTypeOptionDescLight}>
+                      Export all allocation details for this date
+                    </Text>
+                  </View>
+                  {exporting && <ActivityIndicator size="small" color="#fff" />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.exportTypeOption, styles.exportTypeOptionSecondary]}
+                  onPress={() => {
+                    setShowDateExportModal(false);
+                    // Show format selection modal
+                    Alert.alert(
+                      'Select Format',
+                      'Choose the format for tally sheet export:',
+                      [
+                        {
+                          text: 'PDF',
+                          onPress: () => handleExportByDate('tally-sheet', 'pdf')
+                        },
+                        {
+                          text: 'Excel',
+                          onPress: () => handleExportByDate('tally-sheet', 'excel')
+                        },
+                        {
+                          text: 'Cancel',
+                          style: 'cancel',
+                          onPress: () => setShowDateExportModal(true)
+                        }
+                      ]
+                    );
+                  }}
+                  disabled={exporting || !exportDate}
+                >
+                  <MaterialIcons
+                    name="list-alt"
+                    size={24}
+                    color="#fff"
+                    style={styles.exportTypeOptionIcon}
+                  />
+                  <View style={styles.exportTypeOptionContent}>
+                    <Text style={styles.exportTypeOptionTitleLight}>Tally Sheet</Text>
+                    <Text style={styles.exportTypeOptionDescLight}>
+                      Export all tally sheets for this date
+                    </Text>
+                  </View>
+                  {exporting && <ActivityIndicator size="small" color="#fff" />}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Export Type Selection Modal */}
       {hasPermission('can_export_data') && (
@@ -1972,6 +2244,9 @@ const styles = StyleSheet.create({
   exportTypeOptionPrimary: {
     backgroundColor: '#27ae60',
   },
+  exportTypeOptionSecondary: {
+    backgroundColor: '#3498db',
+  },
   exportTypeOptionDisabled: {
     backgroundColor: '#ecf0f1',
     opacity: 0.7,
@@ -2022,6 +2297,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#7f8c8d',
     fontWeight: '600',
+  },
+  dateExportModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    width: '100%',
   },
 });
 
