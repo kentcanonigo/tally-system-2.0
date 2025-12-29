@@ -1,7 +1,7 @@
 """add_tally_role_permissions
 
 Revision ID: 022_add_tally_role_permissions
-Revises: 021_add_tally_log_entry_permissions
+Revises: 021_add_tally_log_perms
 Create Date: 2025-01-29 15:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision = '022_add_tally_role_permissions'
-down_revision = '021_add_tally_log_entry_permissions'
+down_revision = '021_add_tally_log_perms'
 branch_labels = None
 depends_on = None
 

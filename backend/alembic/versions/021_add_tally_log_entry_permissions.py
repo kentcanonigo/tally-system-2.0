@@ -1,6 +1,6 @@
 """add_tally_log_entry_permissions
 
-Revision ID: 021_add_tally_log_entry_permissions
+Revision ID: 021_add_tally_log_perms
 Revises: 020_add_frozen_category
 Create Date: 2025-01-29 14:00:00.000000
 
@@ -12,7 +12,7 @@ from datetime import datetime
 
 
 # revision identifiers, used by Alembic.
-revision = '021_add_tally_log_entry_permissions'
+revision = '021_add_tally_log_perms'
 down_revision = '020_add_frozen_category'
 branch_labels = None
 depends_on = None
