@@ -30,7 +30,8 @@
       "statusBar": {
         "backgroundColor": "#db2175",
         "barStyle": "light-content"
-      }
+      },
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
