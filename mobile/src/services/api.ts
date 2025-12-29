@@ -121,6 +121,14 @@ let API_BASE_URL = Platform.OS === 'android'
 
 const TOKEN_KEY = 'tally_system_token';
 
+// Global logout callback that can be set by AuthContext
+let logoutCallback: (() => Promise<void>) | null = null;
+
+// Export function to register logout callback
+export const setLogoutCallback = (callback: (() => Promise<void>) | null) => {
+  logoutCallback = callback;
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -154,8 +162,13 @@ api.interceptors.response.use(
       // Clear token on 401
       try {
         await AsyncStorage.removeItem(TOKEN_KEY);
+        // Trigger logout callback if registered to sign out user and navigate to login
+        if (logoutCallback) {
+          console.log('[API] Session expired (401), triggering logout');
+          await logoutCallback();
+        }
       } catch (err) {
-        console.error('[API] Error removing token:', err);
+        console.error('[API] Error handling 401:', err);
       }
     }
     return Promise.reject(error);

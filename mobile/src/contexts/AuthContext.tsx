@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { setLogoutCallback } from '../services/api';
 import { User, LoginRequest, AuthResponse, UserRole, UserPreferencesUpdate } from '../types';
 
 const TOKEN_KEY = 'tally_system_token';
@@ -64,6 +65,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
 
     return () => clearInterval(interval);
   }, [initialApiBaseUrl]);
+
+  // Register logout callback with API service on mount, unregister on unmount
+  useEffect(() => {
+    setLogoutCallback(logout);
+    return () => {
+      setLogoutCallback(null);
+    };
+  }, [logout]);
 
   // Load token and user on mount
   useEffect(() => {
@@ -132,7 +141,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(TOKEN_KEY);
       setUser(null);
@@ -140,7 +149,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     } catch (err) {
       console.error('Failed to logout:', err);
     }
-  };
+  }, []);
 
   const refetchUser = async () => {
     if (token) {
