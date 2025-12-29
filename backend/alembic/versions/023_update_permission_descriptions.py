@@ -1,6 +1,6 @@
 """update_permission_descriptions
 
-Revision ID: 023_update_permission_descriptions
+Revision ID: 023_update_perm_descriptions
 Revises: 022_add_tally_role_permissions
 Create Date: 2025-01-29 16:00:00.000000
 
@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 
 # revision identifiers, used by Alembic.
-revision = '023_update_permission_descriptions'
+revision = '023_update_perm_descriptions'
 down_revision = '022_add_tally_role_permissions'
 branch_labels = None
 depends_on = None

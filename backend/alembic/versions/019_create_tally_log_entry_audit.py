@@ -1,6 +1,6 @@
 """create tally_log_entry_audit table
 
-Revision ID: 019_create_tally_log_entry_audit
+Revision ID: 019_create_tally_log_audit
 Revises: 018_add_transfer_tracking
 Create Date: 2025-01-28 12:00:00.000000
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '019_create_tally_log_entry_audit'
+revision = '019_create_tally_log_audit'
 down_revision = '018_add_transfer_tracking'
 branch_labels = None
 depends_on = None

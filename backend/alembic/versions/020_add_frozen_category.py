@@ -1,7 +1,7 @@
 """Add Frozen category to weight_classifications
 
 Revision ID: 020_add_frozen_category
-Revises: 019_create_tally_log_entry_audit
+Revises: 019_create_tally_log_audit
 Create Date: 2025-01-29 12:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '020_add_frozen_category'
-down_revision = '019_create_tally_log_entry_audit'
+down_revision = '019_create_tally_log_audit'
 branch_labels = None
 depends_on = None
 
