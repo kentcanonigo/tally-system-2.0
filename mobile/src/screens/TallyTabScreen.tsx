@@ -7,7 +7,7 @@ import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { tallySessionsApi, customersApi, exportApi, allocationDetailsApi, tallyLogEntriesApi } from '../services/api';
 import type { TallySession, Customer } from '../types';
-import { TallySessionStatus } from '../types';
+import { TallySessionStatus, TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { getActiveSessions, removeActiveSession, setActiveSessions, getSelectedSessionId, setSelectedSessionId as persistSelectedSessionId } from '../utils/activeSessions';
 import TallyScreen from './TallyScreen';
@@ -26,14 +26,19 @@ function TallyTabScreen() {
   const { activePlantId } = usePlant();
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, user } = usePermissions();
   const [activeSessionIds, setActiveSessionIds] = useState<number[]>([]);
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [tallyMode, setTallyMode] = useState<'dressed' | 'byproduct' | 'frozen'>('dressed');
-  const [tallyRole, setTallyRole] = useState<'tally' | 'dispatcher'>('tally');
+  const canTallyAsTallyer = hasPermission('can_tally_as_tallyer');
+  const canTallyAsDispatcher = hasPermission('can_tally_as_dispatcher');
+  
+  // Set default role based on available permissions
+  const defaultRole = canTallyAsTallyer ? 'tally' : (canTallyAsDispatcher ? 'dispatcher' : 'tally');
+  const [tallyRole, setTallyRole] = useState<'tally' | 'dispatcher'>(defaultRole);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -43,6 +48,38 @@ function TallyTabScreen() {
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  
+  // Update role if permissions change and current role is not allowed
+  useEffect(() => {
+    // If user has neither permission, default to 'tally' (will be disabled anyway)
+    if (!canTallyAsTallyer && !canTallyAsDispatcher) {
+      setTallyRole('tally');
+      setShowRoleDropdown(false); // Close dropdown if no permissions
+      return;
+    }
+    
+    // Close dropdown if it's open but user doesn't have permission for current role
+    if (showRoleDropdown) {
+      if (tallyRole === 'tally' && !canTallyAsTallyer) {
+        setShowRoleDropdown(false);
+      } else if (tallyRole === 'dispatcher' && !canTallyAsDispatcher) {
+        setShowRoleDropdown(false);
+      }
+    }
+    
+    // If current role is 'tally' but user doesn't have permission, switch to dispatcher if available
+    if (tallyRole === 'tally' && !canTallyAsTallyer && canTallyAsDispatcher) {
+      setTallyRole('dispatcher');
+    } 
+    // If current role is 'dispatcher' but user doesn't have permission, switch to tally if available
+    else if (tallyRole === 'dispatcher' && !canTallyAsDispatcher && canTallyAsTallyer) {
+      setTallyRole('tally');
+    }
+    // If current role is 'dispatcher' but user doesn't have permission and no tally permission, force to tally
+    else if (tallyRole === 'dispatcher' && !canTallyAsDispatcher && !canTallyAsTallyer) {
+      setTallyRole('tally');
+    }
+  }, [canTallyAsTallyer, canTallyAsDispatcher, tallyRole, showRoleDropdown]);
   const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -458,7 +495,7 @@ function TallyTabScreen() {
       const checkPromises = sessionIds.map(async (sessionId) => {
         try {
           // Try to fetch tally log entries for this session (TALLY role only)
-          const entriesRes = await tallyLogEntriesApi.getBySession(sessionId, 'tally');
+          const entriesRes = await tallyLogEntriesApi.getBySession(sessionId, TallyLogEntryRole.TALLY);
           const entries = entriesRes.data;
           
           if (entries.length === 0) {
@@ -878,25 +915,31 @@ function TallyTabScreen() {
               />
             </TouchableOpacity>
           </View>
-          {/* Role dropdown */}
-          <View>
-            <TouchableOpacity
-              style={dynamicStyles.dropdownButton}
-              onPress={() => {
-                setShowModeDropdown(false);
-                setShowRoleDropdown(!showRoleDropdown);
-              }}
-            >
-              <Text style={dynamicStyles.dropdownButtonText}>
-                {tallyRole === 'tally' ? 'Tallyer' : 'Dispatcher'}
-              </Text>
-              <MaterialIcons
-                name={showRoleDropdown ? 'expand-less' : 'expand-more'}
-                size={20}
-                color="#ecf0f1"
-              />
-            </TouchableOpacity>
-          </View>
+          {/* Role dropdown - only show if user has at least one permission */}
+          {(canTallyAsTallyer || canTallyAsDispatcher) && (
+            <View>
+              <TouchableOpacity
+                style={dynamicStyles.dropdownButton}
+                onPress={() => {
+                  // Only open dropdown if user has at least one permission
+                  if (canTallyAsTallyer || canTallyAsDispatcher) {
+                    setShowModeDropdown(false);
+                    setShowRoleDropdown(!showRoleDropdown);
+                  }
+                }}
+                disabled={!canTallyAsTallyer && !canTallyAsDispatcher}
+              >
+                <Text style={dynamicStyles.dropdownButtonText}>
+                  {tallyRole === 'tally' ? 'Tallyer' : 'Dispatcher'}
+                </Text>
+                <MaterialIcons
+                  name={showRoleDropdown ? 'expand-less' : 'expand-more'}
+                  size={20}
+                  color="#ecf0f1"
+                />
+              </TouchableOpacity>
+            </View>
+          )}
           {/* View Logs button - icon only */}
           {hasPermission('can_view_tally_logs') && selectedSessionId && (
             <TouchableOpacity
@@ -1724,13 +1767,14 @@ function TallyTabScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Role Dropdown Modal */}
-      <Modal
-        transparent
-        visible={showRoleDropdown}
-        animationType="fade"
-        onRequestClose={() => setShowRoleDropdown(false)}
-      >
+      {/* Role Dropdown Modal - only render if user has at least one permission */}
+      {(canTallyAsTallyer || canTallyAsDispatcher) && (
+        <Modal
+          transparent
+          visible={showRoleDropdown && (canTallyAsTallyer || canTallyAsDispatcher)}
+          animationType="fade"
+          onRequestClose={() => setShowRoleDropdown(false)}
+        >
         <TouchableOpacity
           style={styles.dropdownOverlay}
           activeOpacity={1}
@@ -1746,58 +1790,73 @@ function TallyTabScreen() {
             ]}
             onStartShouldSetResponder={() => true}
           >
-            <TouchableOpacity
-              style={[
-                styles.dropdownOption,
-                tallyRole === 'tally' && styles.dropdownOptionSelected,
-                { padding: responsive.padding.medium },
-              ]}
-              onPress={() => {
-                setTallyRole('tally');
-                setShowRoleDropdown(false);
-              }}
-            >
-              <Text
+            {canTallyAsTallyer && hasPermission('can_tally_as_tallyer') ? (
+              <TouchableOpacity
                 style={[
-                  styles.dropdownOptionText,
-                  tallyRole === 'tally' && styles.dropdownOptionTextSelected,
-                  { fontSize: responsive.fontSize.small },
+                  styles.dropdownOption,
+                  tallyRole === 'tally' && styles.dropdownOptionSelected,
+                  { padding: responsive.padding.medium },
                 ]}
+                onPress={() => {
+                  // Triple-check permission before allowing role change
+                  if (hasPermission('can_tally_as_tallyer')) {
+                    setTallyRole('tally');
+                    setShowRoleDropdown(false);
+                  } else {
+                    console.warn('[TallyTabScreen] Permission check failed for can_tally_as_tallyer');
+                  }
+                }}
               >
-                Tallyer
-              </Text>
-              {tallyRole === 'tally' && (
-                <MaterialIcons name="check" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.dropdownOption,
-                styles.dropdownOptionLast,
-                tallyRole === 'dispatcher' && styles.dropdownOptionSelected,
-                { padding: responsive.padding.medium },
-              ]}
-              onPress={() => {
-                setTallyRole('dispatcher');
-                setShowRoleDropdown(false);
-              }}
-            >
-              <Text
+                <Text
+                  style={[
+                    styles.dropdownOptionText,
+                    tallyRole === 'tally' && styles.dropdownOptionTextSelected,
+                    { fontSize: responsive.fontSize.small },
+                  ]}
+                >
+                  Tallyer
+                </Text>
+                {tallyRole === 'tally' && (
+                  <MaterialIcons name="check" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            ) : null}
+            {canTallyAsDispatcher && hasPermission('can_tally_as_dispatcher') ? (
+              <TouchableOpacity
                 style={[
-                  styles.dropdownOptionText,
-                  tallyRole === 'dispatcher' && styles.dropdownOptionTextSelected,
-                  { fontSize: responsive.fontSize.small },
+                  styles.dropdownOption,
+                  (!canTallyAsTallyer || tallyRole === 'dispatcher') && styles.dropdownOptionLast,
+                  tallyRole === 'dispatcher' && styles.dropdownOptionSelected,
+                  { padding: responsive.padding.medium },
                 ]}
+                onPress={() => {
+                  // Triple-check permission before allowing role change
+                  if (hasPermission('can_tally_as_dispatcher')) {
+                    setTallyRole('dispatcher');
+                    setShowRoleDropdown(false);
+                  } else {
+                    console.warn('[TallyTabScreen] Permission check failed for can_tally_as_dispatcher');
+                  }
+                }}
               >
-                Dispatcher
-              </Text>
-              {tallyRole === 'dispatcher' && (
-                <MaterialIcons name="check" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.dropdownOptionText,
+                    tallyRole === 'dispatcher' && styles.dropdownOptionTextSelected,
+                    { fontSize: responsive.fontSize.small },
+                  ]}
+                >
+                  Dispatcher
+                </Text>
+                {tallyRole === 'dispatcher' && (
+                  <MaterialIcons name="check" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            ) : null}
           </View>
         </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }

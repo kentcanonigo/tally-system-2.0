@@ -182,10 +182,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
 
   // Helper to check if user has a specific RBAC role
   const hasRole = (roleName: string): boolean => {
-    if (!user || !user.role_ids || user.role_ids.length === 0) return false;
-    // For SUPERADMIN, check via legacy field or permissions count (they have all permissions)
-    return user.role === UserRole.SUPERADMIN || 
-           (roleName === 'SUPERADMIN' && user.permissions && user.permissions.length >= 4);
+    if (!user) return false;
+    // Check the legacy role field (set by backend based on actual role)
+    if (roleName === 'SUPERADMIN') {
+      return user.role === UserRole.SUPERADMIN;
+    }
+    if (roleName === 'ADMIN') {
+      return user.role === UserRole.ADMIN;
+    }
+    // For other roles, we'd need to check role_ids against role names from the backend
+    // For now, only SUPERADMIN and ADMIN are supported via the legacy role field
+    return false;
   };
 
   const hasPermission = (permissionCode: string): boolean => {

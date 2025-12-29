@@ -49,6 +49,12 @@ export default function RoleEdit() {
         setDescription(role.description || '');
         setIsSystem(role.is_system);
         setSelectedPermissions(role.permissions.map(p => p.id));
+      } else {
+        // For new roles, check can_tally_as_tallyer by default
+        const canTallyAsTallyerPerm = permissions.find(p => p.code === 'can_tally_as_tallyer');
+        if (canTallyAsTallyerPerm) {
+          setSelectedPermissions([canTallyAsTallyerPerm.id]);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load data');

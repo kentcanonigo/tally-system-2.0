@@ -7,7 +7,8 @@ from ...schemas.tally_log_entry_audit import TallyLogEntryAuditResponse
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
 from ...crud import tally_log_entry_audit as audit_crud
-from ...auth.dependencies import get_current_user, require_permission
+from ...auth.dependencies import get_current_user, require_permission, user_has_role
+from ...crud import user as user_crud
 from ...models import User
 
 router = APIRouter()
@@ -22,12 +23,31 @@ def create_tally_log_entry(
     session_id: int,
     log_entry: TallyLogEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("can_tally"))
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new tally log entry for a session. Requires 'can_tally' permission.
+    Create a new tally log entry for a session. 
+    Requires 'can_tally_as_tallyer' permission for TALLY role entries,
+    or 'can_tally_as_dispatcher' permission for DISPATCHER role entries.
     This will also automatically increment the corresponding allocation detail.
     """
+    # Check permission based on role
+    is_superadmin = user_has_role(current_user, 'SUPERADMIN')
+    user_permissions = user_crud.get_user_permissions(db, current_user.id) if not is_superadmin else []
+    
+    if log_entry.role == TallyLogEntryRole.TALLY:
+        if not is_superadmin and 'can_tally_as_tallyer' not in user_permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Permission 'can_tally_as_tallyer' required to create tally entries as Tally-er"
+            )
+    elif log_entry.role == TallyLogEntryRole.DISPATCHER:
+        if not is_superadmin and 'can_tally_as_dispatcher' not in user_permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Permission 'can_tally_as_dispatcher' required to create tally entries as Dispatcher"
+            )
+    
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:

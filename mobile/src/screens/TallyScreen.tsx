@@ -64,8 +64,14 @@ function TallyScreen(props?: TallyScreenProps) {
   const { timezone } = useTimezone();
   const { hasPermission } = usePermissions();
   
-  // Check if user has permission to start/add tally entries
-  const canStartTally = hasPermission('can_tally');
+  // Use props if provided, otherwise fall back to route params
+  const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
+  const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
+  
+  // Check if user has permission to start/add tally entries based on the role they're using
+  const canTallyAsTallyer = hasPermission('can_tally_as_tallyer');
+  const canTallyAsDispatcher = hasPermission('can_tally_as_dispatcher');
+  const canStartTally = tallyRole === 'tally' ? canTallyAsTallyer : canTallyAsDispatcher;
   
   // Single source of truth for can_view_tally_logs permission
   const canViewLogs = useMemo(() => hasPermission('can_view_tally_logs'), [hasPermission]);
@@ -73,10 +79,6 @@ function TallyScreen(props?: TallyScreenProps) {
   // Consistent disabled styling for input elements
   const disabledInputStyle = !canStartTally ? { opacity: 0.5, backgroundColor: '#d5d8dc' } : {};
   const disabledButtonStyle = !canStartTally ? { opacity: 0.5 } : {};
-  
-  // Use props if provided, otherwise fall back to route params
-  const sessionId = props?.sessionId ?? (route.params as any)?.sessionId;
-  const tallyRole = (props?.tallyRole ?? (route.params as any)?.tallyRole) as 'tally' | 'dispatcher' || 'tally';
   const tallyMode = (props?.tallyMode ?? (route.params as any)?.tallyMode) as 'dressed' | 'frozen' | 'byproduct' || 'dressed';
   const hideTitle = props?.hideTitle ?? false;
   const disableSafeArea = props?.disableSafeArea ?? false;

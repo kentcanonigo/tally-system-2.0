@@ -728,105 +728,82 @@ function TallySessionDetailScreen() {
   };
 
   const handleStartTally = () => {
+    // Explicitly check permissions - don't rely on cached values
+    const canTallyAsTallyer = hasPermission('can_tally_as_tallyer');
+    const canTallyAsDispatcher = hasPermission('can_tally_as_dispatcher');
+    
+    if (!canTallyAsTallyer && !canTallyAsDispatcher) {
+      Alert.alert('Permission Denied', 'You do not have permission to tally entries.');
+      return;
+    }
+    
+    const createRoleAlert = (mode: 'dressed' | 'frozen' | 'byproduct') => {
+      const roleButtons: any[] = [];
+      
+      // Double-check permissions before adding buttons
+      if (hasPermission('can_tally_as_tallyer')) {
+        roleButtons.push({
+          text: 'Tally-er',
+          onPress: () => {
+            // Triple-check before navigation
+            if (hasPermission('can_tally_as_tallyer')) {
+              (navigation as any).navigate('Tally', {
+                sessionId: sessionId,
+                tallyRole: 'tally',
+                tallyMode: mode,
+              });
+            } else {
+              Alert.alert('Permission Denied', 'You do not have permission to tally as Tally-er.');
+            }
+          },
+        });
+      }
+      
+      // Double-check permissions before adding buttons
+      if (hasPermission('can_tally_as_dispatcher')) {
+        roleButtons.push({
+          text: 'Dispatcher',
+          onPress: () => {
+            // Triple-check before navigation
+            if (hasPermission('can_tally_as_dispatcher')) {
+              (navigation as any).navigate('Tally', {
+                sessionId: sessionId,
+                tallyRole: 'dispatcher',
+                tallyMode: mode,
+              });
+            } else {
+              Alert.alert('Permission Denied', 'You do not have permission to tally as Dispatcher.');
+            }
+          },
+        });
+      }
+      
+      // If no role buttons were added, show error
+      if (roleButtons.length === 0) {
+        Alert.alert('Permission Denied', 'You do not have permission to tally entries.');
+        return;
+      }
+      
+      roleButtons.push({ text: 'Cancel', style: 'cancel' });
+      
+      Alert.alert('Select Role', 'Are you a tally-er or dispatcher?', roleButtons);
+    };
+    
     Alert.alert(
       'Select Mode',
       'What would you like to tally?',
       [
         {
           text: 'Dressed',
-          onPress: () => {
-            Alert.alert(
-              'Select Role',
-              'Are you a tally-er or dispatcher?',
-              [
-                {
-                  text: 'Tally-er',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'tally',
-                      tallyMode: 'dressed',
-                    });
-                  },
-                },
-                {
-                  text: 'Dispatcher',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'dispatcher',
-                      tallyMode: 'dressed',
-                    });
-                  },
-                },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
-          },
+          onPress: () => createRoleAlert('dressed'),
         },
         {
           text: 'Frozen',
-          onPress: () => {
-            Alert.alert(
-              'Select Role',
-              'Are you a tally-er or dispatcher?',
-              [
-                {
-                  text: 'Tally-er',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'tally',
-                      tallyMode: 'frozen',
-                    });
-                  },
-                },
-                {
-                  text: 'Dispatcher',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'dispatcher',
-                      tallyMode: 'frozen',
-                    });
-                  },
-                },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
-          },
+          onPress: () => createRoleAlert('frozen'),
         },
         {
           text: 'Byproduct',
-          onPress: () => {
-            Alert.alert(
-              'Select Role',
-              'Are you a tally-er or dispatcher?',
-              [
-                {
-                  text: 'Tally-er',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'tally',
-                      tallyMode: 'byproduct',
-                    });
-                  },
-                },
-                {
-                  text: 'Dispatcher',
-                  onPress: () => {
-                    (navigation as any).navigate('Tally', {
-                      sessionId: sessionId,
-                      tallyRole: 'dispatcher',
-                      tallyMode: 'byproduct',
-                    });
-                  },
-                },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
-          },
+          onPress: () => createRoleAlert('byproduct'),
         },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -1158,13 +1135,13 @@ function TallySessionDetailScreen() {
               <TouchableOpacity
                 style={[
                   dynamicStyles.actionButton, 
-                  hasPermission('can_tally') ? styles.startTallyButton : styles.disabledButton
+                  (hasPermission('can_tally_as_tallyer') || hasPermission('can_tally_as_dispatcher')) ? styles.startTallyButton : styles.disabledButton
                 ]}
                 onPress={handleStartTally}
-                disabled={!hasPermission('can_tally')}
+                disabled={!hasPermission('can_tally_as_tallyer') && !hasPermission('can_tally_as_dispatcher')}
               >
                 <Text style={dynamicStyles.actionButtonText}>
-                  {hasPermission('can_tally') ? 'Start Tally' : 'No Tally Permission'}
+                  {(hasPermission('can_tally_as_tallyer') || hasPermission('can_tally_as_dispatcher')) ? 'Start Tally' : 'No Tally Permission'}
                 </Text>
               </TouchableOpacity>
             </>
