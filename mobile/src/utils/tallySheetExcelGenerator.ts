@@ -353,7 +353,12 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   
   // Check if it's a multi-customer response
   const isMultiCustomer = 'customers' in data;
-  const customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  let customers = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  
+  // Sort customers alphabetically by name (backend already sorts, but ensure it here too)
+  customers = [...customers].sort((a, b) => 
+    a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
+  );
   
   // Only show grand total if there are multiple customers
   const showGrandTotal = customers.length > 1;

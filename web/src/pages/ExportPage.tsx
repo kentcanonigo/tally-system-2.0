@@ -165,8 +165,13 @@ function ExportPage() {
       // Backend returns TallySheetMultiCustomerResponse with a customers array
       const customers = response.data.customers || [response.data];
       
+      // Sort customers alphabetically by name (backend already sorts, but ensure it here too)
+      const sortedCustomers = [...customers].sort((a, b) => 
+        a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
+      );
+      
       // Check if any customer has tally data
-      const customersWithData = customers.filter(customer => 
+      const customersWithData = sortedCustomers.filter(customer => 
         customer.pages && customer.pages.length > 0
       );
       

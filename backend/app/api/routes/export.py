@@ -127,8 +127,9 @@ def export_sessions_data(
         elif category_code == "FR":
             grand_total_fr += bags
 
-    # Convert map to list
+    # Convert map to list and sort alphabetically by customer name
     response_customers = list(customers_map.values())
+    response_customers.sort(key=lambda x: x.customer_name.lower())
 
     return ExportResponse(
         customers=response_customers,
@@ -558,5 +559,8 @@ def export_tally_sheet(
     
     if not customer_responses:
         raise HTTPException(status_code=404, detail="No valid data found for export")
+    
+    # Sort customers alphabetically by name
+    customer_responses.sort(key=lambda x: x.customer_name.lower())
     
     return TallySheetMultiCustomerResponse(customers=customer_responses)
