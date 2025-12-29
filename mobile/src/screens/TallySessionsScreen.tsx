@@ -20,6 +20,7 @@ import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
 import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
+import { colors } from '../theme/colors';
 
 function TallySessionsScreen() {
   const navigation = useNavigation();
@@ -711,7 +712,7 @@ function TallySessionsScreen() {
           // Don't add dot marking for the selected date, we'll handle it separately
           marked[dateKey] = {};
         } else {
-          marked[dateKey] = { marked: true, dotColor: '#3498db' };
+          marked[dateKey] = { marked: true, dotColor: colors.primary };
         }
       }
     });
@@ -722,7 +723,7 @@ function TallySessionsScreen() {
         // Single date selection - use simple marking for circle
         marked[dateRange.startDate] = {
           selected: true,
-          selectedColor: '#3498db',
+          selectedColor: colors.primary,
           selectedTextColor: '#ffffff',
           // Keep the dot if there are sessions on this date
           ...(allSessions.some(s => s.date === dateRange.startDate) && { 
@@ -739,7 +740,7 @@ function TallySessionsScreen() {
             marked[date] = {
               ...marked[date],
               startingDay: true,
-              color: '#3498db',
+              color: colors.primary,
               textColor: '#ffffff',
             };
           } else if (index === dates.length - 1) {
@@ -747,14 +748,14 @@ function TallySessionsScreen() {
             marked[date] = {
               ...marked[date],
               endingDay: true,
-              color: '#3498db',
+              color: colors.primary,
               textColor: '#ffffff',
             };
           } else {
             // Middle dates
             marked[date] = {
               ...marked[date],
-              color: '#3498db',
+              color: colors.primary,
               textColor: '#ffffff',
             };
           }
@@ -764,7 +765,7 @@ function TallySessionsScreen() {
       // Only start date selected - show as selected (circle)
       marked[dateRange.startDate] = {
         selected: true,
-        selectedColor: '#3498db',
+        selectedColor: colors.primary,
         selectedTextColor: '#ffffff',
         // Keep the dot if there are sessions on this date
         ...(allSessions.some(s => s.date === dateRange.startDate) && { 
@@ -776,7 +777,7 @@ function TallySessionsScreen() {
       // Only end date selected - show as selected (circle)
       marked[dateRange.endDate] = {
         selected: true,
-        selectedColor: '#3498db',
+        selectedColor: colors.primary,
         selectedTextColor: '#ffffff',
         // Keep the dot if there are sessions on this date
         ...(allSessions.some(s => s.date === dateRange.endDate) && { 
@@ -907,7 +908,7 @@ function TallySessionsScreen() {
               <Text style={styles.datePickerButtonText}>
                 {getDateRangeText()}
               </Text>
-              <MaterialIcons name="calendar-today" size={20} color="#3498db" />
+              <MaterialIcons name="calendar-today" size={20} color={colors.primary} />
             </TouchableOpacity>
             {(dateRange.startDate || dateRange.endDate) && (
               <TouchableOpacity
@@ -1006,7 +1007,7 @@ function TallySessionsScreen() {
   if (loading && sessions.length === 0) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -1110,7 +1111,7 @@ function TallySessionsScreen() {
                   {exporting ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <MaterialIcons name="picture-as-pdf" size={responsive.fontSize.large} color="#fff" />
+                    <MaterialIcons name="picture-as-pdf" size={responsive.fontSize.large} color={colors.white} />
                   )}
                 </TouchableOpacity>
               )}
@@ -1126,7 +1127,7 @@ function TallySessionsScreen() {
                 style={[dynamicStyles.calendarButton]}
                 onPress={exitSelectionMode}
               >
-                <MaterialIcons name="close" size={responsive.fontSize.large} color="#fff" />
+                <MaterialIcons name="close" size={responsive.fontSize.large} color={colors.white} />
               </TouchableOpacity>
             </>
           ) : (
@@ -1144,7 +1145,7 @@ function TallySessionsScreen() {
                 style={[dynamicStyles.calendarButton, (dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId) && styles.calendarButtonActive]}
                 onPress={() => setShowFilters(true)}
               >
-                <MaterialIcons name="filter-list" size={responsive.fontSize.large} color="#fff" />
+                <MaterialIcons name="filter-list" size={responsive.fontSize.large} color={(dateRange.startDate || dateRange.endDate || filterStatus || filterCustomerId) ? colors.primary : colors.white} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[dynamicStyles.calendarButton, showActiveOnly && styles.calendarButtonActive]}
@@ -1153,7 +1154,7 @@ function TallySessionsScreen() {
                 <MaterialIcons 
                   name={showActiveOnly ? 'star' : 'star-border'} 
                   size={responsive.fontSize.large} 
-                  color={showActiveOnly ? '#f39c12' : '#fff'} 
+                  color={showActiveOnly ? colors.primary : colors.white} 
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -1161,7 +1162,7 @@ function TallySessionsScreen() {
                 onPress={() => navigation.navigate('CreateTallySession' as never)}
                 disabled={!canStartTally}
               >
-                <MaterialIcons name="add" size={responsive.fontSize.large} color="#fff" />
+                  <MaterialIcons name="add" size={responsive.fontSize.large} color={colors.white} />
               </TouchableOpacity>
             </>
           )}
@@ -1244,7 +1245,7 @@ function TallySessionsScreen() {
                       <MaterialIcons
                         name={isSelected ? "check-box" : "check-box-outline-blank"}
                         size={24}
-                        color={isSelected ? "#3498db" : "#757575"}
+                        color={isSelected ? colors.primary : "#757575"}
                       />
                     </View>
                   )}
@@ -1398,16 +1399,16 @@ function TallySessionsScreen() {
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
                 textSectionTitleColor: '#b6c1cd',
-                selectedDayBackgroundColor: '#3498db',
+                selectedDayBackgroundColor: colors.primary,
                 selectedDayTextColor: '#ffffff',
-                todayTextColor: '#3498db',
+                todayTextColor: colors.primary,
                 dayTextColor: '#2d4150',
                 textDisabledColor: '#d9e1e8',
-                dotColor: '#3498db',
+                dotColor: colors.primary,
                 selectedDotColor: '#ffffff',
-                arrowColor: '#3498db',
+                arrowColor: colors.primary,
                 monthTextColor: '#2d4150',
-                indicatorColor: '#3498db',
+                indicatorColor: colors.primary,
                 textDayFontWeight: '400',
                 textMonthFontWeight: 'bold',
                 textDayHeaderFontWeight: '600',
@@ -1571,7 +1572,7 @@ function TallySessionsScreen() {
                   <Text style={styles.datePickerButtonText}>
                     {exportDate ? formatDate(exportDate, timezone) : 'Select Date'}
                   </Text>
-                  <MaterialIcons name="calendar-today" size={20} color="#3498db" />
+                  <MaterialIcons name="calendar-today" size={20} color={colors.primary} />
                 </TouchableOpacity>
 
                 <Text style={styles.filterLabel}>Role</Text>
@@ -1742,14 +1743,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
   },
   title: {
     fontWeight: 'bold',
     color: '#fff',
   },
   addButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 5,
   },
   addButtonText: {
@@ -1855,17 +1856,22 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   calendarButton: {
-    backgroundColor: '#34495e',
+    backgroundColor: colors.primary,
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 40,
   },
   calendarButtonActive: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
+    borderWidth: 2,
   },
   calendarButtonText: {
-    color: '#fff',
+    color: colors.white,
+  },
+  calendarButtonTextActive: {
+    color: colors.primary,
   },
   modalOverlay: {
     flex: 1,
@@ -1985,7 +1991,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pickerOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   pickerOptionText: {
     fontSize: 16,
@@ -2016,7 +2022,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 5,
     padding: 12,
     alignItems: 'center',
@@ -2139,14 +2145,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeSortButton: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
   },
   sortButtonText: {
     color: '#666',
   },
   activeSortButtonText: {
-    color: '#fff',
+    color: colors.primary,
     fontWeight: 'bold',
   },
   filterModalActions: {
@@ -2170,7 +2176,7 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -2182,7 +2188,7 @@ const styles = StyleSheet.create({
   },
   // Selection Mode Styles
   selectedCard: {
-    borderColor: '#3498db',
+    borderColor: colors.primary,
     borderWidth: 2,
     backgroundColor: '#f0f8ff',
   },
@@ -2211,7 +2217,7 @@ const styles = StyleSheet.create({
   },
   exportTypeModalSubtitle: {
     fontSize: 13,
-    color: '#3498db',
+    color: colors.primary,
     marginBottom: 16,
     fontWeight: '500',
   },
@@ -2227,7 +2233,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#27ae60',
   },
   exportTypeOptionSecondary: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   exportTypeOptionDisabled: {
     backgroundColor: '#ecf0f1',

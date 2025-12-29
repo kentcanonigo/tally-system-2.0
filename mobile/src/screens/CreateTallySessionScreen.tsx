@@ -11,6 +11,7 @@ import { usePlant } from '../contexts/PlantContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePermissions } from '../utils/usePermissions';
 import { formatDate } from '../utils/dateFormat';
+import { colors } from '../theme/colors';
 
 function CreateTallySessionScreen() {
   const navigation = useNavigation();
@@ -146,7 +147,7 @@ function CreateTallySessionScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -234,7 +235,7 @@ function CreateTallySessionScreen() {
   const selectedDateMarked = {
     [formData.date]: {
       selected: true,
-      selectedColor: '#3498db',
+      selectedColor: colors.primary,
     },
   };
 
@@ -386,16 +387,16 @@ function CreateTallySessionScreen() {
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
                 textSectionTitleColor: '#b6c1cd',
-                selectedDayBackgroundColor: '#3498db',
+                selectedDayBackgroundColor: colors.primary,
                 selectedDayTextColor: '#ffffff',
-                todayTextColor: '#3498db',
+                todayTextColor: colors.primary,
                 dayTextColor: '#2d4150',
                 textDisabledColor: '#d9e1e8',
-                dotColor: '#3498db',
+                dotColor: colors.primary,
                 selectedDotColor: '#ffffff',
-                arrowColor: '#3498db',
+                arrowColor: colors.primary,
                 monthTextColor: '#2d4150',
-                indicatorColor: '#3498db',
+                indicatorColor: colors.primary,
                 textDayFontWeight: '400',
                 textMonthFontWeight: 'bold',
                 textDayHeaderFontWeight: '600',
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f4f8',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3498db',
+    borderColor: colors.primary,
   },
   plantInfoText: {
     color: '#2c3e50',
@@ -504,7 +505,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   dropdownOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   dropdownOptionText: {
     color: '#2c3e50',
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   submitButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',

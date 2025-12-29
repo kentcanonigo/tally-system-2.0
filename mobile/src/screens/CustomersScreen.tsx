@@ -7,6 +7,7 @@ import type { Customer } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { usePlant } from '../contexts/PlantContext';
+import { colors } from '../theme/colors';
 
 function CustomersScreen() {
   const responsive = useResponsive();
@@ -199,7 +200,7 @@ function CustomersScreen() {
               {hasPermission('can_manage_customers') && (
                 <View style={styles.actions}>
                   <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                    <MaterialIcons name="edit" size={20} color="#3498db" />
+                    <MaterialIcons name="edit" size={20} color={colors.primary} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
                     <MaterialIcons name="delete" size={20} color="#e74c3c" />
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   addButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 4,
   },
   addButtonText: {
@@ -349,7 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#95a5a6',
   },
   saveButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   modalButtonText: {
     color: '#fff',

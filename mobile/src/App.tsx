@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { PlantProvider } from './contexts/PlantContext';
 import AppNavigator from './navigation/AppNavigator';
+import { colors } from './theme/colors';
 
 // Polyfill for Base64 if not available (needed for xlsx library in React Native)
 // This must be set before any modules that use Base64 are imported
@@ -132,7 +133,7 @@ function App() {
   if (!apiBaseUrl) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

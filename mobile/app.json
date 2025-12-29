@@ -9,21 +9,28 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#db2175"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tallysystemmobile"
+      "bundleIdentifier": "com.tallysystemmobile",
+      "statusBar": {
+        "barStyle": "light-content"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#db2175"
       },
-      "package": "com.tallysystemmobile"
+      "package": "com.tallysystemmobile",
+      "statusBar": {
+        "backgroundColor": "#db2175",
+        "barStyle": "light-content"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

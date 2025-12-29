@@ -17,6 +17,7 @@ import { TallyLogEntryRole } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '../theme/colors';
 
 function TallySessionLogsScreen() {
   const route = useRoute();
@@ -742,7 +743,7 @@ function TallySessionLogsScreen() {
       borderBottomWidth: 0,
     },
     dropdownOptionSelected: {
-      backgroundColor: '#3498db',
+      backgroundColor: colors.primary,
     },
     dropdownOptionText: {
       color: '#2c3e50',
@@ -819,8 +820,8 @@ function TallySessionLogsScreen() {
       backgroundColor: '#fff',
     },
     checkboxChecked: {
-      backgroundColor: '#3498db',
-      borderColor: '#3498db',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     checkboxCheckmark: {
       color: '#fff',
@@ -833,7 +834,7 @@ function TallySessionLogsScreen() {
       fontWeight: '500' as const,
     },
     columnSettingsButton: {
-      backgroundColor: '#3498db',
+      backgroundColor: colors.primary,
       borderRadius: 8,
       padding: responsive.padding.medium,
       alignItems: 'center' as const,
@@ -1046,7 +1047,7 @@ function TallySessionLogsScreen() {
                   style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                   onPress={openTransferModal}
                 >
-                  <MaterialIcons name="swap-horiz" size={20} color="#3498db" />
+                  <MaterialIcons name="swap-horiz" size={20} color={colors.primary} />
                 </TouchableOpacity>
               )}
               {hasPermission('can_delete_tally_log_entries') && (
@@ -1061,7 +1062,7 @@ function TallySessionLogsScreen() {
                 style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                 onPress={selectAll}
               >
-                <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>
+                <Text style={{ fontSize: 14, color: colors.primary, fontWeight: 'bold' }}>
                   {selectedIds.size === filteredEntries.length && filteredEntries.length > 0 ? 'None' : 'All'}
                 </Text>
               </TouchableOpacity>
@@ -1079,7 +1080,7 @@ function TallySessionLogsScreen() {
                   style={[dynamicStyles.settingsButton, { marginRight: 8 }]}
                   onPress={toggleSelectionMode}
                 >
-                  <Text style={{ fontSize: 14, color: '#3498db', fontWeight: 'bold' }}>Select</Text>
+                  <Text style={{ fontSize: 14, color: colors.primary, fontWeight: 'bold' }}>Select</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -1134,8 +1135,8 @@ function TallySessionLogsScreen() {
                       height: 20,
                       borderRadius: 4,
                       borderWidth: 2,
-                      borderColor: selectedIds.has(entry.id) ? '#3498db' : '#bdc3c7',
-                      backgroundColor: selectedIds.has(entry.id) ? '#3498db' : 'transparent',
+                      borderColor: selectedIds.has(entry.id) ? colors.primary : '#bdc3c7',
+                      backgroundColor: selectedIds.has(entry.id) ? colors.primary : 'transparent',
                       justifyContent: 'center',
                       alignItems: 'center',
                     }}>
@@ -1152,7 +1153,7 @@ function TallySessionLogsScreen() {
                       styles.roleBadgeSmall,
                       {
                         backgroundColor:
-                          entry.role === TallyLogEntryRole.TALLY ? '#3498db' : '#9b59b6',
+                          entry.role === TallyLogEntryRole.TALLY ? colors.primary : '#9b59b6',
                       },
                     ]}
                   >
@@ -2310,7 +2311,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backButtonText: {
-    color: '#3498db',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },

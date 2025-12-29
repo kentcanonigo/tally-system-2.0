@@ -17,6 +17,7 @@ import { usePermissions } from '../utils/usePermissions';
 import { generateSessionReportHTML } from '../utils/pdfGenerator';
 import { generateTallySheetHTML } from '../utils/tallySheetPdfGenerator';
 import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
+import { colors } from '../theme/colors';
 
 // Minimum width for the numpad area before switching to vertical layout
 const MIN_NUMPAD_WIDTH = 600;
@@ -826,7 +827,7 @@ function TallyTabScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[dynamicStyles.container, styles.centered]} edges={['top']}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -870,10 +871,10 @@ function TallyTabScreen() {
               <MaterialIcons
                 name="remove-circle-outline"
                 size={responsive.isTablet ? 18 : 16}
-                color="#e74c3c"
+                color={colors.white}
               />
               {!useVerticalLayout && (
-                <Text style={[dynamicStyles.headerButtonText, { color: '#e74c3c' }]}>
+                <Text style={[dynamicStyles.headerButtonText, { color: colors.white }]}>
                   Remove
                 </Text>
               )}
@@ -1168,7 +1169,7 @@ function TallyTabScreen() {
                   paddingVertical: responsive.spacing.sm,
                   paddingHorizontal: responsive.padding.small,
                   borderRadius: 8,
-                  backgroundColor: '#3498db',
+                  backgroundColor: colors.primary,
                   marginBottom: responsive.spacing.sm,
                   opacity: !selectedSessionId ? 0.6 : 1,
                 }}
@@ -1326,7 +1327,7 @@ function TallyTabScreen() {
               <Text
                 style={{
                   fontSize: responsive.fontSize.small - 2,
-                  color: '#3498db',
+                  color: colors.primary,
                   marginBottom: responsive.spacing.md,
                   fontWeight: '500',
                 }}
@@ -1388,7 +1389,7 @@ function TallyTabScreen() {
                   paddingVertical: responsive.spacing.sm,
                   paddingHorizontal: responsive.padding.small,
                   borderRadius: 8,
-                  backgroundColor: '#3498db',
+                  backgroundColor: colors.primary,
                   marginBottom: responsive.spacing.sm,
                   opacity: isExporting ? 0.6 : 1,
                 }}
@@ -1541,7 +1542,7 @@ function TallyTabScreen() {
                     </Text>
                   </View>
                   {isExporting && (
-                    <ActivityIndicator size="small" color="#3498db" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                   )}
                 </TouchableOpacity>
 
@@ -1566,7 +1567,7 @@ function TallyTabScreen() {
                     </Text>
                   </View>
                   {isExporting && (
-                    <ActivityIndicator size="small" color="#3498db" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -1649,14 +1650,14 @@ function TallyTabScreen() {
                   paddingVertical: responsive.spacing.xs,
                   paddingHorizontal: responsive.padding.small,
                   borderRadius: 6,
-                  backgroundColor: '#e74c3c',
+                  backgroundColor: colors.primaryDark,
                 }}
                 onPress={handleRemoveCurrentSession}
               >
                 <Text
                   style={{
                     fontSize: responsive.fontSize.small,
-                    color: '#fff',
+                    color: colors.white,
                     fontWeight: '600',
                   }}
                 >
@@ -1871,7 +1872,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
   },
   title: {
     fontWeight: 'bold',
@@ -1893,8 +1894,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sessionButtonSelected: {
-    backgroundColor: '#3498db',
-    borderColor: '#2980b9',
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
   },
   sessionButtonText: {
     color: '#2c3e50',
@@ -1902,7 +1903,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   sessionButtonTextSelected: {
-    color: '#fff',
+    color: colors.primary,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -1941,7 +1942,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   dropdownOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   dropdownOptionText: {
     color: '#2c3e50',

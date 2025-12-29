@@ -18,6 +18,7 @@ import { formatDate } from '../utils/dateFormat';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { usePermissions } from '../utils/usePermissions';
 import { removeActiveSession } from '../utils/activeSessions';
+import { colors } from '../theme/colors';
 
 // Normalize API errors (FastAPI 422 can return an array of error objects)
 const formatApiErrorMessage = (error: any, fallback: string) => {
@@ -1487,9 +1488,9 @@ function TallyScreen(props?: TallyScreenProps) {
                 flex: 1.5,
                 backgroundColor: activeInputField === 'weight' ? '#fff' : '#f8f9fa',
                 borderWidth: 2,
-                borderColor: activeInputField === 'weight' ? '#3498db' : '#bdc3c7',
+                borderColor: activeInputField === 'weight' ? colors.primary : '#bdc3c7',
                 borderLeftWidth: 3,
-                borderLeftColor: '#3498db',
+                borderLeftColor: colors.primary,
               }
             ]}>
               <Text style={dynamicStyles.displayLabel}>Weight</Text>
@@ -1530,7 +1531,7 @@ function TallyScreen(props?: TallyScreenProps) {
                 flex: 2,
                 backgroundColor: '#f8f9fa',
                 borderWidth: 2,
-                borderColor: showWeightClassDropdown ? '#3498db' : '#bdc3c7',
+                borderColor: showWeightClassDropdown ? colors.primary : '#bdc3c7',
               }
             ]}>
               <Text style={dynamicStyles.displayLabel}>Weight Classification</Text>
@@ -1565,7 +1566,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   flex: 1,
                   backgroundColor: activeInputField === 'heads' ? '#fff' : '#f8f9fa',
                   borderWidth: 2,
-                  borderColor: activeInputField === 'heads' ? '#3498db' : '#bdc3c7',
+                  borderColor: activeInputField === 'heads' ? colors.primary : '#bdc3c7',
                 }
               ]}>
                 <Text style={dynamicStyles.displayLabel}>Heads</Text>
@@ -1673,7 +1674,7 @@ function TallyScreen(props?: TallyScreenProps) {
                 dynamicStyles.actionButtonLast,
                 !canStartTally 
                   ? { backgroundColor: '#e74c3c' } 
-                  : (showManualInput ? { backgroundColor: '#3498db' } : styles.enterButton),
+                  : (showManualInput ? { backgroundColor: colors.primary } : styles.enterButton),
                 disabledButtonStyle,
                 isSubmitting && { opacity: 0.6 }
               ]}
@@ -2233,7 +2234,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   incrementButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -2282,7 +2283,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ecf0f1',
   },
   modalOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   modalOptionText: {
     color: '#2c3e50',
@@ -2306,7 +2307,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#95a5a6',
   },
   modalSubmitButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   modalButtonText: {
     color: '#fff',
@@ -2356,7 +2357,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   dropdownOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   dropdownOptionText: {
     color: '#2c3e50',

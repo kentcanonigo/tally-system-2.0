@@ -9,6 +9,7 @@ import { useResponsive } from '../utils/responsive';
 import { getTimezoneAbbreviation } from '../utils/dateFormat';
 import { plantsApi, rolesApi, setApiBaseUrl, getCurrentApiBaseUrl } from '../services/api';
 import { Plant, Role } from '../types';
+import { colors } from '../theme/colors';
 
 // Available tabs that can be shown/hidden
 const AVAILABLE_TABS = [
@@ -365,7 +366,7 @@ function SettingsScreen() {
       borderBottomWidth: 0,
     },
     dropdownOptionSelected: {
-      backgroundColor: '#3498db',
+      backgroundColor: colors.primary,
     },
     dropdownOptionText: {
       color: '#2c3e50',
@@ -415,7 +416,7 @@ function SettingsScreen() {
   if (isPlantLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -452,7 +453,7 @@ function SettingsScreen() {
             disabled={isLoadingPlants}
           >
             {isLoadingPlants ? (
-              <ActivityIndicator size="small" color="#3498db" />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
               <>
                 <Text style={dynamicStyles.dropdownText} numberOfLines={1}>
@@ -548,7 +549,7 @@ function SettingsScreen() {
             <Switch
               value={visibleTabs.includes(tab.key)}
               onValueChange={() => toggleTabVisibility(tab.key)}
-              trackColor={{ false: '#ccc', true: '#3498db' }}
+              trackColor={{ false: '#ccc', true: colors.primary }}
               thumbColor={visibleTabs.includes(tab.key) ? '#fff' : '#f4f3f4'}
             />
           </View>
@@ -581,7 +582,7 @@ function SettingsScreen() {
 
         <View style={{ flexDirection: 'row', marginTop: 8 }}>
           <TouchableOpacity
-            style={[dynamicStyles.saveButton, { flex: 1, backgroundColor: '#3498db', marginRight: apiUrl.trim() ? 6 : 0 }]}
+            style={[dynamicStyles.saveButton, { flex: 1, backgroundColor: colors.primary, marginRight: apiUrl.trim() ? 6 : 0 }]}
             onPress={async () => {
               setIsLoadingApiUrl(true);
               try {
@@ -911,7 +912,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   saveButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',

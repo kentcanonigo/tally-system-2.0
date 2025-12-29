@@ -6,6 +6,7 @@ import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
 import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { usePlant } from '../contexts/PlantContext';
+import { colors } from '../theme/colors';
 
 function HomeScreen() {
   const navigation = useNavigation();
@@ -236,32 +237,33 @@ function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.backgroundSecondary,
   },
   scrollContent: {
     flexGrow: 1,
   },
   header: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
   },
   title: {
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
     marginBottom: 5,
   },
   subtitle: {
-    color: '#bdc3c7',
+    color: colors.white,
+    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
   statCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderRadius: 8,
     alignItems: 'center',
     flex: 1,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -269,38 +271,38 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontWeight: 'bold',
-    color: '#3498db',
+    color: colors.primary,
     marginBottom: 5,
   },
   statLabel: {
-    color: '#7f8c8d',
+    color: colors.textSecondary,
   },
   button: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: 'bold',
   },
   activePlantContainer: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.backgroundTertiary,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#27ae60',
+    borderColor: colors.activePlantBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activePlantLabel: {
-    color: '#7f8c8d',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontWeight: '600',
   },
   activePlantName: {
     fontWeight: 'bold',
-    color: '#27ae60',
+    color: colors.activePlantBorder,
     textAlign: 'center',
   },
 });

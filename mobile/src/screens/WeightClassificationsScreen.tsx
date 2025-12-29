@@ -8,6 +8,7 @@ import type { WeightClassification } from '../types';
 import { useResponsive } from '../utils/responsive';
 import { usePlant } from '../contexts/PlantContext';
 import { usePermissions } from '../utils/usePermissions';
+import { colors } from '../theme/colors';
 
 function WeightClassificationsScreen() {
   const responsive = useResponsive();
@@ -218,7 +219,7 @@ function WeightClassificationsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -373,7 +374,7 @@ function WeightClassificationsScreen() {
                   {hasPermission('can_manage_weight_classes') && (
                     <View style={styles.actions}>
                       <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                        <MaterialIcons name="edit" size={20} color="#3498db" />
+                        <MaterialIcons name="edit" size={20} color={colors.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
                         <MaterialIcons name="delete" size={20} color="#e74c3c" />
@@ -411,7 +412,7 @@ function WeightClassificationsScreen() {
                   {hasPermission('can_manage_weight_classes') && (
                     <View style={styles.actions}>
                       <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                        <MaterialIcons name="edit" size={20} color="#3498db" />
+                        <MaterialIcons name="edit" size={20} color={colors.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
                         <MaterialIcons name="delete" size={20} color="#e74c3c" />
@@ -446,7 +447,7 @@ function WeightClassificationsScreen() {
                   {hasPermission('can_manage_weight_classes') && (
                     <View style={styles.actions}>
                       <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
-                        <MaterialIcons name="edit" size={20} color="#3498db" />
+                        <MaterialIcons name="edit" size={20} color={colors.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionButton}>
                         <MaterialIcons name="delete" size={20} color="#e74c3c" />
@@ -617,7 +618,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -627,7 +628,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   addButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     borderRadius: 4,
   },
   addButtonText: {
@@ -702,7 +703,7 @@ const styles = StyleSheet.create({
   },
   defaultHeads: {
     fontSize: 14,
-    color: '#3498db',
+    color: colors.primary,
     marginTop: 4,
     fontWeight: '500',
   },
@@ -797,7 +798,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#95a5a6',
   },
   saveButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   modalButtonText: {
     color: '#fff',
@@ -820,7 +821,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#3498db',
+    borderColor: colors.primary,
     borderRadius: 4,
     marginRight: 12,
     justifyContent: 'center',
@@ -828,7 +829,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   checkboxChecked: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   checkboxLabel: {
     fontSize: 14,

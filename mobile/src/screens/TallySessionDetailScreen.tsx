@@ -25,6 +25,7 @@ import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { removeActiveSession, isActiveSession } from '../utils/activeSessions';
+import { colors } from '../theme/colors';
 
 function TallySessionDetailScreen() {
   const route = useRoute();
@@ -478,7 +479,7 @@ function TallySessionDetailScreen() {
                   style={styles.editButton}
                   onPress={() => handleEditAllocation(allocation)}
                 >
-                  <MaterialIcons name="edit" size={18} color="#3498db" />
+                  <MaterialIcons name="edit" size={18} color={colors.primary} />
                 </TouchableOpacity>
               )}
               {hasPermission('can_delete_tally_allocations') && (
@@ -813,7 +814,7 @@ function TallySessionDetailScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -891,7 +892,7 @@ function TallySessionDetailScreen() {
       borderBottomWidth: 0,
     },
     statusDropdownOptionSelected: {
-      backgroundColor: '#3498db',
+      backgroundColor: colors.primary,
     },
     statusDropdownOptionText: {
       color: '#2c3e50',
@@ -1025,7 +1026,7 @@ function TallySessionDetailScreen() {
       borderBottomWidth: 0,
     },
     weightClassDropdownOptionSelected: {
-      backgroundColor: '#3498db',
+      backgroundColor: colors.primary,
     },
     weightClassDropdownOptionText: {
       color: '#2c3e50',
@@ -1503,7 +1504,7 @@ function TallySessionDetailScreen() {
                     </Text>
                   </View>
                   {loading && (
-                    <ActivityIndicator size="small" color="#3498db" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                   )}
                 </TouchableOpacity>
 
@@ -1528,7 +1529,7 @@ function TallySessionDetailScreen() {
                     </Text>
                   </View>
                   {loading && (
-                    <ActivityIndicator size="small" color="#3498db" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -1559,7 +1560,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#2c3e50',
+    backgroundColor: colors.primary,
   },
   sessionId: {
     fontWeight: 'bold',
@@ -1606,7 +1607,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#27ae60',
   },
   addButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   viewLogsButton: {
     backgroundColor: '#9b59b6',
@@ -1704,7 +1705,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ddd',
   },
   pickerOptionSelected: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   pickerOptionText: {
     color: '#2c3e50',
@@ -1726,7 +1727,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#95a5a6',
   },
   saveButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
   },
   modalButtonText: {
     color: '#fff',
@@ -1770,7 +1771,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   addAllocationButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     width: 30,
     height: 30,
     borderRadius: 15,

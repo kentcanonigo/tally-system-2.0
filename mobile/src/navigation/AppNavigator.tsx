@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { colors } from '../theme/colors';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import TallySessionsScreen from '../screens/TallySessionsScreen';
@@ -81,8 +82,8 @@ function MainTabs() {
 
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: '#7f8c8d',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabInactive,
       })}
     >
       {isTabVisible('Home') && (
@@ -115,7 +116,7 @@ function AppNavigator() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.backgroundSecondary,
   },
 });
 

@@ -28,6 +28,7 @@ import { usePermissions } from '../utils/usePermissions';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { getActiveSessions } from '../utils/activeSessions';
+import { colors } from '../theme/colors';
 
 const ExportScreen = () => {
   const { activePlantId } = usePlant();
@@ -569,7 +570,7 @@ const ExportScreen = () => {
             <MaterialIcons 
               name={isSelected ? "check-box" : "check-box-outline-blank"} 
               size={24} 
-              color={isSelected ? "#3498db" : "#757575"} 
+              color={isSelected ? colors.primary : "#757575"} 
             />
           </View>
           <View style={styles.itemDetails}>
@@ -603,7 +604,7 @@ const ExportScreen = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return '#2ecc71';
-      case 'ongoing': return '#3498db';
+      case 'ongoing': return colors.primary;
       case 'cancelled': return '#e74c3c';
       default: return '#95a5a6';
     }
@@ -612,7 +613,7 @@ const ExportScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3498db" style={styles.loader} />
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
       </View>
     );
   }
@@ -637,11 +638,11 @@ const ExportScreen = () => {
             <MaterialIcons 
               name={showActiveOnly ? 'star' : 'star-border'} 
               size={24} 
-              color={showActiveOnly ? '#f39c12' : '#3498db'} 
+              color={showActiveOnly ? '#f39c12' : colors.primary} 
             />
           </TouchableOpacity>
           <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-            <MaterialIcons name="filter-list" size={24} color="#3498db" />
+            <MaterialIcons name="filter-list" size={24} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={selectAll}>
             <Text style={styles.selectAllText}>
@@ -856,7 +857,7 @@ const ExportScreen = () => {
                   </Text>
                 </View>
                 {exporting && (
-                  <ActivityIndicator size="small" color="#3498db" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 )}
               </TouchableOpacity>
 
@@ -881,7 +882,7 @@ const ExportScreen = () => {
                   </Text>
                 </View>
                 {exporting && (
-                  <ActivityIndicator size="small" color="#3498db" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 )}
               </TouchableOpacity>
             </View>
@@ -907,9 +908,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.primary,
   },
   headerActions: {
     flexDirection: 'row',
@@ -922,10 +923,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.white,
   },
   selectAllText: {
-    color: '#3498db',
+    color: colors.primary,
     fontSize: 16,
   },
   loader: {
@@ -950,7 +951,7 @@ const styles = StyleSheet.create({
     shadowRadius: 1.41,
   },
   selectedItem: {
-    borderColor: '#3498db',
+    borderColor: colors.primary,
     borderWidth: 1,
     backgroundColor: '#f0f8ff',
   },
@@ -1027,7 +1028,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   exportButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -1097,14 +1098,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeSortButton: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
   },
   sortButtonText: {
     color: '#666',
   },
   activeSortButtonText: {
-    color: '#fff',
+    color: colors.primary,
     fontWeight: 'bold',
   },
   resetButton: {
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   applyButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.primary,
     padding: 16,
     margin: 16,
     borderRadius: 8,
@@ -1152,10 +1153,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#3498db',
+    borderColor: colors.primary,
   },
   adjustFiltersButtonText: {
-    color: '#3498db',
+    color: colors.primary,
     fontWeight: '600',
   },
   emptyText: {
@@ -1197,7 +1198,7 @@ const styles = StyleSheet.create({
   },
   exportTypeModalSubtitle: {
     fontSize: 13,
-    color: '#3498db',
+    color: colors.primary,
     marginBottom: 16,
     fontWeight: '500',
   },
