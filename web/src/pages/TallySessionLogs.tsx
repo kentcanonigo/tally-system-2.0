@@ -112,9 +112,9 @@ function TallySessionLogs() {
     if (wc.category === 'Byproduct' && wc.min_weight === null && wc.max_weight === null) {
       return 'N/A';
     }
-    // For Dressed with both weights null, show All Sizes (catch-all)
+    // For Dressed/Frozen with both weights null, show Custom (manual input only)
     if (wc.min_weight === null && wc.max_weight === null) {
-      return 'All Sizes';
+      return 'Custom';
     }
     if (wc.min_weight === null && wc.max_weight !== null) {
       return `Up to ${wc.max_weight}`;

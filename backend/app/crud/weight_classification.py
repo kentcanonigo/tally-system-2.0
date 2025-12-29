@@ -10,14 +10,16 @@ def _ranges_overlap(
 ) -> bool:
     """
     Check if two weight ranges overlap.
-    - Catch-all (both None): overlaps with everything
+    - Manual input only (both None): does NOT overlap with anything (skip overlap check)
+    - Catch-all (both None): overlaps with everything (but we treat null/null as manual input only now)
     - "Up" range (min set, max None): >= min_weight
     - "Down" range (min None, max set): <= max_weight
     - Regular range (both set): min_weight <= weight <= max_weight
     """
-    # Catch-all overlaps with everything
+    # Manual input only (both None) - treat as not overlapping with anything
+    # This allows multiple manual input only classifications and they won't conflict with ranges
     if (min1 is None and max1 is None) or (min2 is None and max2 is None):
-        return True
+        return False
     
     # Convert None to appropriate infinity/negative infinity for comparison
     min1_val = float('-inf') if min1 is None else min1
@@ -76,9 +78,17 @@ def _check_overlaps(
     """
     Check if the given weight range overlaps with any existing classification
     for the same plant and category. Applies to Dressed and Frozen categories.
+    
+    Manual input only classifications (both weights null) do not overlap with anything
+    and can coexist with any other classification.
     """
     # Skip weight range checking for byproducts
     if category == 'Byproduct':
+        return
+    
+    # Skip overlap checking for manual input only (both weights null)
+    # These are meant for manual entry and don't conflict with weight ranges
+    if min_weight is None and max_weight is None:
         return
     
     existing = db.query(WeightClassification).filter(
@@ -90,6 +100,11 @@ def _check_overlaps(
         if exclude_id and existing_wc.id == exclude_id:
             continue
         
+        # Skip existing manual input only classifications (both weights null)
+        # They don't conflict with anything
+        if existing_wc.min_weight is None and existing_wc.max_weight is None:
+            continue
+        
         if _ranges_overlap(
             min_weight, max_weight,
             existing_wc.min_weight, existing_wc.max_weight
@@ -98,6 +113,7 @@ def _check_overlaps(
                 existing_wc.min_weight is None and existing_wc.max_weight is None
             ) else (
                 f"{existing_wc.min_weight} and up" if existing_wc.max_weight is None
+                else f"up to {existing_wc.max_weight}" if existing_wc.min_weight is None
                 else f"{existing_wc.min_weight}-{existing_wc.max_weight}"
             )
             raise ValueError(

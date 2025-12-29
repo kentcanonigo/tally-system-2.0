@@ -118,7 +118,7 @@ function WeightClassificationsScreen() {
       return wc.description || 'N/A';
     }
     if (wc.min_weight === null && wc.max_weight === null) {
-      return 'Catch-all';
+      return 'Custom';
     }
     if (wc.min_weight === null && wc.max_weight !== null) {
       return `≤ ${wc.max_weight} kg`;
