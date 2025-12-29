@@ -169,6 +169,61 @@ def get_tally_log_entry_audit(
     return result
 
 
+@router.get(
+    "/audit-logs",
+    response_model=List[TallyLogEntryAuditResponse]
+)
+def get_all_audit_logs(
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of audit logs to return"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all audit logs for tally log entries (admin only).
+    Returns list of audit entries ordered by edited_at descending (newest first).
+    Only accessible by SUPERADMIN users.
+    Includes related information: session, customer, plant, weight classification.
+    """
+    # Check if user is superadmin
+    if not user_has_role(current_user, 'SUPERADMIN'):
+        raise HTTPException(
+            status_code=403,
+            detail="Only superadmin users can access audit logs"
+        )
+    
+    audit_entries = audit_crud.get_all_audit_entries(db, limit=limit)
+    
+    # Convert to response models with all related information
+    result = []
+    for audit_entry in audit_entries:
+        # Get related entry information
+        entry = audit_entry.tally_log_entry
+        session = entry.tally_session if entry else None
+        customer = session.customer if session else None
+        plant = session.plant if session else None
+        weight_classification = entry.weight_classification if entry else None
+        
+        audit_dict = {
+            "id": audit_entry.id,
+            "tally_log_entry_id": audit_entry.tally_log_entry_id,
+            "user_id": audit_entry.user_id,
+            "edited_at": audit_entry.edited_at,
+            "changes": audit_entry.changes,
+            "user_username": audit_entry.user.username if audit_entry.user else None,
+            # Related entry information
+            "session_id": session.id if session else None,
+            "session_number": session.session_number if session else None,
+            "session_date": session.date.isoformat() if session and session.date else None,
+            "customer_name": customer.name if customer else None,
+            "plant_name": plant.name if plant else None,
+            "weight_classification_name": weight_classification.classification if weight_classification else None,
+            "weight_classification_category": weight_classification.category if weight_classification else None,
+        }
+        result.append(TallyLogEntryAuditResponse(**audit_dict))
+    
+    return result
+
+
 @router.delete(
     "/log-entries/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT

@@ -1,6 +1,11 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from ..models.tally_log_entry_audit import TallyLogEntryAudit
+from ..models.tally_log_entry import TallyLogEntry
+from ..models.tally_session import TallySession
+from ..models.customer import Customer
+from ..models.plant import Plant
+from ..models.weight_classification import WeightClassification
 from ..schemas.tally_log_entry_audit import TallyLogEntryAuditResponse
 
 
@@ -52,3 +57,35 @@ def get_audit_entries_by_entry_id(
         TallyLogEntryAudit.tally_log_entry_id == entry_id
     ).order_by(TallyLogEntryAudit.edited_at.desc()).all()
 
+
+def get_all_audit_entries(
+    db: Session,
+    limit: int = 100
+) -> List[TallyLogEntryAudit]:
+    """
+    Retrieve all audit entries, ordered by edited_at descending (newest first).
+    Useful for admin dashboard to see latest editing activity.
+    Includes related data via joins: entry, session, customer, plant, weight classification.
+    
+    Args:
+        db: Database session
+        limit: Maximum number of entries to return (default: 100)
+    
+    Returns:
+        List of audit entries with loaded relationships
+    """
+    return db.query(TallyLogEntryAudit)\
+        .options(
+            joinedload(TallyLogEntryAudit.tally_log_entry)
+            .joinedload(TallyLogEntry.tally_session)
+            .joinedload(TallySession.customer),
+            joinedload(TallyLogEntryAudit.tally_log_entry)
+            .joinedload(TallyLogEntry.tally_session)
+            .joinedload(TallySession.plant),
+            joinedload(TallyLogEntryAudit.tally_log_entry)
+            .joinedload(TallyLogEntry.weight_classification),
+            joinedload(TallyLogEntryAudit.user)
+        )\
+        .order_by(TallyLogEntryAudit.edited_at.desc())\
+        .limit(limit)\
+        .all()

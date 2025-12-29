@@ -87,6 +87,14 @@ export interface TallyLogEntryAudit {
   edited_at: string;
   changes: Record<string, ChangeDetail>;
   user_username?: string | null;
+  // Related entry information
+  session_id?: number | null;
+  session_number?: number | null;
+  session_date?: string | null;
+  customer_name?: string | null;
+  plant_name?: string | null;
+  weight_classification_name?: string | null;
+  weight_classification_category?: string | null;
 }
 
 export interface ExportItem {

@@ -138,6 +138,10 @@ export const tallyLogEntriesApi = {
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
   getAuditHistory: (entryId: number) =>
     api.get<TallyLogEntryAudit[]>(`/log-entries/${entryId}/audit`),
+  getAllAuditLogs: (limit?: number) =>
+    api.get<TallyLogEntryAudit[]>(`/audit-logs`, {
+      params: limit ? { limit } : undefined,
+    }),
   update: (entryId: number, data: { weight?: number; role?: TallyLogEntryRole; heads?: number; notes?: string | null; weight_classification_id?: number; tally_session_id?: number }) =>
     api.put<TallyLogEntry>(`/log-entries/${entryId}`, data),
   delete: (entryId: number) =>

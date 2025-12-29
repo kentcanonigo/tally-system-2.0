@@ -13,6 +13,7 @@ import ExportPage from './pages/ExportPage';
 import Users from './pages/Users';
 import Roles from './pages/Roles';
 import RoleEdit from './pages/RoleEdit';
+import AuditLogs from './pages/AuditLogs';
 import './App.css';
 
 // Protected Route Component
@@ -121,9 +122,14 @@ function MainLayout({ children }: { children: React.ReactNode }) {
                 <Link to="/roles">Roles & Permissions</Link>
               </li>
               {isSuperadmin && (
-                <li>
-                  <Link to="/users">User Management</Link>
-                </li>
+                <>
+                  <li>
+                    <Link to="/users">User Management</Link>
+                  </li>
+                  <li>
+                    <Link to="/audit-logs">Audit Logs</Link>
+                  </li>
+                </>
               )}
             </>
           )}
@@ -194,6 +200,14 @@ function App() {
                       element={
                         <SuperadminRoute>
                           <Users />
+                        </SuperadminRoute>
+                      }
+                    />
+                    <Route
+                      path="/audit-logs"
+                      element={
+                        <SuperadminRoute>
+                          <AuditLogs />
                         </SuperadminRoute>
                       }
                     />
