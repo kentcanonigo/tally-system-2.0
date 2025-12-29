@@ -115,11 +115,8 @@ function TallySessionLogsScreen() {
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (sessionId) {
-        const hasData = session !== null || logEntries.length > 0;
-        if (hasData && !loading && !refreshing) {
-          fetchData(false);
-        }
+      if (sessionId && !loading && !refreshing) {
+        fetchData(false);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId])
