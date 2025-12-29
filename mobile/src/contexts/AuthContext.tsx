@@ -66,6 +66,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
     return () => clearInterval(interval);
   }, [initialApiBaseUrl]);
 
+  const logout = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+      setToken(null);
+    } catch (err) {
+      console.error('Failed to logout:', err);
+    }
+  }, []);
+
   // Register logout callback with API service on mount, unregister on unmount
   useEffect(() => {
     setLogoutCallback(logout);
@@ -117,14 +127,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
 
       // Get current API URL (might have changed)
       const currentUrl = await AsyncStorage.getItem('API_BASE_URL') || apiBaseUrl;
+      
+      // Ensure URL doesn't have trailing slash and construct login URL properly
+      const baseUrl = currentUrl.replace(/\/+$/, '');
+      const loginUrl = `${baseUrl}/auth/login`.replace(/([^:]\/)\/+/g, '$1');
 
-      // Login and get token
+      console.log('[Auth] Login attempt to:', loginUrl);
+      console.log('[Auth] Username:', credentials.username);
+
+      // Login and get token with explicit headers
       const loginResponse = await axios.post<AuthResponse>(
-        `${currentUrl}/auth/login`,
-        credentials
+        loginUrl,
+        credentials,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        }
       );
 
+      console.log('[Auth] Login successful, token received');
+
       const newToken = loginResponse.data.access_token;
+      
+      if (!newToken) {
+        throw new Error('No access token received from server');
+      }
       
       // Store token
       await AsyncStorage.setItem(TOKEN_KEY, newToken);
@@ -133,23 +162,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, apiBaseUrl
       // Fetch user data
       await fetchUserData(newToken);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Login failed';
+      // Comprehensive error logging
+      console.error('[Auth] Login error:', err);
+      console.error('[Auth] Error type:', err.constructor.name);
+      console.error('[Auth] Error message:', err.message);
+      console.error('[Auth] Error code:', err.code);
+      
+      if (err.response) {
+        console.error('[Auth] Response status:', err.response.status);
+        console.error('[Auth] Response data:', JSON.stringify(err.response.data));
+        console.error('[Auth] Response headers:', err.response.headers);
+      } else if (err.request) {
+        console.error('[Auth] Request made but no response received');
+        console.error('[Auth] Request config:', {
+          url: err.config?.url,
+          method: err.config?.method,
+          headers: err.config?.headers,
+        });
+      }
+      
+      // Better error message handling
+      let errorMessage = 'Login failed';
+      
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else if (err.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to server. Check your API URL and network connection.';
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. Check your network connection.';
+      } else if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error. Check your internet connection.';
+      }
+      
+      console.error('[Auth] Final error message:', errorMessage);
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
-
-  const logout = useCallback(async () => {
-    try {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      setUser(null);
-      setToken(null);
-    } catch (err) {
-      console.error('Failed to logout:', err);
-    }
-  }, []);
 
   const refetchUser = async () => {
     if (token) {
