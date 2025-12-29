@@ -21,6 +21,7 @@ function WeightClassifications() {
     isCatchAll: false,
     isUpRange: false,
     isDownRange: false,
+    isManualInputOnly: false,
   });
 
   useEffect(() => {
@@ -75,6 +76,7 @@ function WeightClassifications() {
       isCatchAll: false,
       isUpRange: false,
       isDownRange: false,
+      isManualInputOnly: false,
     });
     setShowModal(true);
   };
@@ -83,6 +85,9 @@ function WeightClassifications() {
     const isCatchAll = classification.min_weight === null && classification.max_weight === null;
     const isUpRange = classification.min_weight !== null && classification.max_weight === null;
     const isDownRange = classification.min_weight === null && classification.max_weight !== null;
+    // Manual input only: both weights are null (same as catch-all, but we'll track it separately)
+    // For existing records, we can't distinguish, so default to false
+    const isManualInputOnly = false;
     
     setEditingClassification(classification);
     setFormData({
@@ -95,6 +100,7 @@ function WeightClassifications() {
       isCatchAll,
       isUpRange,
       isDownRange,
+      isManualInputOnly,
     });
     setShowModal(true);
   };
@@ -119,6 +125,10 @@ function WeightClassifications() {
     
     // For Byproduct, always set weights to null
     if (formData.category === 'Byproduct') {
+      submitData.min_weight = null;
+      submitData.max_weight = null;
+    } else if (formData.isManualInputOnly) {
+      // Manual input only - no weight range
       submitData.min_weight = null;
       submitData.max_weight = null;
     } else if (formData.isCatchAll) {
@@ -368,23 +378,50 @@ function WeightClassifications() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={formData.isCatchAll}
+                        checked={formData.isManualInputOnly}
                         onChange={(e) => {
-                          const isCatchAll = e.target.checked;
+                          const isManualInputOnly = e.target.checked;
                           setFormData({
                             ...formData,
-                            isCatchAll,
-                            isUpRange: isCatchAll ? false : formData.isUpRange,
-                            min_weight: isCatchAll ? null : formData.min_weight,
-                            max_weight: isCatchAll ? null : formData.max_weight,
+                            isManualInputOnly,
+                            isCatchAll: isManualInputOnly ? false : formData.isCatchAll,
+                            isUpRange: isManualInputOnly ? false : formData.isUpRange,
+                            isDownRange: isManualInputOnly ? false : formData.isDownRange,
+                            min_weight: isManualInputOnly ? null : formData.min_weight,
+                            max_weight: isManualInputOnly ? null : formData.max_weight,
                           });
                         }}
                       />
-                      {' '}Catch-all (All Sizes)
+                      {' '}Manual Input Only (No Weight Range)
                     </label>
+                    <small style={{ color: '#7f8c8d', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                      Check this if this classification is for manual input only and does not need a weight range
+                    </small>
                   </div>
                   
-                  {!formData.isCatchAll && (
+                  {!formData.isManualInputOnly && (
+                    <>
+                      <div className="form-group">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={formData.isCatchAll}
+                            onChange={(e) => {
+                              const isCatchAll = e.target.checked;
+                              setFormData({
+                                ...formData,
+                                isCatchAll,
+                                isUpRange: isCatchAll ? false : formData.isUpRange,
+                                min_weight: isCatchAll ? null : formData.min_weight,
+                                max_weight: isCatchAll ? null : formData.max_weight,
+                              });
+                            }}
+                          />
+                          {' '}Catch-all (All Sizes)
+                        </label>
+                      </div>
+                      
+                      {!formData.isCatchAll && (
                     <>
                       <div className="form-group">
                         <label>
@@ -453,6 +490,7 @@ function WeightClassifications() {
                         </div>
                       )}
                     </>
+                  )}
                   )}
                 </>
               )}

@@ -26,6 +26,7 @@ function WeightClassificationsScreen() {
   const [maxWeight, setMaxWeight] = useState('');
   const [category, setCategory] = useState<'Dressed' | 'Byproduct' | 'Frozen'>('Dressed');
   const [defaultHeads, setDefaultHeads] = useState('15');
+  const [isManualInputOnly, setIsManualInputOnly] = useState(false);
 
   useEffect(() => {
     if (activePlantId) {
@@ -70,6 +71,7 @@ function WeightClassificationsScreen() {
     setMaxWeight('');
     setCategory('Dressed');
     setDefaultHeads('15');
+    setIsManualInputOnly(false);
     setModalVisible(true);
   };
 
@@ -81,6 +83,9 @@ function WeightClassificationsScreen() {
     setMaxWeight(wc.max_weight?.toString() || '');
     setCategory(wc.category as 'Dressed' | 'Byproduct' | 'Frozen');
     setDefaultHeads((wc.default_heads ?? 15).toString());
+    // For existing records, we can't distinguish manual input only from catch-all
+    // Default to false - user can check the box if needed
+    setIsManualInputOnly(false);
     setModalVisible(true);
   };
 
@@ -161,28 +166,34 @@ function WeightClassificationsScreen() {
 
       // Handle weights based on category
       if (category === 'Dressed' || category === 'Frozen') {
-        // Parse weights - allow empty strings for null values
-        data.min_weight = minWeight.trim() === '' ? null : parseFloat(minWeight);
-        data.max_weight = maxWeight.trim() === '' ? null : parseFloat(maxWeight);
+        if (isManualInputOnly) {
+          // Manual input only - no weight range
+          data.min_weight = null;
+          data.max_weight = null;
+        } else {
+          // Parse weights - allow empty strings for null values
+          data.min_weight = minWeight.trim() === '' ? null : parseFloat(minWeight);
+          data.max_weight = maxWeight.trim() === '' ? null : parseFloat(maxWeight);
 
-        // Validate that at least one weight is set or both are null (catch-all)
-        if (data.min_weight === null && data.max_weight === null) {
-          // Catch-all is valid
-        } else if (data.min_weight !== null && data.max_weight !== null) {
-          if (isNaN(data.min_weight) || isNaN(data.max_weight)) {
-            Alert.alert('Error', 'Please enter valid numbers for weights');
+          // Validate that at least one weight is set or both are null (catch-all)
+          if (data.min_weight === null && data.max_weight === null) {
+            // Catch-all is valid
+          } else if (data.min_weight !== null && data.max_weight !== null) {
+            if (isNaN(data.min_weight) || isNaN(data.max_weight)) {
+              Alert.alert('Error', 'Please enter valid numbers for weights');
+              return;
+            }
+            if (data.max_weight < data.min_weight) {
+              Alert.alert('Error', 'Max weight must be greater than or equal to min weight');
+              return;
+            }
+          } else if (data.min_weight !== null && isNaN(data.min_weight)) {
+            Alert.alert('Error', 'Please enter a valid number for min weight');
+            return;
+          } else if (data.max_weight !== null && isNaN(data.max_weight)) {
+            Alert.alert('Error', 'Please enter a valid number for max weight');
             return;
           }
-          if (data.max_weight < data.min_weight) {
-            Alert.alert('Error', 'Max weight must be greater than or equal to min weight');
-            return;
-          }
-        } else if (data.min_weight !== null && isNaN(data.min_weight)) {
-          Alert.alert('Error', 'Please enter a valid number for min weight');
-          return;
-        } else if (data.max_weight !== null && isNaN(data.max_weight)) {
-          Alert.alert('Error', 'Please enter a valid number for max weight');
-          return;
         }
       } else {
         // Byproduct - no weights
@@ -488,6 +499,7 @@ function WeightClassificationsScreen() {
                     if (value === 'Byproduct') {
                       setMinWeight('');
                       setMaxWeight('');
+                      setIsManualInputOnly(false);
                     }
                   }}
                   style={styles.picker}
@@ -522,27 +534,53 @@ function WeightClassificationsScreen() {
 
               {(category === 'Dressed' || category === 'Frozen') && (
                 <>
-                  <Text style={styles.label}>Min Weight (kg) - Leave empty for "up to" or catch-all</Text>
-                  <TextInput
-                    style={dynamicStyles.input}
-                    placeholder="e.g., 1.5"
-                    value={minWeight}
-                    onChangeText={setMinWeight}
-                    keyboardType="numeric"
-                  />
+                  <View style={styles.checkboxContainer}>
+                    <TouchableOpacity
+                      style={styles.checkboxRow}
+                      onPress={() => {
+                        const newValue = !isManualInputOnly;
+                        setIsManualInputOnly(newValue);
+                        if (newValue) {
+                          setMinWeight('');
+                          setMaxWeight('');
+                        }
+                      }}
+                    >
+                      <View style={[styles.checkbox, isManualInputOnly && styles.checkboxChecked]}>
+                        {isManualInputOnly && <MaterialIcons name="check" size={20} color="#fff" />}
+                      </View>
+                      <Text style={styles.checkboxLabel}>Manual Input Only (No Weight Range)</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.helpText}>
+                      Check this if this classification is for manual input only and does not need a weight range
+                    </Text>
+                  </View>
 
-                  <Text style={styles.label}>Max Weight (kg) - Leave empty for "and up" or catch-all</Text>
-                  <TextInput
-                    style={dynamicStyles.input}
-                    placeholder="e.g., 2.5"
-                    value={maxWeight}
-                    onChangeText={setMaxWeight}
-                    keyboardType="numeric"
-                  />
+                  {!isManualInputOnly && (
+                    <>
+                      <Text style={styles.label}>Min Weight (kg) - Leave empty for "up to" or catch-all</Text>
+                      <TextInput
+                        style={dynamicStyles.input}
+                        placeholder="e.g., 1.5"
+                        value={minWeight}
+                        onChangeText={setMinWeight}
+                        keyboardType="numeric"
+                      />
 
-                  <Text style={styles.helpText}>
-                    Leave both empty for catch-all. Leave min empty for "up to X". Leave max empty for "X and up".
-                  </Text>
+                      <Text style={styles.label}>Max Weight (kg) - Leave empty for "and up" or catch-all</Text>
+                      <TextInput
+                        style={dynamicStyles.input}
+                        placeholder="e.g., 2.5"
+                        value={maxWeight}
+                        onChangeText={setMaxWeight}
+                        keyboardType="numeric"
+                      />
+
+                      <Text style={styles.helpText}>
+                        Leave both empty for catch-all. Leave min empty for "up to X". Leave max empty for "X and up".
+                      </Text>
+                    </>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -769,6 +807,34 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
     fontSize: 16,
+  },
+  checkboxContainer: {
+    marginBottom: 16,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#3498db',
+    borderRadius: 4,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#3498db',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    flex: 1,
   },
 });
 
