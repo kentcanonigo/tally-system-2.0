@@ -252,7 +252,7 @@ function Users() {
               </td>
               <td>
                 {userHasSuperadminRole(user.role_ids || []) ? (
-                  <em style={{ color: '#3498db' }}>All plants</em>
+                  <em style={{ color: '#db2175' }}>All plants</em>
                 ) : (
                   <span>{user.plant_ids.length} plant(s)</span>
                 )}

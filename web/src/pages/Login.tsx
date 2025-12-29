@@ -34,7 +34,7 @@ function Login() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #db2175 0%, #b91c6b 100%)',
       padding: '20px'
     }}>
       <div style={{
@@ -100,7 +100,7 @@ function Login() {
                 boxSizing: 'border-box',
                 transition: 'border-color 0.3s'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
+              onFocus={(e) => e.target.style.borderColor = '#db2175'}
               onBlur={(e) => e.target.style.borderColor = '#ddd'}
             />
           </div>
@@ -131,7 +131,7 @@ function Login() {
                 boxSizing: 'border-box',
                 transition: 'border-color 0.3s'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
+              onFocus={(e) => e.target.style.borderColor = '#db2175'}
               onBlur={(e) => e.target.style.borderColor = '#ddd'}
             />
           </div>
@@ -142,7 +142,7 @@ function Login() {
             style={{
               width: '100%',
               padding: '14px',
-              background: loading ? '#999' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: loading ? '#999' : 'linear-gradient(135deg, #db2175 0%, #b91c6b 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '5px',
@@ -150,17 +150,17 @@ function Login() {
               fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'transform 0.2s, box-shadow 0.2s',
-              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+              boxShadow: '0 4px 15px rgba(219, 33, 117, 0.4)'
             }}
             onMouseEnter={(e) => {
               if (!loading) {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(219, 33, 117, 0.6)';
               }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(219, 33, 117, 0.4)';
             }}
           >
             {loading ? 'Logging in...' : 'Login'}

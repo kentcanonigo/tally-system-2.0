@@ -751,7 +751,7 @@ function TallySessionLogs() {
                           style={{
                             padding: '4px 8px',
                             borderRadius: '4px',
-                            backgroundColor: entry.role === TallyLogEntryRole.TALLY ? '#3498db' : '#9b59b6',
+                            backgroundColor: entry.role === TallyLogEntryRole.TALLY ? '#db2175' : '#9b59b6',
                             color: 'white',
                             fontSize: '12px',
                           }}

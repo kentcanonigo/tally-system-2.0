@@ -156,7 +156,7 @@ function TallySessions() {
         return sessionDate === dateStr;
       });
       if (hasSessions) {
-        return <div style={{ height: '4px', width: '4px', backgroundColor: '#3498db', borderRadius: '50%', margin: '2px auto' }} />;
+        return <div style={{ height: '4px', width: '4px', backgroundColor: '#db2175', borderRadius: '50%', margin: '2px auto' }} />;
       }
     }
     return null;

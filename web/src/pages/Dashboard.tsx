@@ -52,7 +52,7 @@ function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
         <div className="table-container" style={{ padding: '20px' }}>
           <h3 style={{ marginBottom: '10px', color: '#2c3e50' }}>Total Customers</h3>
-          <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#3498db' }}>{stats.customers}</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#db2175' }}>{stats.customers}</p>
         </div>
         <div className="table-container" style={{ padding: '20px' }}>
           <h3 style={{ marginBottom: '10px', color: '#2c3e50' }}>Total Plants</h3>

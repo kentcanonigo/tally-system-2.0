@@ -35,7 +35,7 @@ class ErrorBoundary extends Component<Props, State> {
             onClick={() => window.location.reload()}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#3498db',
+              backgroundColor: '#db2175',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
@@ -45,7 +45,7 @@ class ErrorBoundary extends Component<Props, State> {
             Reload Page
           </button>
           <details style={{ marginTop: '20px', textAlign: 'left', maxWidth: '800px', margin: '20px auto' }}>
-            <summary style={{ cursor: 'pointer', color: '#3498db' }}>Error Details</summary>
+            <summary style={{ cursor: 'pointer', color: '#db2175' }}>Error Details</summary>
             <pre style={{ background: '#f5f5f5', padding: '15px', borderRadius: '4px', overflow: 'auto' }}>
               {this.state.error?.stack}
             </pre>
