@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, ScrollView, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { Picker } from '@react-native-picker/picker';
 import { printToFileAsync } from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -46,6 +47,7 @@ function TallyTabScreen() {
   const [showExportTypeModal, setShowExportTypeModal] = useState(false);
   const [exportSessionIds, setExportSessionIds] = useState<number[]>([]);
   const [exportTitle, setExportTitle] = useState('');
+  const [exportRole, setExportRole] = useState<TallyLogEntryRole>(TallyLogEntryRole.TALLY);
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -396,7 +398,7 @@ function TallyTabScreen() {
   };
 
   // Step 2: Export with the selected type
-  const handleExportAllocationSummary = async () => {
+  const handleExportAllocationSummary = async (role?: TallyLogEntryRole) => {
     if (exportSessionIds.length === 0) {
       Alert.alert('No Sessions', 'There are no sessions to export.');
       return;
@@ -404,12 +406,38 @@ function TallyTabScreen() {
 
     try {
       setIsExporting(true);
+      const selectedRole = role || exportRole;
 
       const response = await exportApi.exportSessions({
         session_ids: exportSessionIds,
+        role: selectedRole,
       });
 
-      const html = generateSessionReportHTML(response.data);
+      const data = response.data;
+
+      // Check if the report is empty
+      if (!data.customers || data.customers.length === 0) {
+        Alert.alert(
+          'No Data',
+          `Cannot export allocation report: No ${selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`
+        );
+        return;
+      }
+
+      // Check if all customers have no items
+      const hasAnyItems = data.customers.some(
+        (customer: any) => customer.items && customer.items.length > 0
+      );
+
+      if (!hasAnyItems) {
+        Alert.alert(
+          'No Data',
+          `Cannot export allocation report: No ${selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`
+        );
+        return;
+      }
+
+      const html = generateSessionReportHTML(data);
 
       const { uri } = await printToFileAsync({
         html,
@@ -435,9 +463,19 @@ function TallyTabScreen() {
       });
 
       await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export PDF');
+      const selectedRole = role || exportRole;
+      // Check if the error is from the backend about empty data
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No') && (errorMessage.includes('data') || errorMessage.includes('allocation'))) {
+        Alert.alert(
+          'No Data',
+          `Cannot export allocation report: No ${selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`
+        );
+      } else {
+        Alert.alert('Error', `Failed to export PDF: ${errorMessage}`);
+      }
     } finally {
       setIsExporting(false);
       setShowExportTypeModal(false);
@@ -536,11 +574,13 @@ function TallyTabScreen() {
     }
   };
 
-  const handleExportTallySheet = async (format: 'pdf' | 'excel') => {
+  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole) => {
     if (exportSessionIds.length === 0) {
       Alert.alert('No Sessions', 'There are no sessions to export.');
       return;
     }
+
+    const selectedRole = role || exportRole;
 
     // Check for sessions without tally entries
     const { sessionsWithoutEntries, validSessionIds } = await checkSessionsForTallyEntries(exportSessionIds);
@@ -568,7 +608,7 @@ function TallyTabScreen() {
               }
               // Store valid session IDs and proceed with export
               setExportSessionIds(validSessionIds);
-              performExportWithChecks(format, validSessionIds);
+              performExportWithChecks(format, validSessionIds, selectedRole);
             }
           }
         ]
@@ -577,10 +617,10 @@ function TallyTabScreen() {
     }
 
     // All sessions have entries, proceed with checks
-    performExportWithChecks(format, exportSessionIds);
+    performExportWithChecks(format, exportSessionIds, selectedRole);
   };
 
-  const performExportWithChecks = async (format: 'pdf' | 'excel', sessionIdsToExport: number[]) => {
+  const performExportWithChecks = async (format: 'pdf' | 'excel', sessionIdsToExport: number[], role?: TallyLogEntryRole) => {
     // Check for allocation mismatches
     const { hasMismatches, mismatchedSessions } = await checkAllocationMismatches(sessionIdsToExport);
     
@@ -599,7 +639,7 @@ function TallyTabScreen() {
           },
           {
             text: 'Proceed',
-            onPress: () => performExport(format, sessionIdsToExport)
+            onPress: () => performExport(format, sessionIdsToExport, role)
           }
         ]
       );
@@ -607,17 +647,18 @@ function TallyTabScreen() {
     }
 
     // No mismatches, proceed with export
-    performExport(format, sessionIdsToExport);
+    performExport(format, sessionIdsToExport, role);
   };
 
-  const performExport = async (format: 'pdf' | 'excel', sessionIdsToExport?: number[]) => {
+  const performExport = async (format: 'pdf' | 'excel', sessionIdsToExport?: number[], role?: TallyLogEntryRole) => {
+    // Use provided session IDs or fall back to exportSessionIds
+    const sessionIds = sessionIdsToExport || exportSessionIds;
+    const selectedRole = role || exportRole;
+
     try {
       setIsExporting(true);
       setShowTallySheetFormatModal(false);
       setShowExportTypeModal(false);
-
-      // Use provided session IDs or fall back to exportSessionIds
-      const sessionIds = sessionIdsToExport || exportSessionIds;
 
       // Validate that we have valid session IDs
       if (sessionIds.length === 0) {
@@ -626,7 +667,8 @@ function TallyTabScreen() {
       }
 
       const response = await exportApi.exportTallySheet({
-        session_ids: sessionIds
+        session_ids: sessionIds,
+        role: selectedRole,
       });
 
       if (format === 'pdf') {
@@ -676,18 +718,24 @@ function TallyTabScreen() {
     } catch (error: any) {
       console.error('Tally sheet export error:', error);
       let errorMessage = 'Failed to export tally sheet';
+      const roleLabel = selectedRole === TallyLogEntryRole.TALLY ? 'Tally-er' : 'Dispatcher';
       
       if (error.response?.status === 404) {
         const detail = error.response?.data?.detail || '';
         if (detail.includes('not found')) {
           errorMessage = 'One or more sessions were not found. Please refresh and try again.';
-        } else if (detail.includes('No tally entries')) {
-          errorMessage = 'The selected sessions do not have any tally entries. Please ensure sessions have tally data before exporting.';
+        } else if (detail.includes('No tally entries') || detail.includes('No data')) {
+          errorMessage = `The selected sessions do not have any ${roleLabel.toLowerCase()} tally entries. Please ensure sessions have ${roleLabel.toLowerCase()} data before exporting.`;
         } else {
-          errorMessage = 'No valid data found for export. Please ensure the selected sessions have tally entries.';
+          errorMessage = `No valid ${roleLabel.toLowerCase()} data found for export. Please ensure the selected sessions have ${roleLabel.toLowerCase()} tally entries.`;
         }
       } else if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.detail || 'Invalid request. Please try again.';
+        const detail = error.response?.data?.detail || 'Invalid request. Please try again.';
+        if (detail.includes('No') && (detail.includes('data') || detail.includes('entries'))) {
+          errorMessage = `Cannot export tally sheet: No ${roleLabel} data found for the selected sessions.`;
+        } else {
+          errorMessage = detail;
+        }
       }
       
       Alert.alert('Export Error', errorMessage);
@@ -1328,12 +1376,46 @@ function TallyTabScreen() {
                 style={{
                   fontSize: responsive.fontSize.small - 2,
                   color: colors.primary,
-                  marginBottom: responsive.spacing.md,
+                  marginBottom: responsive.spacing.sm,
                   fontWeight: '500',
                 }}
               >
                 Exporting: {exportTitle}
               </Text>
+
+              {/* Role Selection */}
+              <View style={{ marginBottom: responsive.spacing.md }}>
+                <Text
+                  style={{
+                    fontSize: responsive.fontSize.small,
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: responsive.spacing.xs,
+                  }}
+                >
+                  Role
+                </Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#ddd',
+                    borderRadius: 8,
+                    backgroundColor: '#fff',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Picker
+                    selectedValue={exportRole}
+                    onValueChange={(itemValue) => setExportRole(itemValue)}
+                    style={{
+                      color: '#2c3e50',
+                    }}
+                  >
+                    <Picker.Item label="Tally-er" value={TallyLogEntryRole.TALLY} />
+                    <Picker.Item label="Dispatcher" value={TallyLogEntryRole.DISPATCHER} />
+                  </Picker>
+                </View>
+              </View>
 
               {/* Allocation Summary */}
               <TouchableOpacity
@@ -1347,7 +1429,7 @@ function TallyTabScreen() {
                   marginBottom: responsive.spacing.sm,
                   opacity: isExporting ? 0.6 : 1,
                 }}
-                onPress={handleExportAllocationSummary}
+                onPress={() => handleExportAllocationSummary(exportRole)}
                 disabled={isExporting}
               >
                 <MaterialIcons
@@ -1520,13 +1602,46 @@ function TallyTabScreen() {
                 </TouchableOpacity>
               </View>
 
+              <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: 8,
+                  }}
+                >
+                  Role
+                </Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#ddd',
+                    borderRadius: 8,
+                    backgroundColor: '#fff',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Picker
+                    selectedValue={exportRole}
+                    onValueChange={(itemValue) => setExportRole(itemValue)}
+                    style={{
+                      color: '#2c3e50',
+                    }}
+                  >
+                    <Picker.Item label="Tally-er" value={TallyLogEntryRole.TALLY} />
+                    <Picker.Item label="Dispatcher" value={TallyLogEntryRole.DISPATCHER} />
+                  </Picker>
+                </View>
+              </View>
+
               <View style={styles.formatOptionsContainer}>
                 <TouchableOpacity
                   style={[
                     styles.formatOption,
                     isExporting && styles.formatOptionDisabled,
                   ]}
-                  onPress={() => handleExportTallySheet('pdf')}
+                  onPress={() => handleExportTallySheet('pdf', exportRole)}
                   disabled={isExporting}
                   activeOpacity={0.7}
                 >
@@ -1551,7 +1666,7 @@ function TallyTabScreen() {
                     styles.formatOption,
                     isExporting && styles.formatOptionDisabled,
                   ]}
-                  onPress={() => handleExportTallySheet('excel')}
+                  onPress={() => handleExportTallySheet('excel', exportRole)}
                   disabled={isExporting}
                   activeOpacity={0.7}
                 >
