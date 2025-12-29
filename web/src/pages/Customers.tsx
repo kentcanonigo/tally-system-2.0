@@ -21,7 +21,11 @@ function Customers() {
   const fetchCustomers = async () => {
     try {
       const response = await customersApi.getAll();
-      setCustomers(response.data);
+      // Sort customers alphabetically by name
+      const sortedCustomers = [...response.data].sort((a, b) => 
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+      setCustomers(sortedCustomers);
     } catch (error) {
       console.error('Error fetching customers:', error);
       alert('Error fetching customers');
