@@ -1134,11 +1134,14 @@ function TallySessionsScreen() {
             <>
               {hasPermission('can_export_data') && (
                 <TouchableOpacity
-                  style={[dynamicStyles.calendarButton, { backgroundColor: '#27ae60' }]}
+                  style={[dynamicStyles.calendarButton, { backgroundColor: '#27ae60', flexDirection: 'row', gap: 4 }]}
                   onPress={() => setShowDateExportModal(true)}
                   disabled={exporting}
                 >
-                  <MaterialIcons name="event" size={responsive.fontSize.large} color="#fff" />
+                  <MaterialIcons name="event" size={responsive.fontSize.large} color={colors.white} />
+                  <Text style={{ color: colors.white, fontSize: responsive.fontSize.small, fontWeight: '600' }}>
+                    Export
+                  </Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
