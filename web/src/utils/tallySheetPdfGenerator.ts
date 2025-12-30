@@ -49,6 +49,10 @@ interface TallySheetResponse {
   grand_total_kilograms: number;
 }
 
+interface TallySheetMultiCustomerResponse {
+  customers: TallySheetResponse[];
+}
+
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -61,11 +65,55 @@ const formatNumber = (value: number, decimals: number = 2): string => {
   return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
-export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: boolean = true) => {
+// Calculate grand totals by classification across all customers
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
+  const totalsMap = new Map<number, TallySheetSummary>();
+
+  customers.forEach(customer => {
+    customer.pages.forEach(page => {
+      // Process both dressed and byproduct summaries
+      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      
+      summaries.forEach(summary => {
+        const existing = totalsMap.get(summary.classification_id);
+        if (existing) {
+          existing.bags += summary.bags;
+          existing.heads += summary.heads;
+          existing.kilograms += summary.kilograms;
+        } else {
+          totalsMap.set(summary.classification_id, {
+            classification: summary.classification,
+            classification_id: summary.classification_id,
+            bags: summary.bags,
+            heads: summary.heads,
+            kilograms: summary.kilograms,
+          });
+        }
+      });
+    });
+  });
+
+  return totalsMap;
+};
+
+export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMultiCustomerResponse, showGrandTotal: boolean = true) => {
+  // Check if it's a multi-customer response
+  const isMultiCustomer = 'customers' in data;
+  let customers: TallySheetResponse[] = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  
+  // Sort customers alphabetically by name
+  customers = [...customers].sort((a, b) => 
+    a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
+  );
+  
+  // Calculate grand totals by classification if multiple customers
+  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
+  
+  // Only show grand total category table if there are multiple customers
+  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
-  const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
-
+  
   // Layout constants
   const PAGE_WIDTH = 279.4; // Letter landscape width in mm
   const MARGIN = 10;
@@ -80,11 +128,18 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
   const GRID_START_Y = 42; // Increased from 38 to add more space below date
   const GRID_WIDTH = NUM_COLUMNS * CELL_WIDTH;
   const GRID_HEIGHT = ROWS_PER_PAGE * CELL_HEIGHT;
+  
+  let isFirstPage = true;
+  
+  // Process each customer
+  customers.forEach((customerData) => {
+    const { customer_name, date, pages } = customerData;
 
-  pages.forEach((page, pageIndex) => {
-    if (pageIndex > 0) {
-      doc.addPage();
-    }
+    pages.forEach((page) => {
+      if (!isFirstPage) {
+        doc.addPage();
+      }
+      isFirstPage = false;
 
     const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
     const summaries = is_byproduct ? summary_byproduct : summary_dressed;
@@ -292,27 +347,120 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     doc.text('Approved by: _______________', MARGIN + 5 + (signatureSpacing * 2), signatureStartY);
     doc.text('Received by: _______________', MARGIN + 5 + (signatureSpacing * 3), signatureStartY);
 
-    // ========== GRAND TOTAL (only on last page and if showGrandTotal is true) ==========
-    if (page_number === total_pages && showGrandTotal) {
-      const grandTotalY = signatureStartY + 15;
-      
-      // Draw a line above grand total
-      doc.setLineWidth(0.2);
-      doc.line(MARGIN, grandTotalY - 2, PAGE_WIDTH - MARGIN, grandTotalY - 2);
-      
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Grand Total:', MARGIN + 5, grandTotalY + 5);
-      doc.setFontSize(10);
-      doc.text(`Bags: ${formatNumber(grand_total_bags, 2)}`, MARGIN + 45, grandTotalY + 5);
-      doc.text(`Heads: ${formatNumber(grand_total_heads, 2)}`, MARGIN + 85, grandTotalY + 5);
-      doc.text(`Kilograms: ${formatNumber(grand_total_kilograms, 2)}`, MARGIN + 125, grandTotalY + 5);
-    }
+      // ========== GRAND TOTAL (only on last page of last customer and if showGrandTotal is true) ==========
+      const isLastCustomer = customers.indexOf(customerData) === customers.length - 1;
+      const isLastPageOfLastCustomer = isLastCustomer && page_number === total_pages;
+      if (isLastPageOfLastCustomer && showGrandTotal) {
+        const grandTotalY = signatureStartY + 15;
+        
+        // Draw a line above grand total
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN, grandTotalY - 2, PAGE_WIDTH - MARGIN, grandTotalY - 2);
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Grand Total:', MARGIN + 5, grandTotalY + 5);
+        doc.setFontSize(10);
+        
+        // Calculate overall grand totals across all customers
+        const overallGrandTotalBags = customers.reduce((sum, c) => sum + c.grand_total_bags, 0);
+        const overallGrandTotalHeads = customers.reduce((sum, c) => sum + c.grand_total_heads, 0);
+        const overallGrandTotalKilos = customers.reduce((sum, c) => sum + c.grand_total_kilograms, 0);
+        
+        doc.text(`Bags: ${formatNumber(overallGrandTotalBags, 2)}`, MARGIN + 45, grandTotalY + 5);
+        doc.text(`Heads: ${formatNumber(overallGrandTotalHeads, 2)}`, MARGIN + 85, grandTotalY + 5);
+        doc.text(`Kilograms: ${formatNumber(overallGrandTotalKilos, 2)}`, MARGIN + 125, grandTotalY + 5);
+      }
+    });
   });
 
+  // ========== GRAND TOTAL CATEGORY TABLE (only on last page if multiple customers) ==========
+  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
+    // Add a new page for the grand total category table
+    doc.addPage();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GRAND TOTAL BY CLASSIFICATION', PAGE_WIDTH / 2, 20, { align: 'center' });
+    
+    // Convert map to array and sort by classification name
+    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+    
+    // Table dimensions
+    const tableStartY = 35;
+    const tableStartX = MARGIN + 20;
+    const tableWidth = PAGE_WIDTH - (2 * tableStartX);
+    const rowHeight = 7;
+    const col1Width = tableWidth * 0.5; // Classification
+    const col2Width = tableWidth * 0.15; // Bags
+    const col3Width = tableWidth * 0.15; // Heads
+    // col4 (Kilograms) uses remaining width
+    
+    const numRows = sortedTotals.length + 2; // +2 for header and total row
+    const tableHeight = numRows * rowHeight;
+    
+    // Draw table borders
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.2);
+    doc.rect(tableStartX, tableStartY, tableWidth, tableHeight);
+    
+    // Draw horizontal lines
+    doc.setLineWidth(0.1);
+    for (let i = 0; i <= numRows; i++) {
+      const y = tableStartY + (i * rowHeight);
+      doc.line(tableStartX, y, tableStartX + tableWidth, y);
+    }
+    
+    // Draw vertical lines
+    doc.line(tableStartX + col1Width, tableStartY, tableStartX + col1Width, tableStartY + tableHeight);
+    doc.line(tableStartX + col1Width + col2Width, tableStartY, tableStartX + col1Width + col2Width, tableStartY + tableHeight);
+    doc.line(tableStartX + col1Width + col2Width + col3Width, tableStartY, tableStartX + col1Width + col2Width + col3Width, tableStartY + tableHeight);
+    
+    // Header row
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    const headerY = tableStartY + (rowHeight / 2) + 2;
+    doc.text('Classification', tableStartX + 2, headerY);
+    doc.text('Bags', tableStartX + col1Width + col2Width - 2, headerY, { align: 'right' });
+    doc.text('Heads', tableStartX + col1Width + col2Width + col3Width - 2, headerY, { align: 'right' });
+    doc.text('Kilograms', tableStartX + tableWidth - 2, headerY, { align: 'right' });
+    
+    // Data rows
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    sortedTotals.forEach((summary, index) => {
+      const rowY = tableStartY + ((index + 1) * rowHeight) + (rowHeight / 2) + 2;
+      doc.text(summary.classification, tableStartX + 2, rowY);
+      doc.text(formatNumber(summary.bags, 2), tableStartX + col1Width + col2Width - 2, rowY, { align: 'right' });
+      doc.text(formatNumber(summary.heads, 2), tableStartX + col1Width + col2Width + col3Width - 2, rowY, { align: 'right' });
+      doc.text(formatNumber(summary.kilograms, 2), tableStartX + tableWidth - 2, rowY, { align: 'right' });
+    });
+    
+    // Total row
+    const totalRowY = tableStartY + ((sortedTotals.length + 1) * rowHeight) + (rowHeight / 2) + 2;
+    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
+    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
+    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', tableStartX + 2, totalRowY);
+    doc.text(formatNumber(totalBags, 2), tableStartX + col1Width + col2Width - 2, totalRowY, { align: 'right' });
+    doc.text(formatNumber(totalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, totalRowY, { align: 'right' });
+    doc.text(formatNumber(totalKilos, 2), tableStartX + tableWidth - 2, totalRowY, { align: 'right' });
+  }
+
   // Generate filename
-  const dateStr = formatDate(date).replace(/\//g, '-');
-  const filename = `Tally Sheet - ${customer_name} - ${dateStr}.pdf`;
+  const firstCustomer = customers[0];
+  const dateStr = formatDate(firstCustomer.date).replace(/\//g, '-');
+  let filename: string;
+  if (customers.length === 1) {
+    filename = `Tally Sheet - ${firstCustomer.customer_name} - ${dateStr}.pdf`;
+  } else {
+    filename = `Tally Sheet - Multiple Customers (${customers.length}) - ${dateStr}.pdf`;
+  }
 
   doc.save(filename);
 };

@@ -63,6 +63,37 @@ const formatNumber = (value: number, decimals: number = 2): string => {
   return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
+// Calculate grand totals by classification across all customers
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
+  const totalsMap = new Map<number, TallySheetSummary>();
+
+  customers.forEach(customer => {
+    customer.pages.forEach(page => {
+      // Process both dressed and byproduct summaries
+      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      
+      summaries.forEach(summary => {
+        const existing = totalsMap.get(summary.classification_id);
+        if (existing) {
+          existing.bags += summary.bags;
+          existing.heads += summary.heads;
+          existing.kilograms += summary.kilograms;
+        } else {
+          totalsMap.set(summary.classification_id, {
+            classification: summary.classification,
+            classification_id: summary.classification_id,
+            bags: summary.bags,
+            heads: summary.heads,
+            kilograms: summary.kilograms,
+          });
+        }
+      });
+    });
+  });
+
+  return totalsMap;
+};
+
 const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean = true): string => {
   const { customer_name, product_type, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
   const ROWS_PER_PAGE = 20;
@@ -255,6 +286,10 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
   // Only show grand total if there are multiple customers
   const showGrandTotal = customers.length > 1;
   
+  // Calculate grand totals by classification if multiple customers
+  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
+  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  
   // Generate HTML for each customer with a page break between customers
   const customersHTML = customers.map((customerData, index) => {
     const customerHTML = generateCustomerHTML(customerData, showGrandTotal);
@@ -264,6 +299,51 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
     }
     return customerHTML;
   }).join('');
+
+  // Generate grand total category table HTML if needed
+  let grandTotalCategoryTableHTML = '';
+  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
+    // Convert map to array and sort by classification name
+    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+    
+    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
+    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
+    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    
+    grandTotalCategoryTableHTML = `
+      <div style="page-break-before: always; padding: 20px;">
+        <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">GRAND TOTAL BY CLASSIFICATION</h1>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #000; padding: 8px; text-align: left; background-color: #70AD47; color: white;">Classification</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Bags</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Heads</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Kilograms</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedTotals.map(summary => `
+              <tr>
+                <td style="border: 1px solid #000; padding: 6px;">${summary.classification}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.bags, 2)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.heads, 2)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.kilograms, 2)}</td>
+              </tr>
+            `).join('')}
+            <tr style="font-weight: bold; background-color: #C6E0B4;">
+              <td style="border: 1px solid #000; padding: 8px;">TOTAL</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalBags, 2)}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalHeads, 2)}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalKilos, 2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
 
   return `
     <!DOCTYPE html>
@@ -279,6 +359,7 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
     </head>
     <body>
       ${customersHTML}
+      ${grandTotalCategoryTableHTML}
     </body>
     </html>
   `;

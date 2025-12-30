@@ -49,6 +49,10 @@ interface TallySheetResponse {
   grand_total_kilograms: number;
 }
 
+interface TallySheetMultiCustomerResponse {
+  customers: TallySheetResponse[];
+}
+
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -57,18 +61,69 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-export const generateTallySheetExcel = async (data: TallySheetResponse, showGrandTotal: boolean = true) => {
+// Calculate grand totals by classification across all customers
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
+  const totalsMap = new Map<number, TallySheetSummary>();
+
+  customers.forEach(customer => {
+    customer.pages.forEach(page => {
+      // Process both dressed and byproduct summaries
+      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      
+      summaries.forEach(summary => {
+        const existing = totalsMap.get(summary.classification_id);
+        if (existing) {
+          existing.bags += summary.bags;
+          existing.heads += summary.heads;
+          existing.kilograms += summary.kilograms;
+        } else {
+          totalsMap.set(summary.classification_id, {
+            classification: summary.classification,
+            classification_id: summary.classification_id,
+            bags: summary.bags,
+            heads: summary.heads,
+            kilograms: summary.kilograms,
+          });
+        }
+      });
+    });
+  });
+
+  return totalsMap;
+};
+
+export const generateTallySheetExcel = async (data: TallySheetResponse | TallySheetMultiCustomerResponse, showGrandTotal: boolean = true) => {
   const workbook = new ExcelJS.Workbook();
-  const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = data;
+  
+  // Check if it's a multi-customer response
+  const isMultiCustomer = 'customers' in data;
+  let customers: TallySheetResponse[] = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
+  
+  // Sort customers alphabetically by name
+  customers = [...customers].sort((a, b) => 
+    a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
+  );
+  
+  // Calculate grand totals by classification if multiple customers
+  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
+  
+  // Only show grand total category table if there are multiple customers
+  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  
+  // Process each customer
+  let allCurrentRows: number[] = [];
+  
+  customers.forEach((customerData) => {
+    const { customer_name, date, pages, grand_total_bags, grand_total_heads, grand_total_kilograms } = customerData;
 
-  const ROWS_PER_PAGE = 20;
-  const NUM_COLUMNS = 13;
-  const SUMMARY_START_COL = 15; // Start summary table after the grid (row number + 13 columns + 1 gap)
-  const SPACING_BETWEEN_TABLES = 3; // Rows between tables
+    const ROWS_PER_PAGE = 20;
+    const NUM_COLUMNS = 13;
+    const SUMMARY_START_COL = 15; // Start summary table after the grid (row number + 13 columns + 1 gap)
+    const SPACING_BETWEEN_TABLES = 3; // Rows between tables
 
-  // Create worksheet
-  const sheetName = customer_name.length > 31 ? customer_name.substring(0, 31) : customer_name;
-  const worksheet = workbook.addWorksheet(sheetName);
+    // Create worksheet for this customer
+    const sheetName = customer_name.length > 31 ? customer_name.substring(0, 31) : customer_name;
+    const worksheet = workbook.addWorksheet(sheetName);
 
   // Define styles
   const headerStyle = {
@@ -383,53 +438,120 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
     currentRow++;
   });
 
-  // Grand Total table (only once at the end and if showGrandTotal is true)
-  if (showGrandTotal) {
-    worksheet.addRow([]);
-    currentRow++;
-    
-    // Grand Total header row
-    const grandTotalHeaderRow = worksheet.addRow([]);
-    grandTotalHeaderRow.height = 20;
-    grandTotalHeaderRow.getCell(1).value = 'Grand Total';
-    grandTotalHeaderRow.getCell(1).style = summaryHeaderStyle;
-    grandTotalHeaderRow.getCell(2).value = 'Bags';
-    grandTotalHeaderRow.getCell(2).style = summaryHeaderStyle;
-    grandTotalHeaderRow.getCell(3).value = 'Heads';
-    grandTotalHeaderRow.getCell(3).style = summaryHeaderStyle;
-    grandTotalHeaderRow.getCell(4).value = 'Kilograms';
-    grandTotalHeaderRow.getCell(4).style = summaryHeaderStyle;
-    currentRow++;
-    
-    // Grand Total data row
-    const grandTotalRow = worksheet.addRow([]);
-    grandTotalRow.height = 22;
-    grandTotalRow.getCell(1).value = 'TOTAL';
-    grandTotalRow.getCell(1).style = summaryTotalLeftStyle;
-    grandTotalRow.getCell(2).value = grand_total_bags;
-    grandTotalRow.getCell(2).numFmt = '0.00';
-    grandTotalRow.getCell(2).style = summaryTotalStyle;
-    grandTotalRow.getCell(3).value = grand_total_heads;
-    grandTotalRow.getCell(3).numFmt = '0.00';
-    grandTotalRow.getCell(3).style = summaryTotalStyle;
-    grandTotalRow.getCell(4).value = grand_total_kilograms;
-    grandTotalRow.getCell(4).numFmt = '0.00';
-    grandTotalRow.getCell(4).style = summaryTotalStyle;
-  }
+    // Grand Total table (only once at the end of each customer's worksheet and if showGrandTotal is true)
+    if (showGrandTotal) {
+      worksheet.addRow([]);
+      currentRow++;
+      
+      // Grand Total header row
+      const grandTotalHeaderRow = worksheet.addRow([]);
+      grandTotalHeaderRow.height = 20;
+      grandTotalHeaderRow.getCell(1).value = 'Grand Total';
+      grandTotalHeaderRow.getCell(1).style = summaryHeaderStyle;
+      grandTotalHeaderRow.getCell(2).value = 'Bags';
+      grandTotalHeaderRow.getCell(2).style = summaryHeaderStyle;
+      grandTotalHeaderRow.getCell(3).value = 'Heads';
+      grandTotalHeaderRow.getCell(3).style = summaryHeaderStyle;
+      grandTotalHeaderRow.getCell(4).value = 'Kilograms';
+      grandTotalHeaderRow.getCell(4).style = summaryHeaderStyle;
+      currentRow++;
+      
+      // Grand Total data row
+      const grandTotalRow = worksheet.addRow([]);
+      grandTotalRow.height = 22;
+      grandTotalRow.getCell(1).value = 'TOTAL';
+      grandTotalRow.getCell(1).style = summaryTotalLeftStyle;
+      grandTotalRow.getCell(2).value = grand_total_bags;
+      grandTotalRow.getCell(2).numFmt = '0.00';
+      grandTotalRow.getCell(2).style = summaryTotalStyle;
+      grandTotalRow.getCell(3).value = grand_total_heads;
+      grandTotalRow.getCell(3).numFmt = '0.00';
+      grandTotalRow.getCell(3).style = summaryTotalStyle;
+      grandTotalRow.getCell(4).value = grand_total_kilograms;
+      grandTotalRow.getCell(4).numFmt = '0.00';
+      grandTotalRow.getCell(4).style = summaryTotalStyle;
+    }
 
-  // Set column widths
-  worksheet.getColumn(1).width = 8; // Row number column
-  for (let col = 2; col <= NUM_COLUMNS + 1; col++) {
-    worksheet.getColumn(col).width = 12; // Grid data columns
+    // Set column widths
+    worksheet.getColumn(1).width = 8; // Row number column
+    for (let col = 2; col <= NUM_COLUMNS + 1; col++) {
+      worksheet.getColumn(col).width = 12; // Grid data columns
+    }
+    worksheet.getColumn(SUMMARY_START_COL).width = 20; // Classification
+    worksheet.getColumn(SUMMARY_START_COL + 1).width = 12; // Bags
+    worksheet.getColumn(SUMMARY_START_COL + 2).width = 12; // Heads
+    worksheet.getColumn(SUMMARY_START_COL + 3).width = 15; // Kilograms
+    
+    allCurrentRows.push(currentRow);
+  });
+
+  // Add grand total category table worksheet if multiple customers
+  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
+    const summaryWorksheet = workbook.addWorksheet('Grand Total by Classification');
+    
+    // Convert map to array and sort by classification name
+    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+    
+    // Header row
+    const headerRow = summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
+    headerRow.height = 20;
+    headerRow.eachCell((cell, colNumber) => {
+      cell.style = summaryHeaderStyle;
+    });
+    
+    // Data rows
+    sortedTotals.forEach(summary => {
+      const row = summaryWorksheet.addRow([
+        summary.classification,
+        summary.bags,
+        summary.heads,
+        summary.kilograms
+      ]);
+      row.getCell(2).numFmt = '0.00';
+      row.getCell(3).numFmt = '0.00';
+      row.getCell(4).numFmt = '0.00';
+      row.eachCell((cell, colNumber) => {
+        if (colNumber === 1) {
+          cell.style = summaryCellLeftStyle;
+        } else {
+          cell.style = summaryCellStyle;
+        }
+      });
+    });
+    
+    // Total row
+    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
+    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
+    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    
+    const totalRow = summaryWorksheet.addRow(['TOTAL', totalBags, totalHeads, totalKilos]);
+    totalRow.height = 22;
+    totalRow.getCell(1).style = summaryTotalLeftStyle;
+    totalRow.getCell(2).numFmt = '0.00';
+    totalRow.getCell(2).style = summaryTotalStyle;
+    totalRow.getCell(3).numFmt = '0.00';
+    totalRow.getCell(3).style = summaryTotalStyle;
+    totalRow.getCell(4).numFmt = '0.00';
+    totalRow.getCell(4).style = summaryTotalStyle;
+    
+    // Set column widths
+    summaryWorksheet.getColumn(1).width = 30; // Classification
+    summaryWorksheet.getColumn(2).width = 15; // Bags
+    summaryWorksheet.getColumn(3).width = 15; // Heads
+    summaryWorksheet.getColumn(4).width = 18; // Kilograms
   }
-  worksheet.getColumn(SUMMARY_START_COL).width = 20; // Classification
-  worksheet.getColumn(SUMMARY_START_COL + 1).width = 12; // Bags
-  worksheet.getColumn(SUMMARY_START_COL + 2).width = 12; // Heads
-  worksheet.getColumn(SUMMARY_START_COL + 3).width = 15; // Kilograms
 
   // Generate filename
-  const dateStr = formatDate(date).replace(/\//g, '-');
-  const filename = `Tally Sheet - ${customer_name} - ${dateStr}.xlsx`;
+  const firstCustomer = customers[0];
+  const dateStr = formatDate(firstCustomer.date).replace(/\//g, '-');
+  let filename: string;
+  if (customers.length === 1) {
+    filename = `Tally Sheet - ${firstCustomer.customer_name} - ${dateStr}.xlsx`;
+  } else {
+    filename = `Tally Sheet - Multiple Customers (${customers.length}) - ${dateStr}.xlsx`;
+  }
 
   // Save file
   const buffer = await workbook.xlsx.writeBuffer();

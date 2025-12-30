@@ -111,6 +111,37 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
+// Calculate grand totals by classification across all customers
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
+  const totalsMap = new Map<number, TallySheetSummary>();
+
+  customers.forEach(customer => {
+    customer.pages.forEach(page => {
+      // Process both dressed and byproduct summaries
+      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      
+      summaries.forEach(summary => {
+        const existing = totalsMap.get(summary.classification_id);
+        if (existing) {
+          existing.bags += summary.bags;
+          existing.heads += summary.heads;
+          existing.kilograms += summary.kilograms;
+        } else {
+          totalsMap.set(summary.classification_id, {
+            classification: summary.classification,
+            classification_id: summary.classification_id,
+            bags: summary.bags,
+            heads: summary.heads,
+            kilograms: summary.kilograms,
+          });
+        }
+      });
+    });
+  });
+
+  return totalsMap;
+};
+
 const generateWorksheetForCustomer = (
   data: TallySheetResponse,
   workbook: XLSX.WorkBook,
@@ -363,10 +394,57 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   // Only show grand total if there are multiple customers
   const showGrandTotal = customers.length > 1;
   
+  // Calculate grand totals by classification if multiple customers
+  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
+  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  
   // Generate a worksheet for each customer
   customers.forEach((customerData) => {
     generateWorksheetForCustomer(customerData, workbook, showGrandTotal);
   });
+  
+  // Add grand total category table worksheet if multiple customers
+  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
+    // Convert map to array and sort by classification name
+    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+    
+    const summaryWorksheetData: any[][] = [];
+    
+    // Header row
+    summaryWorksheetData.push(['Classification', 'Bags', 'Heads', 'Kilograms']);
+    
+    // Data rows
+    sortedTotals.forEach(summary => {
+      summaryWorksheetData.push([
+        summary.classification,
+        summary.bags,
+        summary.heads,
+        summary.kilograms
+      ]);
+    });
+    
+    // Total row
+    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
+    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
+    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    summaryWorksheetData.push(['TOTAL', totalBags, totalHeads, totalKilos]);
+    
+    // Create worksheet
+    const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryWorksheetData);
+    
+    // Set column widths
+    const colWidths: any[] = [];
+    colWidths[0] = { wch: 30 }; // Classification
+    colWidths[1] = { wch: 15 }; // Bags
+    colWidths[2] = { wch: 15 }; // Heads
+    colWidths[3] = { wch: 18 }; // Kilograms
+    summaryWorksheet['!cols'] = colWidths;
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Grand Total by Classification');
+  }
 
   // Generate filename based on number of customers
   let filename: string;

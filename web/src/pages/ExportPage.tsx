@@ -180,20 +180,14 @@ function ExportPage() {
         return;
       }
       
-      // Generate separate files for each customer with data
-      // Add a small delay between downloads to avoid browser blocking multiple downloads
-      // Only show grand total if there are multiple customers
+      // Pass all customers data to generators for multi-customer export with grand total category table
       const showGrandTotal = customersWithData.length > 1;
-      for (let i = 0; i < customersWithData.length; i++) {
-        if (i > 0) {
-          // Wait 500ms between downloads
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        if (format === 'pdf') {
-          generateTallySheetPDF(customersWithData[i], showGrandTotal);
-        } else {
-          await generateTallySheetExcel(customersWithData[i], showGrandTotal);
-        }
+      if (format === 'pdf') {
+        // Pass multi-customer response to generate single PDF with all customers
+        generateTallySheetPDF({ customers: customersWithData }, showGrandTotal);
+      } else {
+        // Pass multi-customer response to generate single Excel file with all customers
+        await generateTallySheetExcel({ customers: customersWithData }, showGrandTotal);
       }
     } catch (error: any) {
       console.error('Tally sheet export failed', error);

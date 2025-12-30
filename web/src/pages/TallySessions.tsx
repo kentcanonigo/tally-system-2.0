@@ -2,11 +2,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { customersApi, plantsApi, tallySessionsApi } from '../services/api';
+import { customersApi, plantsApi, tallySessionsApi, exportApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTimezone } from '../hooks/useTimezone';
 import { formatDate } from '../utils/dateFormat';
-import type { Customer, Plant, TallySession } from '../types';
+import { generateSessionReportPDF } from '../utils/pdfGenerator';
+import { generateTallySheetPDF } from '../utils/tallySheetPdfGenerator';
+import { generateTallySheetExcel } from '../utils/tallySheetExcelGenerator';
+import type { Customer, Plant, TallySession, TallyLogEntryRole } from '../types';
+import { TallyLogEntryRole as RoleEnum } from '../types';
 
 // Type for react-calendar's onChange value
 type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
@@ -36,14 +40,28 @@ function TallySessions() {
   });
   const [sortBy, setSortBy] = useState<'date' | 'id' | 'session_number' | 'status' | 'created_at' | 'updated_at'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const [showTallySheetFormatModal, setShowTallySheetFormatModal] = useState(false);
+  const [showAllocationReportRoleModal, setShowAllocationReportRoleModal] = useState(false);
+  const [exportRole, setExportRole] = useState<TallyLogEntryRole>(RoleEnum.TALLY);
 
   useEffect(() => {
     fetchData();
   }, []);
 
   useEffect(() => {
-    fetchSessions();
+    setCurrentPage(1); // Reset to page 1 when filters change
+    fetchSessions(1);
   }, [filters]);
+
+  useEffect(() => {
+    fetchSessions(currentPage);
+  }, [currentPage, itemsPerPage]);
 
   // Sort sessions function
   const sortSessions = useCallback((sessionsToSort: TallySession[]): TallySession[] => {
@@ -104,6 +122,13 @@ function TallySessions() {
     setSessions(sorted);
   }, [selectedDate, allSessions, sortSessions]);
 
+  // Reset to page 1 when date filter changes
+  useEffect(() => {
+    if (selectedDate !== null) {
+      setCurrentPage(1);
+    }
+  }, [selectedDate]);
+
   const fetchData = async () => {
     try {
       const [customersRes, plantsRes] = await Promise.all([
@@ -117,7 +142,7 @@ function TallySessions() {
     }
   };
 
-  const fetchSessions = async () => {
+  const fetchSessions = async (page: number = currentPage) => {
     setLoading(true);
     try {
       const params: any = {};
@@ -125,8 +150,23 @@ function TallySessions() {
       if (filters.plant_id) params.plant_id = Number(filters.plant_id);
       if (filters.status) params.status = filters.status;
 
+      // Add pagination parameters
+      const skip = (page - 1) * itemsPerPage;
+      const limit = itemsPerPage + 1; // Fetch one extra to check if there are more pages
+      params.skip = skip;
+      params.limit = limit;
+
       const response = await tallySessionsApi.getAll(params);
-      setAllSessions(response.data);
+      const fetchedSessions = response.data;
+      
+      // Check if there are more pages
+      const hasMore = fetchedSessions.length > itemsPerPage;
+      if (hasMore) {
+        fetchedSessions.pop(); // Remove the extra item
+      }
+      setHasMorePages(hasMore);
+      
+      setAllSessions(fetchedSessions);
     } catch (error) {
       console.error('Error fetching sessions:', error);
       alert('Error fetching tally sessions');
@@ -257,6 +297,108 @@ function TallySessions() {
     }
   };
 
+  const toggleSelection = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(sId => sId !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === sessions.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(sessions.map(s => s.id));
+    }
+  };
+
+  const handleExport = async (role?: TallyLogEntryRole) => {
+    if (selectedIds.length === 0) return;
+    const selectedRole = role || exportRole;
+    setExporting(true);
+    setShowAllocationReportRoleModal(false);
+    try {
+      const response = await exportApi.exportSessions({ session_ids: selectedIds, role: selectedRole });
+      const data = response.data;
+      
+      // Check if the report is empty
+      if (!data.customers || data.customers.length === 0) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`);
+        return;
+      }
+      
+      // Check if all customers have no items
+      const hasAnyItems = data.customers.some(customer => 
+        customer.items && customer.items.length > 0
+      );
+      
+      if (!hasAnyItems) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`);
+        return;
+      }
+      
+      generateSessionReportPDF(data);
+    } catch (error: any) {
+      console.error('Export failed', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No') && (errorMessage.includes('data') || errorMessage.includes('allocation'))) {
+        alert(`Cannot export allocation report: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} allocation data found for the selected sessions.`);
+      } else {
+        alert(`Export failed: ${errorMessage}`);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportTallySheet = async (format: 'pdf' | 'excel', role?: TallyLogEntryRole) => {
+    if (selectedIds.length === 0) return;
+    const selectedRole = role || exportRole;
+    setExporting(true);
+    setShowTallySheetFormatModal(false);
+    try {
+      const response = await exportApi.exportTallySheet({ session_ids: selectedIds, role: selectedRole });
+      // Backend returns TallySheetMultiCustomerResponse with a customers array
+      const customers = response.data.customers || [response.data];
+      
+      // Sort customers alphabetically by name (backend already sorts, but ensure it here too)
+      const sortedCustomers = [...customers].sort((a, b) => 
+        a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
+      );
+      
+      // Check if any customer has tally data
+      const customersWithData = sortedCustomers.filter(customer => 
+        customer.pages && customer.pages.length > 0
+      );
+      
+      if (customersWithData.length === 0) {
+        alert(`Cannot export tally sheet: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} data found for the selected sessions.`);
+        return;
+      }
+      
+      // Pass all customers data to generators for multi-customer export with grand total category table
+      const showGrandTotal = customersWithData.length > 1;
+      if (format === 'pdf') {
+        // Pass multi-customer response to generate single PDF with all customers
+        generateTallySheetPDF({ customers: customersWithData }, showGrandTotal);
+      } else {
+        // Pass multi-customer response to generate single Excel file with all customers
+        await generateTallySheetExcel({ customers: customersWithData }, showGrandTotal);
+      }
+    } catch (error: any) {
+      console.error('Tally sheet export failed', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (errorMessage.includes('No tally entries found') || errorMessage.includes('No valid data found')) {
+        alert(`Cannot export tally sheet: No ${selectedRole === RoleEnum.TALLY ? 'Tally-er' : 'Dispatcher'} data found for the selected sessions.`);
+      } else {
+        alert(`Tally sheet export failed: ${errorMessage}`);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && sessions.length === 0) {
     return <div>Loading...</div>;
   }
@@ -276,6 +418,37 @@ function TallySessions() {
           >
             Create New Session
           </button>
+        )}
+        <button 
+          className={`btn ${isSelectionMode ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => {
+            setIsSelectionMode(!isSelectionMode);
+            if (isSelectionMode) {
+              setSelectedIds([]);
+            }
+          }}
+        >
+          {isSelectionMode ? 'Disable Selection' : 'Enable Selection'}
+        </button>
+        {isSelectionMode && hasPermission('can_export_data') && selectedIds.length > 0 && (
+          <>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => setShowAllocationReportRoleModal(true)}
+              disabled={exporting}
+              style={{ opacity: exporting ? 0.5 : 1 }}
+            >
+              {exporting ? 'Generating PDF...' : `Export Allocation Report (${selectedIds.length})`}
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setShowTallySheetFormatModal(true)}
+              disabled={exporting}
+              style={{ opacity: exporting ? 0.5 : 1 }}
+            >
+              Export Tally Sheet ({selectedIds.length})
+            </button>
+          </>
         )}
         <button 
           className="btn btn-secondary" 
@@ -357,12 +530,35 @@ function TallySessions() {
             <option value="asc">Ascending (Oldest First)</option>
           </select>
         </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: '150px' }}>
+          <label>Items per Page</label>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1); // Reset to page 1 when changing items per page
+            }}
+          >
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
       </div>
 
       <div className="table-container">
         <table>
           <thead>
             <tr>
+              {isSelectionMode && (
+                <th style={{ width: '40px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={sessions.length > 0 && selectedIds.length === sessions.length}
+                    onChange={toggleAll}
+                  />
+                </th>
+              )}
               <th>ID</th>
               <th>Customer</th>
               <th>Plant</th>
@@ -374,7 +570,20 @@ function TallySessions() {
           </thead>
           <tbody>
             {sessions.map((session) => (
-              <tr key={session.id}>
+              <tr 
+                key={session.id}
+                onClick={() => isSelectionMode && toggleSelection(session.id)}
+                style={{ cursor: isSelectionMode ? 'pointer' : 'default' }}
+              >
+                {isSelectionMode && (
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedIds.includes(session.id)}
+                      onChange={() => toggleSelection(session.id)}
+                    />
+                  </td>
+                )}
                 <td>{session.id}</td>
                 <td>{getCustomerName(session.customer_id)}</td>
                 <td>{getPlantName(session.plant_id)}</td>
@@ -426,6 +635,53 @@ function TallySessions() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {(sessions.length > 0 || allSessions.length > 0) && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginTop: '20px',
+          padding: '10px 0',
+          borderTop: '1px solid #ddd'
+        }}>
+          <div style={{ color: '#666' }}>
+            {selectedDate ? (
+              <>Showing {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} matching selected date</>
+            ) : (
+              <>Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, (currentPage - 1) * itemsPerPage + allSessions.length)} of {allSessions.length} {hasMorePages ? '+' : ''} sessions</>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || loading}
+              style={{ opacity: (currentPage === 1 || loading) ? 0.5 : 1 }}
+            >
+              Previous
+            </button>
+            <span style={{ padding: '0 10px' }}>
+              Page {currentPage}
+            </span>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={(!hasMorePages && !selectedDate) || loading}
+              style={{ opacity: ((!hasMorePages && !selectedDate) || loading) ? 0.5 : 1 }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {sessions.length === 0 && allSessions.length === 0 && !loading && (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+          {selectedDate ? 'No sessions found for the selected date.' : 'No sessions found.'}
+        </div>
+      )}
 
       {showModal && (
         <div className="modal" onClick={() => setShowModal(false)}>
@@ -521,6 +777,132 @@ function TallySessions() {
                   Clear Filter
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTallySheetFormatModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Select Export Options</h3>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Role:</label>
+              <select
+                value={exportRole}
+                onChange={(e) => setExportRole(e.target.value as TallyLogEntryRole)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={RoleEnum.TALLY}>Tally-er</option>
+                <option value={RoleEnum.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Format:</label>
+              <p style={{ marginTop: '5px', color: '#666' }}>Choose the format for the tally sheet export:</p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('pdf', exportRole)}
+                disabled={exporting}
+              >
+                PDF
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportTallySheet('excel', exportRole)}
+                disabled={exporting}
+              >
+                Excel
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowTallySheetFormatModal(false)}
+                disabled={exporting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAllocationReportRoleModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ marginTop: 0 }}>Select Role for Allocation Report</h3>
+            <p style={{ marginBottom: '15px' }}>Choose which role's allocation data to export:</p>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Role:</label>
+              <select
+                value={exportRole}
+                onChange={(e) => setExportRole(e.target.value as TallyLogEntryRole)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value={RoleEnum.TALLY}>Tally-er</option>
+                <option value={RoleEnum.DISPATCHER}>Dispatcher</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExport(exportRole)}
+                disabled={exporting}
+              >
+                Export
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAllocationReportRoleModal(false)}
+                disabled={exporting}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
