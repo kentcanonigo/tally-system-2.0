@@ -177,8 +177,10 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     }
 
     // ========== SUMMARY SECTION (on every page) - positioned on the right ==========
-    const summaryStartY = GRID_START_Y; // Align with grid top
-    const summaryX = GRID_START_X + ROW_NUMBER_WIDTH + GRID_WIDTH + 15; // Right side of grid
+    // Align summary table header with grid border start position
+    const summaryHeaderTop = GRID_START_Y; // Align with grid border start
+    const summaryStartY = summaryHeaderTop + 5; // Data rows start 5mm below header (summaryRowHeight)
+    const summaryX = GRID_START_X + ROW_NUMBER_WIDTH + GRID_WIDTH + 8; // Right side of grid with reduced gap
     const summaryRowHeight = 5;
     // For byproducts, we only show 3 columns (Classification, Bags, Kilograms), so adjust width
     const summaryTableWidth = is_byproduct ? 70 : 90; // Total width of summary table
@@ -194,8 +196,8 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     doc.setDrawColor(0);
     doc.setLineWidth(0.2);
     
-    // Outer border
-    doc.rect(summaryX, summaryStartY - 5, summaryTableWidth, summaryTableHeight);
+    // Outer border - starts at summaryHeaderTop
+    doc.rect(summaryX, summaryHeaderTop, summaryTableWidth, summaryTableHeight);
     
     // Horizontal lines
     doc.setLineWidth(0.1);
@@ -206,20 +208,19 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
       const y = summaryStartY + ((i + 1) * summaryRowHeight);
       doc.line(summaryX, y, summaryX + summaryTableWidth, y);
     }
-    // Line above total row (same as line below last data row, so no need to draw again)
-    const totalRowY = summaryStartY + (numSummaryRows * summaryRowHeight);
+    // Line above total row is already drawn by the loop above (when i = numSummaryRows - 1)
     
     // Vertical lines
-    doc.line(summaryX + summaryCol1Width, summaryStartY - 5, summaryX + summaryCol1Width, summaryStartY - 5 + summaryTableHeight);
-    doc.line(summaryX + summaryCol1Width + summaryCol2Width, summaryStartY - 5, summaryX + summaryCol1Width + summaryCol2Width, summaryStartY - 5 + summaryTableHeight);
+    doc.line(summaryX + summaryCol1Width, summaryHeaderTop, summaryX + summaryCol1Width, summaryHeaderTop + summaryTableHeight);
+    doc.line(summaryX + summaryCol1Width + summaryCol2Width, summaryHeaderTop, summaryX + summaryCol1Width + summaryCol2Width, summaryHeaderTop + summaryTableHeight);
     if (!is_byproduct) {
       // Only draw the third vertical line for dressed (Heads column)
-      doc.line(summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5, summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryStartY - 5 + summaryTableHeight);
+      doc.line(summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryHeaderTop, summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width, summaryHeaderTop + summaryTableHeight);
     }
 
     // Single summary table on the right - text centered vertically in cells
     // Header row
-    const headerRowY = summaryStartY - 5 + (summaryRowHeight / 2) + 1.5; // Center of header cell
+    const headerRowY = summaryHeaderTop + (summaryRowHeight / 2) + 1.5; // Center of header cell
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     // Left align classification, right align numbers
