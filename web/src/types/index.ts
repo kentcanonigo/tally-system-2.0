@@ -153,10 +153,14 @@ export interface TallySheetPage {
   }>;
   grid: (number | null)[][];
   summary_dressed: TallySheetSummary[];
+  summary_frozen: TallySheetSummary[];
   summary_byproduct: TallySheetSummary[];
   total_dressed_bags: number;
   total_dressed_heads: number;
   total_dressed_kilograms: number;
+  total_frozen_bags: number;
+  total_frozen_heads: number;
+  total_frozen_kilograms: number;
   total_byproduct_bags: number;
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;

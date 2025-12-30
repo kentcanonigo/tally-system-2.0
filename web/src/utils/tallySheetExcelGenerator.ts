@@ -131,6 +131,59 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   // Show grand total category table if showGrandTotal is true (for both single and multiple customers)
   const showGrandTotalCategoryTable = showGrandTotal;
   
+  // Define summary styles (used in both customer worksheets and grand total category table)
+  const summaryHeaderStyle = {
+    font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
+    fill: {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FF70AD47' } // Green background
+    },
+    alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
+    border: {
+      top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
+    }
+  };
+
+  const summaryCellStyle = {
+    alignment: { horizontal: 'right' as const, vertical: 'middle' as const },
+    border: {
+      top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
+    }
+  };
+
+  const summaryCellLeftStyle = {
+    ...summaryCellStyle,
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
+  };
+
+  const summaryTotalStyle = {
+    font: { bold: true, size: 10 },
+    fill: {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFC6E0B4' } // Light green
+    },
+    alignment: { horizontal: 'right' as const, vertical: 'middle' as const },
+    border: {
+      top: { style: 'medium' as const, color: { argb: 'FF000000' } },
+      bottom: { style: 'medium' as const, color: { argb: 'FF000000' } },
+      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
+    }
+  };
+
+  const summaryTotalLeftStyle = {
+    ...summaryTotalStyle,
+    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
+  };
+
   // Process each customer
   let allCurrentRows: number[] = [];
   
@@ -212,58 +265,6 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       left: { style: 'thin' as const, color: { argb: 'FF000000' } },
       right: { style: 'thin' as const, color: { argb: 'FF000000' } }
     }
-  };
-
-  const summaryHeaderStyle = {
-    font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
-    fill: {
-      type: 'pattern' as const,
-      pattern: 'solid' as const,
-      fgColor: { argb: 'FF70AD47' } // Green background
-    },
-    alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
-    border: {
-      top: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
-    }
-  };
-
-  const summaryCellStyle = {
-    alignment: { horizontal: 'right' as const, vertical: 'middle' as const },
-    border: {
-      top: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
-    }
-  };
-
-  const summaryCellLeftStyle = {
-    ...summaryCellStyle,
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
-  };
-
-  const summaryTotalStyle = {
-    font: { bold: true, size: 10 },
-    fill: {
-      type: 'pattern' as const,
-      pattern: 'solid' as const,
-      fgColor: { argb: 'FFC6E0B4' } // Light green
-    },
-    alignment: { horizontal: 'right' as const, vertical: 'middle' as const },
-    border: {
-      top: { style: 'medium' as const, color: { argb: 'FF000000' } },
-      bottom: { style: 'medium' as const, color: { argb: 'FF000000' } },
-      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
-      right: { style: 'thin' as const, color: { argb: 'FF000000' } }
-    }
-  };
-
-  const summaryTotalLeftStyle = {
-    ...summaryTotalStyle,
-    alignment: { horizontal: 'left' as const, vertical: 'middle' as const }
   };
 
   let currentRow = 1;
@@ -555,7 +556,7 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       // Header row for this category
       const headerRow = summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
       headerRow.height = 20;
-      headerRow.eachCell((cell, colNumber) => {
+      headerRow.eachCell((cell) => {
         cell.style = summaryHeaderStyle;
       });
       currentRow++;
