@@ -248,11 +248,11 @@ function TallySessionDetail() {
         return;
       }
       
-      // Single customer, so don't show grand total
+      // Show grand total for single customer as well
       if (format === 'pdf') {
-        generateTallySheetPDF(customerData, false);
+        generateTallySheetPDF(customerData, true);
       } else {
-        await generateTallySheetExcel(customerData, false);
+        await generateTallySheetExcel(customerData, true);
       }
     } catch (error: any) {
       console.error('Tally sheet export error:', error);

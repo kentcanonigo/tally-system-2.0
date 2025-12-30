@@ -180,8 +180,8 @@ function ExportPage() {
         return;
       }
       
-      // Pass all customers data to generators for multi-customer export with grand total category table
-      const showGrandTotal = customersWithData.length > 1;
+      // Pass all customers data to generators - always show grand total category table
+      const showGrandTotal = true;
       if (format === 'pdf') {
         // Pass multi-customer response to generate single PDF with all customers
         generateTallySheetPDF({ customers: customersWithData }, showGrandTotal);

@@ -15,6 +15,10 @@ interface TallySheetSummary {
   kilograms: number;
 }
 
+interface TallySheetSummaryWithCategory extends TallySheetSummary {
+  category: 'Dressed' | 'Frozen' | 'Byproduct';
+}
+
 interface TallySheetPage {
   page_number: number;
   total_pages: number;
@@ -28,10 +32,14 @@ interface TallySheetPage {
   }>;
   grid: (number | null)[][];
   summary_dressed: TallySheetSummary[];
+  summary_frozen: TallySheetSummary[];
   summary_byproduct: TallySheetSummary[];
   total_dressed_bags: number;
   total_dressed_heads: number;
   total_dressed_kilograms: number;
+  total_frozen_bags: number;
+  total_frozen_heads: number;
+  total_frozen_kilograms: number;
   total_byproduct_bags: number;
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;
@@ -61,14 +69,26 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-// Calculate grand totals by classification across all customers
-const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
-  const totalsMap = new Map<number, TallySheetSummary>();
+// Calculate grand totals by classification across all customers, grouped by category
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummaryWithCategory> => {
+  const totalsMap = new Map<number, TallySheetSummaryWithCategory>();
 
   customers.forEach(customer => {
     customer.pages.forEach(page => {
-      // Process both dressed and byproduct summaries
-      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      // Process dressed, frozen, and byproduct summaries
+      let summaries: TallySheetSummary[] = [];
+      let category: 'Dressed' | 'Frozen' | 'Byproduct' = 'Dressed';
+      
+      if (page.is_byproduct) {
+        summaries = page.summary_byproduct || [];
+        category = 'Byproduct';
+      } else if (page.product_type === "Frozen Chicken") {
+        summaries = page.summary_frozen || [];
+        category = 'Frozen';
+      } else {
+        summaries = page.summary_dressed || [];
+        category = 'Dressed';
+      }
       
       summaries.forEach(summary => {
         const existing = totalsMap.get(summary.classification_id);
@@ -83,6 +103,7 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
             bags: summary.bags,
             heads: summary.heads,
             kilograms: summary.kilograms,
+            category: category,
           });
         }
       });
@@ -104,11 +125,11 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
   );
   
-  // Calculate grand totals by classification if multiple customers
-  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
+  // Calculate grand totals by classification (for both single and multiple customers)
+  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
   
-  // Only show grand total category table if there are multiple customers
-  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  // Show grand total category table if showGrandTotal is true (for both single and multiple customers)
+  const showGrandTotalCategoryTable = showGrandTotal;
   
   // Process each customer
   let allCurrentRows: number[] = [];
@@ -249,8 +270,10 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
 
   // Process each page
   pages.forEach((page, pageIndex) => {
-    const { columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
-    const summaries = is_byproduct ? summary_byproduct : summary_dressed;
+    const { columns, grid, summary_dressed, summary_frozen, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
+    // Determine which summary to use based on product type
+    const summaries = is_byproduct ? summary_byproduct : (page_product_type === "Frozen Chicken" ? summary_frozen : summary_dressed);
+    const isFrozen = page_product_type === "Frozen Chicken";
 
     // Add spacing between tables (except for first table)
     if (pageIndex > 0) {
@@ -379,9 +402,9 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     }
 
     // Page total row in summary table (same row as grid totals)
-    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : page.total_dressed_bags;
-    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : page.total_dressed_heads;
-    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : page.total_dressed_kilograms;
+    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : (isFrozen ? page.total_frozen_bags : page.total_dressed_bags);
+    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : (isFrozen ? page.total_frozen_heads : page.total_dressed_heads);
+    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : (isFrozen ? page.total_frozen_kilograms : page.total_dressed_kilograms);
     totalsRow.getCell(SUMMARY_START_COL).value = 'TOTAL';
     totalsRow.getCell(SUMMARY_START_COL).style = summaryTotalLeftStyle;
     totalsRow.getCell(SUMMARY_START_COL + 1).value = pageTotalBags;
@@ -485,56 +508,146 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     allCurrentRows.push(currentRow);
   });
 
-  // Add grand total category table worksheet if multiple customers
+  // Add grand total category table worksheet
   if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
     const summaryWorksheet = workbook.addWorksheet('Grand Total by Classification');
     
-    // Convert map to array and sort by classification name
-    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
-      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
-    );
+    // Group totals by category
+    const totalsByCategory = {
+      Dressed: [] as TallySheetSummaryWithCategory[],
+      Frozen: [] as TallySheetSummaryWithCategory[],
+      Byproduct: [] as TallySheetSummaryWithCategory[],
+    };
     
-    // Header row
-    const headerRow = summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
-    headerRow.height = 20;
-    headerRow.eachCell((cell, colNumber) => {
-      cell.style = summaryHeaderStyle;
+    grandTotalsByClassification.forEach((summary) => {
+      totalsByCategory[summary.category].push(summary);
     });
     
-    // Data rows
-    sortedTotals.forEach(summary => {
-      const row = summaryWorksheet.addRow([
-        summary.classification,
-        summary.bags,
-        summary.heads,
-        summary.kilograms
-      ]);
-      row.getCell(2).numFmt = '0.00';
-      row.getCell(3).numFmt = '0.00';
-      row.getCell(4).numFmt = '0.00';
-      row.eachCell((cell, colNumber) => {
-        if (colNumber === 1) {
-          cell.style = summaryCellLeftStyle;
-        } else {
-          cell.style = summaryCellStyle;
+    // Sort each category by classification name
+    Object.keys(totalsByCategory).forEach(category => {
+      totalsByCategory[category as keyof typeof totalsByCategory].sort((a, b) =>
+        a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+      );
+    });
+    
+    let currentRow = 1;
+    const categoryOrder: Array<'Dressed' | 'Frozen' | 'Byproduct'> = ['Dressed', 'Frozen', 'Byproduct'];
+    
+    // Render each category sub-table
+    categoryOrder.forEach((category) => {
+      const categoryTotals = totalsByCategory[category];
+      if (categoryTotals.length === 0) return; // Skip empty categories
+      
+      // Category header
+      const categoryHeaderRow = summaryWorksheet.addRow([`${category} Chicken`]);
+      categoryHeaderRow.height = 20;
+      categoryHeaderRow.getCell(1).style = {
+        font: { bold: true, size: 14 },
+        fill: {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0E0E0' }
         }
+      };
+      summaryWorksheet.mergeCells(currentRow, 1, currentRow, 4);
+      currentRow++;
+      
+      // Header row for this category
+      const headerRow = summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
+      headerRow.height = 20;
+      headerRow.eachCell((cell, colNumber) => {
+        cell.style = summaryHeaderStyle;
       });
+      currentRow++;
+      
+      // Data rows for this category
+      categoryTotals.forEach(summary => {
+        const row = summaryWorksheet.addRow([
+          summary.classification,
+          summary.bags,
+          summary.heads,
+          summary.kilograms
+        ]);
+        row.getCell(2).numFmt = '0.00';
+        row.getCell(3).numFmt = '0.00';
+        row.getCell(4).numFmt = '0.00';
+        row.eachCell((cell, colNumber) => {
+          if (colNumber === 1) {
+            cell.style = summaryCellLeftStyle;
+          } else {
+            cell.style = summaryCellStyle;
+          }
+        });
+        currentRow++;
+      });
+      
+      // Category total row
+      const categoryTotalBags = categoryTotals.reduce((sum, s) => sum + s.bags, 0);
+      const categoryTotalHeads = categoryTotals.reduce((sum, s) => sum + s.heads, 0);
+      const categoryTotalKilos = categoryTotals.reduce((sum, s) => sum + s.kilograms, 0);
+      
+      const categoryTotalRow = summaryWorksheet.addRow([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads, categoryTotalKilos]);
+      categoryTotalRow.height = 22;
+      categoryTotalRow.getCell(1).style = summaryTotalLeftStyle;
+      categoryTotalRow.getCell(2).numFmt = '0.00';
+      categoryTotalRow.getCell(2).style = summaryTotalStyle;
+      categoryTotalRow.getCell(3).numFmt = '0.00';
+      categoryTotalRow.getCell(3).style = summaryTotalStyle;
+      categoryTotalRow.getCell(4).numFmt = '0.00';
+      categoryTotalRow.getCell(4).style = summaryTotalStyle;
+      currentRow++;
+      
+      // Add spacing between categories
+      summaryWorksheet.addRow([]);
+      currentRow++;
     });
     
-    // Total row
-    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
-    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
-    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    // Overall total row (after all category tables)
+    const allTotals = Array.from(grandTotalsByClassification.values());
+    const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
+    const overallTotalHeads = allTotals.reduce((sum, s) => sum + s.heads, 0);
+    const overallTotalKilos = allTotals.reduce((sum, s) => sum + s.kilograms, 0);
     
-    const totalRow = summaryWorksheet.addRow(['TOTAL', totalBags, totalHeads, totalKilos]);
-    totalRow.height = 22;
-    totalRow.getCell(1).style = summaryTotalLeftStyle;
-    totalRow.getCell(2).numFmt = '0.00';
-    totalRow.getCell(2).style = summaryTotalStyle;
-    totalRow.getCell(3).numFmt = '0.00';
-    totalRow.getCell(3).style = summaryTotalStyle;
-    totalRow.getCell(4).numFmt = '0.00';
-    totalRow.getCell(4).style = summaryTotalStyle;
+    const overallTotalRow = summaryWorksheet.addRow(['GRAND TOTAL', overallTotalBags, overallTotalHeads, overallTotalKilos]);
+    overallTotalRow.height = 24;
+    overallTotalRow.getCell(1).style = {
+      font: { bold: true, size: 12 },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD0D0D0' }
+      }
+    };
+    overallTotalRow.getCell(2).numFmt = '0.00';
+    overallTotalRow.getCell(2).style = {
+      font: { bold: true, size: 12 },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD0D0D0' }
+      },
+      alignment: { horizontal: 'right' }
+    };
+    overallTotalRow.getCell(3).numFmt = '0.00';
+    overallTotalRow.getCell(3).style = {
+      font: { bold: true, size: 12 },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD0D0D0' }
+      },
+      alignment: { horizontal: 'right' }
+    };
+    overallTotalRow.getCell(4).numFmt = '0.00';
+    overallTotalRow.getCell(4).style = {
+      font: { bold: true, size: 12 },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD0D0D0' }
+      },
+      alignment: { horizontal: 'right' }
+    };
     
     // Set column widths
     summaryWorksheet.getColumn(1).width = 30; // Classification

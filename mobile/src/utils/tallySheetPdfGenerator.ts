@@ -26,10 +26,14 @@ interface TallySheetPage {
   }>;
   grid: (number | null)[][];
   summary_dressed: TallySheetSummary[];
+  summary_frozen: TallySheetSummary[];
   summary_byproduct: TallySheetSummary[];
   total_dressed_bags: number;
   total_dressed_heads: number;
   total_dressed_kilograms: number;
+  total_frozen_bags: number;
+  total_frozen_heads: number;
+  total_frozen_kilograms: number;
   total_byproduct_bags: number;
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;
@@ -69,8 +73,15 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
 
   customers.forEach(customer => {
     customer.pages.forEach(page => {
-      // Process both dressed and byproduct summaries
-      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      // Process dressed, frozen, and byproduct summaries
+      let summaries: TallySheetSummary[] = [];
+      if (page.is_byproduct) {
+        summaries = page.summary_byproduct || [];
+      } else if (page.product_type === "Frozen Chicken") {
+        summaries = page.summary_frozen || [];
+      } else {
+        summaries = page.summary_dressed || [];
+      }
       
       summaries.forEach(summary => {
         const existing = totalsMap.get(summary.classification_id);
@@ -99,7 +110,10 @@ const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean 
   const ROWS_PER_PAGE = 20;
 
   const generatePageHTML = (page: TallySheetPage): string => {
-    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
+    const { page_number, total_pages, columns, grid, summary_dressed, summary_frozen, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
+    // Determine which summary to use based on product type
+    const isFrozen = page_product_type === "Frozen Chicken";
+    const summaries = is_byproduct ? summary_byproduct : (isFrozen ? summary_frozen : summary_dressed);
     
     let html = `
       <div style="page-break-after: ${page_number < total_pages ? 'always' : 'auto'}; padding: 20px;">
@@ -201,7 +215,43 @@ const generateCustomerHTML = (data: TallySheetResponse, showGrandTotal: boolean 
         </tbody>
       </table>
       `;
-    } else if (!is_byproduct && summary_dressed.length > 0) {
+    } else if (isFrozen && summary_frozen && summary_frozen.length > 0) {
+      html += `
+        <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Summary - Frozen</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #000; padding: 3px; text-align: left;">Classification</th>
+              <th style="border: 1px solid #000; padding: 3px; text-align: center;">Bags</th>
+              <th style="border: 1px solid #000; padding: 3px; text-align: center;">Heads</th>
+              <th style="border: 1px solid #000; padding: 3px; text-align: center;">Kilograms</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      summary_frozen.forEach(summary => {
+        html += `
+          <tr>
+            <td style="border: 1px solid #000; padding: 3px;">${summary.classification}</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(summary.bags, 2)}</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(summary.heads, 2)}</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(summary.kilograms, 2)}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 3px;">TOTAL</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(page.total_frozen_bags, 2)}</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(page.total_frozen_heads, 2)}</td>
+            <td style="border: 1px solid #000; padding: 3px; text-align: center;">${formatNumber(page.total_frozen_kilograms, 2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      `;
+    } else if (!is_byproduct && !isFrozen && summary_dressed.length > 0) {
       html += `
         <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Summary - Dressed</h3>
         <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
@@ -286,9 +336,9 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
   // Only show grand total if there are multiple customers
   const showGrandTotal = customers.length > 1;
   
-  // Calculate grand totals by classification if multiple customers
-  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
-  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  // Calculate grand totals by classification (for both single and multiple customers)
+  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
+  const showGrandTotalCategoryTable = showGrandTotal;
   
   // Generate HTML for each customer with a page break between customers
   const customersHTML = customers.map((customerData, index) => {

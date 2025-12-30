@@ -214,15 +214,18 @@ def process_sessions_for_customer(
     # Sort classifications
     sorted_classifications = sorted(entries_by_classification.keys(), key=get_classification_sort_key)
     
-    # Separate entries by category (Dressed/Frozen vs Byproduct), keeping them grouped by classification
+    # Separate entries by category (Dressed, Frozen, Byproduct), keeping them grouped by classification
     dressed_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
+    frozen_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
     byproduct_entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]] = {}
     
     for wc_id, classification in sorted_classifications:
         wc = weight_classifications[wc_id]
         entry_list = [(entry, wc_id, classification) for entry in entries_by_classification[(wc_id, classification)]]
-        if wc.category == "Dressed" or wc.category == "Frozen":
+        if wc.category == "Dressed":
             dressed_entries_by_classification[(wc_id, classification)] = entry_list
+        elif wc.category == "Frozen":
+            frozen_entries_by_classification[(wc_id, classification)] = entry_list
         else:
             byproduct_entries_by_classification[(wc_id, classification)] = entry_list
     
@@ -234,7 +237,7 @@ def process_sessions_for_customer(
     pages: List[TallySheetPage] = []
     
     # Helper function to process entries grouped by classification and create pages
-    def process_entries_by_classification(entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]], is_byproduct: bool) -> int:
+    def process_entries_by_classification(entries_by_classification: Dict[Tuple[int, str], List[Tuple[TallyLogEntry, int, str]]], is_byproduct: bool, is_frozen: bool = False) -> int:
         """Process entries grouped by classification and create pages. Returns number of pages created."""
         if not entries_by_classification:
             return 0
@@ -263,7 +266,7 @@ def process_sessions_for_customer(
                 if columns_available == 0 or entries_available < ROWS_PER_PAGE:
                     # Create page with current entries
                     if current_page_entries:
-                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, is_frozen, len(pages) + 1)
                     # Reset for new page
                     current_page_entries = []
                     current_column_count = 0
@@ -287,19 +290,19 @@ def process_sessions_for_customer(
                 # If page is full, create it and start a new one
                 if current_column_count >= COLUMNS_PER_PAGE or current_total_entries >= ENTRIES_PER_PAGE:
                     if current_page_entries:
-                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+                        pages_created += create_page_from_entries(current_page_entries, is_byproduct, is_frozen, len(pages) + 1)
                     current_page_entries = []
                     current_column_count = 0
                     current_total_entries = 0
         
         # Create final page if there are remaining entries
         if current_page_entries:
-            pages_created += create_page_from_entries(current_page_entries, is_byproduct, len(pages) + 1)
+            pages_created += create_page_from_entries(current_page_entries, is_byproduct, is_frozen, len(pages) + 1)
         
         return pages_created
     
     # Helper function to create a page from a list of entries
-    def create_page_from_entries(page_entries: List[Tuple[TallyLogEntry, int, str]], is_byproduct: bool, page_number: int) -> int:
+    def create_page_from_entries(page_entries: List[Tuple[TallyLogEntry, int, str]], is_byproduct: bool, is_frozen: bool, page_number: int) -> int:
         """Create a page from entries. Returns 1 if page was created, 0 otherwise."""
         if not page_entries:
             return 0
@@ -396,11 +399,15 @@ def process_sessions_for_customer(
         
         # Calculate summaries per classification - only include relevant category
         summary_dressed: List[TallySheetSummary] = []
+        summary_frozen: List[TallySheetSummary] = []
         summary_byproduct: List[TallySheetSummary] = []
         
         total_dressed_bags = 0.0
         total_dressed_heads = 0.0
         total_dressed_kilograms = 0.0
+        total_frozen_bags = 0.0
+        total_frozen_heads = 0.0
+        total_frozen_kilograms = 0.0
         total_byproduct_bags = 0.0
         total_byproduct_heads = 0.0
         total_byproduct_kilograms = 0.0
@@ -414,7 +421,7 @@ def process_sessions_for_customer(
             ]
             
             bags = len(page_entries_for_wc)
-            # For both byproduct and dressed, use actual heads from entries with fallback to weight classification's default_heads
+            # For both byproduct and dressed/frozen, use actual heads from entries with fallback to weight classification's default_heads
             default_heads = wc.default_heads if wc.default_heads is not None else FALLBACK_DEFAULT_HEADS
             heads = sum(e.heads if e.heads is not None else default_heads for e, _, _ in page_entries_for_wc)
             kilograms = sum(e.weight for e, _, _ in page_entries_for_wc)
@@ -433,15 +440,24 @@ def process_sessions_for_customer(
                 total_byproduct_bags += bags
                 total_byproduct_heads += heads
                 total_byproduct_kilograms += kilograms
+            elif is_frozen:
+                summary_frozen.append(summary)
+                total_frozen_bags += bags
+                total_frozen_heads += heads
+                total_frozen_kilograms += kilograms
             else:
                 summary_dressed.append(summary)
                 total_dressed_bags += bags
                 total_dressed_heads += heads
                 total_dressed_kilograms += kilograms
         
-        # Determine product type for this page - since entries are always separated by category,
-        # we can simply use the is_byproduct flag
-        page_product_type = "Byproduct" if is_byproduct else "Dressed Chicken"
+        # Determine product type for this page - since entries are always separated by category
+        if is_byproduct:
+            page_product_type = "Byproduct"
+        elif is_frozen:
+            page_product_type = "Frozen Chicken"
+        else:
+            page_product_type = "Dressed Chicken"
         
         pages.append(TallySheetPage(
             page_number=page_number,
@@ -450,10 +466,14 @@ def process_sessions_for_customer(
             entries=sheet_entries,
             grid=grid,
             summary_dressed=summary_dressed,
+            summary_frozen=summary_frozen,
             summary_byproduct=summary_byproduct,
             total_dressed_bags=total_dressed_bags,
             total_dressed_heads=total_dressed_heads,
             total_dressed_kilograms=total_dressed_kilograms,
+            total_frozen_bags=total_frozen_bags,
+            total_frozen_heads=total_frozen_heads,
+            total_frozen_kilograms=total_frozen_kilograms,
             total_byproduct_bags=total_byproduct_bags,
             total_byproduct_heads=total_byproduct_heads,
             total_byproduct_kilograms=total_byproduct_kilograms,
@@ -464,10 +484,13 @@ def process_sessions_for_customer(
         return 1
     
     # Process Dressed entries first
-    process_entries_by_classification(dressed_entries_by_classification, is_byproduct=False)
+    process_entries_by_classification(dressed_entries_by_classification, is_byproduct=False, is_frozen=False)
+    
+    # Process Frozen entries
+    process_entries_by_classification(frozen_entries_by_classification, is_byproduct=False, is_frozen=True)
     
     # Process Byproduct entries
-    process_entries_by_classification(byproduct_entries_by_classification, is_byproduct=True)
+    process_entries_by_classification(byproduct_entries_by_classification, is_byproduct=True, is_frozen=False)
     
     # Update total_pages for all pages
     total_pages = len(pages)

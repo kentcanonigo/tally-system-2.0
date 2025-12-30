@@ -78,10 +78,14 @@ interface TallySheetPage {
   }>;
   grid: (number | null)[][];
   summary_dressed: TallySheetSummary[];
+  summary_frozen: TallySheetSummary[];
   summary_byproduct: TallySheetSummary[];
   total_dressed_bags: number;
   total_dressed_heads: number;
   total_dressed_kilograms: number;
+  total_frozen_bags: number;
+  total_frozen_heads: number;
+  total_frozen_kilograms: number;
   total_byproduct_bags: number;
   total_byproduct_heads: number;
   total_byproduct_kilograms: number;
@@ -117,8 +121,15 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
 
   customers.forEach(customer => {
     customer.pages.forEach(page => {
-      // Process both dressed and byproduct summaries
-      const summaries = page.is_byproduct ? page.summary_byproduct : page.summary_dressed;
+      // Process dressed, frozen, and byproduct summaries
+      let summaries: TallySheetSummary[] = [];
+      if (page.is_byproduct) {
+        summaries = page.summary_byproduct || [];
+      } else if (page.product_type === "Frozen Chicken") {
+        summaries = page.summary_frozen || [];
+      } else {
+        summaries = page.summary_dressed || [];
+      }
       
       summaries.forEach(summary => {
         const existing = totalsMap.get(summary.classification_id);
@@ -162,8 +173,10 @@ const generateWorksheetForCustomer = (
 
   // Process each page
   pages.forEach((page, pageIndex) => {
-    const { page_number, total_pages, columns, grid, summary_dressed, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
-    const summaries = is_byproduct ? summary_byproduct : summary_dressed;
+    const { page_number, total_pages, columns, grid, summary_dressed, summary_frozen, summary_byproduct, is_byproduct, product_type: page_product_type } = page;
+    // Determine which summary to use based on product type
+    const summaries = is_byproduct ? summary_byproduct : (page_product_type === "Frozen Chicken" ? summary_frozen : summary_dressed);
+    const isFrozen = page_product_type === "Frozen Chicken";
 
     // Add spacing between tables (except for first table)
     if (pageIndex > 0) {
@@ -301,9 +314,9 @@ const generateWorksheetForCustomer = (
     }
 
     // Page total row in summary table (after all summary rows)
-    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : page.total_dressed_bags;
-    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : page.total_dressed_heads;
-    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : page.total_dressed_kilograms;
+    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : (isFrozen ? page.total_frozen_bags : page.total_dressed_bags);
+    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : (isFrozen ? page.total_frozen_heads : page.total_dressed_heads);
+    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : (isFrozen ? page.total_frozen_kilograms : page.total_dressed_kilograms);
     const pageTotalRow: any[] = Array(SUMMARY_START_COL + 3).fill('');
     pageTotalRow[SUMMARY_START_COL - 1] = 'TOTAL';
     pageTotalRow[SUMMARY_START_COL] = pageTotalBags;
@@ -394,9 +407,9 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   // Only show grand total if there are multiple customers
   const showGrandTotal = customers.length > 1;
   
-  // Calculate grand totals by classification if multiple customers
-  const grandTotalsByClassification = customers.length > 1 ? calculateGrandTotalsByClassification(customers) : null;
-  const showGrandTotalCategoryTable = customers.length > 1 && showGrandTotal;
+  // Calculate grand totals by classification (for both single and multiple customers)
+  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
+  const showGrandTotalCategoryTable = showGrandTotal;
   
   // Generate a worksheet for each customer
   customers.forEach((customerData) => {

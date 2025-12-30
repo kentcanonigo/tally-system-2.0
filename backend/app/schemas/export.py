@@ -58,15 +58,19 @@ class TallySheetPage(BaseModel):
     entries: List[TallySheetEntry]  # All entries on this page
     grid: List[List[Optional[float]]]  # 20xN grid, None for empty cells
     summary_dressed: List[TallySheetSummary]  # Dressed category summaries
+    summary_frozen: List[TallySheetSummary]  # Frozen category summaries
     summary_byproduct: List[TallySheetSummary]  # Byproduct category summaries
     total_dressed_bags: float
     total_dressed_heads: float
     total_dressed_kilograms: float
+    total_frozen_bags: float
+    total_frozen_heads: float
+    total_frozen_kilograms: float
     total_byproduct_bags: float
     total_byproduct_heads: float
     total_byproduct_kilograms: float
     is_byproduct: bool  # True if this page contains byproduct entries (shows heads instead of weights)
-    product_type: str  # Product type for this page: "Dressed Chicken", "Byproduct", or "Mixed"
+    product_type: str  # Product type for this page: "Dressed Chicken", "Frozen Chicken", "Byproduct", or "Mixed"
 
 class TallySheetRequest(BaseModel):
     """Request model for tally sheet export"""
