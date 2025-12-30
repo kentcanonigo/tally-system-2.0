@@ -44,7 +44,6 @@ export const PlantProvider = ({ children }: { children: ReactNode }) => {
       // If user logged out, clear the plant context
       if (user === null) {
         if (activePlantId !== null) {
-          console.log('[PlantContext] User logged out, clearing plant context');
           try {
             await AsyncStorage.removeItem('activePlantId');
             setActivePlantIdState(null);
@@ -63,7 +62,6 @@ export const PlantProvider = ({ children }: { children: ReactNode }) => {
         if (userPlantId !== null && userPlantId !== undefined) {
           // User has a plant preference set - sync it
           if (activePlantId !== userPlantId) {
-            console.log('[PlantContext] Syncing plant from user preferences:', userPlantId);
             try {
               await AsyncStorage.setItem('activePlantId', userPlantId.toString());
               setActivePlantIdState(userPlantId);
@@ -78,7 +76,6 @@ export const PlantProvider = ({ children }: { children: ReactNode }) => {
         } else if (userPlantId === null) {
           // User has explicitly set plant to null
           if (activePlantId !== null) {
-            console.log('[PlantContext] Syncing plant to null from user preferences');
             try {
               await AsyncStorage.removeItem('activePlantId');
               setActivePlantIdState(null);

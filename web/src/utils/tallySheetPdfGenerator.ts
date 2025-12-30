@@ -95,18 +95,6 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
         category = 'Dressed';
       }
       
-      // Debug log for each page
-      console.log('Processing page:', {
-        pageNumber: page.page_number,
-        productType: page.product_type,
-        isByproduct: page.is_byproduct,
-        summariesLength: summaries.length,
-        category,
-        hasSummaryDressed: !!page.summary_dressed,
-        hasSummaryFrozen: !!(page as any).summary_frozen,
-        hasSummaryByproduct: !!page.summary_byproduct
-      });
-      
       summaries.forEach(summary => {
         const existing = totalsMap.get(summary.classification_id);
         if (existing) {
@@ -126,31 +114,11 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
       });
     });
   });
-  
-  console.log('Grand totals map after processing:', {
-    size: totalsMap.size,
-    entries: Array.from(totalsMap.entries()).map(([id, summary]) => ({
-      id,
-      classification: summary.classification,
-      category: summary.category,
-      bags: summary.bags,
-      heads: summary.heads,
-      kilograms: summary.kilograms
-    }))
-  });
 
   return totalsMap;
 };
 
 export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMultiCustomerResponse, showGrandTotal: boolean = true) => {
-  // Debug: Log received parameters
-  console.log('generateTallySheetPDF called with:', {
-    showGrandTotal,
-    hasCustomers: 'customers' in data,
-    isMultiCustomer: 'customers' in data,
-    dataKeys: Object.keys(data)
-  });
-  
   // Check if it's a multi-customer response
   const isMultiCustomer = 'customers' in data;
   let customers: TallySheetResponse[] = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
@@ -166,13 +134,6 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
   // Show grand total category table if showGrandTotal is true (for both single and multiple customers)
   const showGrandTotalCategoryTable = showGrandTotal;
   
-  // Debug: Log to help troubleshoot
-  console.log('Grand total category table:', {
-    showGrandTotalCategoryTable,
-    grandTotalsByClassificationSize: grandTotalsByClassification?.size,
-    customersCount: customers.length,
-    showGrandTotal
-  });
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
   
@@ -439,15 +400,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
   });
 
   // ========== GRAND TOTAL CATEGORY TABLE (at the end for both single and multiple customers) ==========
-  console.log('Checking if grand total table should render:', {
-    showGrandTotalCategoryTable,
-    hasGrandTotals: !!grandTotalsByClassification,
-    grandTotalsSize: grandTotalsByClassification?.size,
-    willRender: showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0
-  });
-  
   if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    console.log('Rendering grand total category table');
     // Add a new page for the grand total category table
     doc.addPage();
     
