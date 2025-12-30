@@ -57,6 +57,10 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
+const formatNumber = (value: number, decimals: number = 2): string => {
+  return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
 export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: boolean = true) => {
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
@@ -150,7 +154,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
         if (cell !== null && cell !== undefined) {
           const x = GRID_START_X + ROW_NUMBER_WIDTH + (colIndex * CELL_WIDTH) + (CELL_WIDTH / 2);
           const y = GRID_START_Y + (rowIndex * CELL_HEIGHT) + (CELL_HEIGHT / 2) + 1.5;
-          const displayValue = is_byproduct ? cell.toFixed(0) : cell.toFixed(2);
+          const displayValue = is_byproduct ? formatNumber(cell, 0) : formatNumber(cell, 2);
           doc.text(displayValue, x, y, { align: 'center' });
         }
       });
@@ -172,7 +176,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
         }
       });
       const x = GRID_START_X + ROW_NUMBER_WIDTH + (colIndex * CELL_WIDTH) + (CELL_WIDTH / 2);
-      const displayValue = is_byproduct ? columnTotal.toFixed(0) : columnTotal.toFixed(2);
+      const displayValue = is_byproduct ? formatNumber(columnTotal, 0) : formatNumber(columnTotal, 2);
       doc.text(displayValue, x, totalsY, { align: 'center' });
     }
 
@@ -244,14 +248,14 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
       // Left align classification
       doc.text(summary.classification, summaryX + 2, rowY);
       // Right align numbers
-      doc.text(summary.bags.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width - 2, rowY, { align: 'right' });
+      doc.text(formatNumber(summary.bags, 2), summaryX + summaryCol1Width + summaryCol2Width - 2, rowY, { align: 'right' });
       if (is_byproduct) {
         // For byproducts: show heads value as Kilograms
-        doc.text(summary.heads.toFixed(0), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
+        doc.text(formatNumber(summary.heads, 0), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
       } else {
         // For dressed: show Heads and Kilograms
-        doc.text(summary.heads.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, rowY, { align: 'right' });
-        doc.text(summary.kilograms.toFixed(2), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
+        doc.text(formatNumber(summary.heads, 2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, rowY, { align: 'right' });
+        doc.text(formatNumber(summary.kilograms, 2), summaryX + summaryTableWidth - 2, rowY, { align: 'right' });
       }
     });
 
@@ -264,14 +268,14 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     // Left align TOTAL label
     doc.text('TOTAL', summaryX + 2, totalRowTextY);
     // Right align numbers
-    doc.text(pageTotalBags.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width - 2, totalRowTextY, { align: 'right' });
+    doc.text(formatNumber(pageTotalBags, 2), summaryX + summaryCol1Width + summaryCol2Width - 2, totalRowTextY, { align: 'right' });
     if (is_byproduct) {
       // For byproducts: show heads total as Kilograms
-      doc.text(pageTotalHeads.toFixed(0), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
+      doc.text(formatNumber(pageTotalHeads, 0), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
     } else {
       // For dressed: show Heads and Kilograms totals
-      doc.text(pageTotalHeads.toFixed(2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, totalRowTextY, { align: 'right' });
-      doc.text(pageTotalKilos.toFixed(2), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
+      doc.text(formatNumber(pageTotalHeads, 2), summaryX + summaryCol1Width + summaryCol2Width + summaryCol3Width - 2, totalRowTextY, { align: 'right' });
+      doc.text(formatNumber(pageTotalKilos, 2), summaryX + summaryTableWidth - 2, totalRowTextY, { align: 'right' });
     }
     
     // Update currentY for signature positioning
@@ -300,9 +304,9 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
       doc.setFont('helvetica', 'bold');
       doc.text('Grand Total:', MARGIN + 5, grandTotalY + 5);
       doc.setFontSize(10);
-      doc.text(`Bags: ${grand_total_bags.toFixed(2)}`, MARGIN + 45, grandTotalY + 5);
-      doc.text(`Heads: ${grand_total_heads.toFixed(2)}`, MARGIN + 85, grandTotalY + 5);
-      doc.text(`Kilograms: ${grand_total_kilograms.toFixed(2)}`, MARGIN + 125, grandTotalY + 5);
+      doc.text(`Bags: ${formatNumber(grand_total_bags, 2)}`, MARGIN + 45, grandTotalY + 5);
+      doc.text(`Heads: ${formatNumber(grand_total_heads, 2)}`, MARGIN + 85, grandTotalY + 5);
+      doc.text(`Kilograms: ${formatNumber(grand_total_kilograms, 2)}`, MARGIN + 125, grandTotalY + 5);
     }
   });
 

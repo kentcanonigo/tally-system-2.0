@@ -1330,7 +1330,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
                   return (
                     <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                      <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={1}>
+                      <Text style={[dynamicStyles.summaryCell, { flex: 2, fontWeight: 'bold' }]} numberOfLines={1}>
                         {wc.classification}
                       </Text>
                       <Text style={[dynamicStyles.summaryCell, { flex: 2 }]} numberOfLines={2}>
@@ -1752,7 +1752,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         
                         return (
                           <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2 }]} numberOfLines={1}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2, fontWeight: 'bold' }]} numberOfLines={1}>
                               {wc.classification}
                             </Text>
                             <Text style={[
@@ -1862,7 +1862,7 @@ function TallyScreen(props?: TallyScreenProps) {
                         
                         return (
                           <View key={allocation.id} style={dynamicStyles.summaryRow}>
-                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2 }]} numberOfLines={1}>
+                            <Text style={[dynamicStyles.summaryCell, { flex: 1.2, fontWeight: 'bold' }]} numberOfLines={1}>
                               {wc.classification}
                             </Text>
                             <Text style={[
