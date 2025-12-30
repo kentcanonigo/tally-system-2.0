@@ -201,14 +201,13 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     doc.setLineWidth(0.1);
     // Line below header
     doc.line(summaryX, summaryStartY, summaryX + summaryTableWidth, summaryStartY);
-    // Lines between data rows
+    // Lines between data rows (drawn below each data row)
     for (let i = 0; i < numSummaryRows; i++) {
-      const y = summaryStartY + 5 + (i * summaryRowHeight);
+      const y = summaryStartY + ((i + 1) * summaryRowHeight);
       doc.line(summaryX, y, summaryX + summaryTableWidth, y);
     }
-    // Line above total row
-    const totalRowY = summaryStartY + 5 + (numSummaryRows * summaryRowHeight);
-    doc.line(summaryX, totalRowY, summaryX + summaryTableWidth, totalRowY);
+    // Line above total row (same as line below last data row, so no need to draw again)
+    const totalRowY = summaryStartY + (numSummaryRows * summaryRowHeight);
     
     // Vertical lines
     doc.line(summaryX + summaryCol1Width, summaryStartY - 5, summaryX + summaryCol1Width, summaryStartY - 5 + summaryTableHeight);
@@ -240,7 +239,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     doc.setFont('helvetica', 'normal');
     summaries.forEach((summary, index) => {
       // Calculate Y position at center of each row cell
-      const rowY = summaryStartY + 5 + (index * summaryRowHeight) + (summaryRowHeight / 2) + 1.5;
+      const rowY = summaryStartY + (index * summaryRowHeight) + (summaryRowHeight / 2) + 1.5;
       // Left align classification
       doc.text(summary.classification, summaryX + 2, rowY);
       // Right align numbers
@@ -256,7 +255,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     });
 
     // Page total row - centered vertically
-    const totalRowTextY = summaryStartY + 5 + (numSummaryRows * summaryRowHeight) + (summaryRowHeight / 2) + 1.5;
+    const totalRowTextY = summaryStartY + (numSummaryRows * summaryRowHeight) + (summaryRowHeight / 2) + 1.5;
     const pageTotalBags = is_byproduct ? page.total_byproduct_bags : page.total_dressed_bags;
     const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : page.total_dressed_heads;
     const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : page.total_dressed_kilograms;
@@ -275,7 +274,7 @@ export const generateTallySheetPDF = (data: TallySheetResponse, showGrandTotal: 
     }
     
     // Update currentY for signature positioning
-    const currentY = summaryStartY + 5 + (numSummaryRows * summaryRowHeight) + summaryRowHeight;
+    const currentY = summaryStartY + (numSummaryRows * summaryRowHeight) + summaryRowHeight;
 
     // ========== SIGNATURES (on every page) - below summary table, all in one line ==========
     const signatureStartY = Math.max(totalsY + 8, currentY + 8);

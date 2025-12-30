@@ -248,7 +248,7 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
     headerRow.getCell(1).style = gridHeaderStyle;
     currentRow++;
 
-    // Grid rows (20 rows)
+    // Grid rows (20 rows) - with summary data on the right
     for (let row = 0; row < ROWS_PER_PAGE; row++) {
       const dataRow = worksheet.addRow([row + 1]);
       dataRow.height = 18;
@@ -278,6 +278,30 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
         // Alternate row colors
         dataCell.style = row % 2 === 0 ? gridCellStyle : gridCellAltStyle;
       }
+
+      // Summary data on the right (if this row has summary data)
+      if (row < summaries.length) {
+        const summary = summaries[row];
+        dataRow.getCell(SUMMARY_START_COL).value = summary.classification;
+        dataRow.getCell(SUMMARY_START_COL).style = summaryCellLeftStyle;
+        dataRow.getCell(SUMMARY_START_COL + 1).value = summary.bags;
+        dataRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
+        dataRow.getCell(SUMMARY_START_COL + 1).style = summaryCellStyle;
+        if (is_byproduct) {
+          // For byproducts: show heads value as Kilograms
+          dataRow.getCell(SUMMARY_START_COL + 2).value = Math.round(summary.heads);
+          dataRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
+          dataRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
+        } else {
+          // For dressed: show Heads and Kilograms
+          dataRow.getCell(SUMMARY_START_COL + 2).value = summary.heads;
+          dataRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
+          dataRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
+          dataRow.getCell(SUMMARY_START_COL + 3).value = summary.kilograms;
+          dataRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
+          dataRow.getCell(SUMMARY_START_COL + 3).style = summaryCellStyle;
+        }
+      }
       currentRow++;
     }
 
@@ -297,6 +321,30 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
       totalCell.value = is_byproduct ? Math.round(columnTotal) : columnTotal;
       totalCell.numFmt = is_byproduct ? '0' : '0.00';
       totalCell.style = totalsRowStyle;
+    }
+
+    // Page total row in summary table (same row as grid totals)
+    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : page.total_dressed_bags;
+    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : page.total_dressed_heads;
+    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : page.total_dressed_kilograms;
+    totalsRow.getCell(SUMMARY_START_COL).value = 'TOTAL';
+    totalsRow.getCell(SUMMARY_START_COL).style = summaryTotalLeftStyle;
+    totalsRow.getCell(SUMMARY_START_COL + 1).value = pageTotalBags;
+    totalsRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
+    totalsRow.getCell(SUMMARY_START_COL + 1).style = summaryTotalStyle;
+    if (is_byproduct) {
+      // For byproducts: show heads total as Kilograms
+      totalsRow.getCell(SUMMARY_START_COL + 2).value = Math.round(pageTotalHeads);
+      totalsRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
+      totalsRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
+    } else {
+      // For dressed: show Heads and Kilograms totals
+      totalsRow.getCell(SUMMARY_START_COL + 2).value = pageTotalHeads;
+      totalsRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
+      totalsRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
+      totalsRow.getCell(SUMMARY_START_COL + 3).value = pageTotalKilos;
+      totalsRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
+      totalsRow.getCell(SUMMARY_START_COL + 3).style = summaryTotalStyle;
     }
     currentRow++;
 
@@ -318,57 +366,7 @@ export const generateTallySheetExcel = async (data: TallySheetResponse, showGran
       summaryHeaderRow.getCell(SUMMARY_START_COL + 3).style = summaryHeaderStyle;
     }
 
-    // Summary rows
-    summaries.forEach((summary, index) => {
-      const summaryRow = worksheet.getRow(gridStartRow + 1 + index);
-      summaryRow.height = 18;
-      summaryRow.getCell(SUMMARY_START_COL).value = summary.classification;
-      summaryRow.getCell(SUMMARY_START_COL).style = summaryCellLeftStyle;
-      summaryRow.getCell(SUMMARY_START_COL + 1).value = summary.bags;
-      summaryRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
-      summaryRow.getCell(SUMMARY_START_COL + 1).style = summaryCellStyle;
-      if (is_byproduct) {
-        // For byproducts: show heads value as Kilograms
-        summaryRow.getCell(SUMMARY_START_COL + 2).value = Math.round(summary.heads);
-        summaryRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
-        summaryRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
-      } else {
-        // For dressed: show Heads and Kilograms
-        summaryRow.getCell(SUMMARY_START_COL + 2).value = summary.heads;
-        summaryRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
-        summaryRow.getCell(SUMMARY_START_COL + 2).style = summaryCellStyle;
-        summaryRow.getCell(SUMMARY_START_COL + 3).value = summary.kilograms;
-        summaryRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
-        summaryRow.getCell(SUMMARY_START_COL + 3).style = summaryCellStyle;
-      }
-    });
 
-    // Page total row in summary table
-    const pageTotalRowIndex = gridStartRow + 1 + summaries.length;
-    const pageTotalRow = worksheet.getRow(pageTotalRowIndex);
-    pageTotalRow.height = 20;
-    const pageTotalBags = is_byproduct ? page.total_byproduct_bags : page.total_dressed_bags;
-    const pageTotalHeads = is_byproduct ? page.total_byproduct_heads : page.total_dressed_heads;
-    const pageTotalKilos = is_byproduct ? page.total_byproduct_kilograms : page.total_dressed_kilograms;
-    pageTotalRow.getCell(SUMMARY_START_COL).value = 'TOTAL';
-    pageTotalRow.getCell(SUMMARY_START_COL).style = summaryTotalLeftStyle;
-    pageTotalRow.getCell(SUMMARY_START_COL + 1).value = pageTotalBags;
-    pageTotalRow.getCell(SUMMARY_START_COL + 1).numFmt = '0.00';
-    pageTotalRow.getCell(SUMMARY_START_COL + 1).style = summaryTotalStyle;
-    if (is_byproduct) {
-      // For byproducts: show heads total as Kilograms
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).value = Math.round(pageTotalHeads);
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).numFmt = '0';
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
-    } else {
-      // For dressed: show Heads and Kilograms totals
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).value = pageTotalHeads;
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).numFmt = '0.00';
-      pageTotalRow.getCell(SUMMARY_START_COL + 2).style = summaryTotalStyle;
-      pageTotalRow.getCell(SUMMARY_START_COL + 3).value = pageTotalKilos;
-      pageTotalRow.getCell(SUMMARY_START_COL + 3).numFmt = '0.00';
-      pageTotalRow.getCell(SUMMARY_START_COL + 3).style = summaryTotalStyle;
-    }
 
     // Signatures (on every page) - all in one line
     worksheet.addRow([]);
