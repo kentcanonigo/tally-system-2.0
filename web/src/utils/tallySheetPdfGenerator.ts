@@ -128,12 +128,6 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
   );
   
-  // Calculate grand totals by classification (for both single and multiple customers)
-  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
-  
-  // Show grand total category table if showGrandTotal is true (for both single and multiple customers)
-  const showGrandTotalCategoryTable = showGrandTotal;
-  
   // Landscape orientation for letter size paper
   const doc = new jsPDF('landscape', 'mm', 'letter');
   
@@ -376,7 +370,8 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
   });
 
   // ========== GRAND TOTAL CATEGORY TABLE (one per customer) ==========
-  customers.forEach((customerData) => {
+  if (showGrandTotal) {
+    customers.forEach((customerData) => {
     const { customer_name } = customerData;
     
     // Calculate grand totals for this specific customer
@@ -573,7 +568,8 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
       doc.text(formatNumber(overallTotalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, overallTotalTextY, { align: 'right' });
       doc.text(formatNumber(overallTotalKilos, 2), tableStartX + tableWidth - 2, overallTotalTextY, { align: 'right' });
     }
-  });
+    });
+  }
 
   // Generate filename
   const firstCustomer = customers[0];

@@ -125,12 +125,6 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
   );
   
-  // Calculate grand totals by classification (for both single and multiple customers)
-  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
-  
-  // Show grand total category table if showGrandTotal is true (for both single and multiple customers)
-  const showGrandTotalCategoryTable = showGrandTotal;
-  
   // Define summary styles (used in both customer worksheets and grand total category table)
   const summaryHeaderStyle = {
     font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
