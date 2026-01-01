@@ -417,11 +417,6 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   // Always show grand total for each customer (Bags, Heads, Kilograms) - but we'll use the detailed table instead
   const showGrandTotal = false; // Don't show simple grand total, use detailed table instead
   
-  // Calculate grand totals by classification (for both single and multiple customers)
-  const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
-  // Always show grand total category table (matching web version)
-  const showGrandTotalCategoryTable = true;
-  
   // Generate a worksheet for each customer
   customers.forEach((customerData) => {
     generateWorksheetForCustomer(customerData, workbook, showGrandTotal);

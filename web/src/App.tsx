@@ -46,24 +46,9 @@ function SuperadminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Permission-based Route Component
-function PermissionRoute({ children, permission }: { children: React.ReactNode; permission: string }) {
-  const { hasPermission, loading } = useAuth();
-
-  if (loading) {
-    return <div className="container"><p>Loading...</p></div>;
-  }
-
-  if (!hasPermission(permission)) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}
-
 // Main Layout with Sidebar
 function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout, isSuperadmin, hasAnyPermission, hasPermission } = useAuth();
+  const { user, logout, isSuperadmin, hasAnyPermission } = useAuth();
   
   // Check if user can manage roles (SUPERADMIN or ADMIN role)
   const canManageRoles = isSuperadmin || hasAnyPermission(['can_manage_customers', 'can_manage_weight_classes']);

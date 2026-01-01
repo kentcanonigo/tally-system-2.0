@@ -54,7 +54,6 @@ function TallySessionLogs() {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [pageSize, setPageSize] = useState<number | null>(50); // Default 50, null means "All"
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -86,9 +85,7 @@ function TallySessionLogs() {
       // Handle paginated response structure
       const entriesData = entriesRes.data;
       const entries = entriesData.entries || entriesData || [];
-      const total = entriesData.total !== undefined ? entriesData.total : entries.length;
       setLogEntries(Array.isArray(entries) ? entries : []);
-      setTotalCount(total);
       setWeightClassifications(wcRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
