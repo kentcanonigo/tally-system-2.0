@@ -164,6 +164,14 @@ function TallyScreen(props?: TallyScreenProps) {
     }
   }, [plant, customer, session, tallyRole, tallyMode, navigation, hideTitle]);
 
+  // Helper function to extract entries from paginated response or array
+  const extractEntries = (data: any): TallyLogEntry[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (data.entries && Array.isArray(data.entries)) return data.entries;
+    return [];
+  };
+
   const fetchData = async () => {
     try {
       // First fetch the session to get plant_id and customer_id
@@ -178,9 +186,9 @@ function TallyScreen(props?: TallyScreenProps) {
         allocationDetailsApi.getBySession(sessionId),
         weightClassificationsApi.getByPlant(sessionData.plant_id),
         tallyLogEntriesApi.getBySession(sessionId).catch((error: any) => {
-          // Handle permission errors gracefully - return empty array if user can't view logs
+          // Handle permission errors gracefully - return paginated response with empty entries if user can't view logs
           if (error.response?.status === 403 || error.response?.status === 401) {
-            return { data: [] };
+            return { data: { entries: [], total: 0 } };
           }
           throw error;
         }),
@@ -190,7 +198,9 @@ function TallyScreen(props?: TallyScreenProps) {
       setPlant(plantRes.data);
       setAllocations(allocationsRes.data);
       setWeightClassifications(weightClassificationsRes.data);
-      setLogEntries(logEntriesRes.data);
+      // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       // If session doesn't exist (404), remove it from active sessions and navigate back
@@ -277,6 +287,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
   // Calculate sum of weights for a specific weight classification and role
   const getSumForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries
       .filter(entry => 
         entry.weight_classification_id === wcId && 
@@ -286,6 +297,7 @@ function TallyScreen(props?: TallyScreenProps) {
   };
 
   const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries
       .filter(entry => 
         entry.weight_classification_id === wcId && 
@@ -296,6 +308,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
   // Count log entries for a specific weight classification and role
   const getEntryCountForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries
       .filter(entry =>
         entry.weight_classification_id === wcId &&
@@ -305,6 +318,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
   // Count all log entries for a specific weight classification (all roles)
   const getTotalEntryCountForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries.filter(entry => entry.weight_classification_id === wcId).length;
   };
 
@@ -538,7 +552,9 @@ function TallyScreen(props?: TallyScreenProps) {
           // Always refresh log entries (errors handled gracefully in fetchData)
           try {
             const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-            setLogEntries(logEntriesRes.data);
+            // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
           } catch (error: any) {
             // If permission denied, log entries will remain empty - that's fine
             if (error.response?.status !== 403 && error.response?.status !== 401) {
@@ -659,7 +675,9 @@ function TallyScreen(props?: TallyScreenProps) {
         
         if (canViewLogs) {
           const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-          setLogEntries(logEntriesRes.data);
+          // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
         }
 
         // Show success feedback (optional - you can remove this if it's too much)
@@ -810,7 +828,9 @@ function TallyScreen(props?: TallyScreenProps) {
         
         if (canViewLogs) {
           const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-          setLogEntries(logEntriesRes.data);
+          // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
         }
       } catch (error: any) {
         const errorMessage = formatApiErrorMessage(
@@ -947,7 +967,9 @@ function TallyScreen(props?: TallyScreenProps) {
         
         if (canViewLogs) {
           const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-          setLogEntries(logEntriesRes.data);
+          // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
         }
 
         // Close modal and reset after state updates
@@ -1082,7 +1104,9 @@ function TallyScreen(props?: TallyScreenProps) {
         
         if (canViewLogs) {
           const logEntriesRes = await tallyLogEntriesApi.getBySession(sessionId);
-          setLogEntries(logEntriesRes.data);
+          // Extract entries from paginated response, ensuring we always set an array
+      const extracted = extractEntries(logEntriesRes?.data);
+      setLogEntries(Array.isArray(extracted) ? extracted : []);
         }
       } catch (error: any) {
         const errorMessage = formatApiErrorMessage(

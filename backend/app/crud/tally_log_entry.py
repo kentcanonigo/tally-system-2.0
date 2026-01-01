@@ -93,11 +93,14 @@ def get_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry]:
 def get_tally_log_entries_by_session(
     db: Session, 
     session_id: int, 
-    role: Optional[TallyLogEntryRole] = None
-) -> List[TallyLogEntry]:
+    role: Optional[TallyLogEntryRole] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None
+) -> tuple[List[TallyLogEntry], int]:
     """
-    Get all tally log entries for a session, optionally filtered by role.
+    Get tally log entries for a session, optionally filtered by role and paginated.
     Results are ordered by created_at descending (newest first).
+    Returns a tuple of (entries, total_count).
     """
     query = db.query(TallyLogEntry).filter(
         TallyLogEntry.tally_session_id == session_id
@@ -106,7 +109,20 @@ def get_tally_log_entries_by_session(
     if role is not None:
         query = query.filter(TallyLogEntry.role == role)
     
-    return query.order_by(TallyLogEntry.created_at.desc()).all()
+    # Get total count before pagination
+    total_count = query.count()
+    
+    # Apply ordering
+    query = query.order_by(TallyLogEntry.created_at.desc())
+    
+    # Apply pagination if provided
+    if limit is not None:
+        query = query.limit(limit)
+    if offset is not None:
+        query = query.offset(offset)
+    
+    entries = query.all()
+    return entries, total_count
 
 
 def delete_tally_log_entry(db: Session, entry_id: int) -> Optional[TallyLogEntry]:

@@ -73,6 +73,13 @@ export interface TallyLogEntry {
   transferred_at?: string | null;
 }
 
+export interface PaginatedTallyLogEntriesResponse {
+  entries: TallyLogEntry[];
+  total: number;
+  limit?: number | null;
+  offset?: number | null;
+}
+
 export interface ChangeDetail {
   old: any;
   new: any;

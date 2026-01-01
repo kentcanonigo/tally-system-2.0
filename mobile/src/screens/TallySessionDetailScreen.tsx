@@ -115,7 +115,10 @@ function TallySessionDetailScreen() {
       
       // Only set log entries if we fetched them
       if (canViewLogs && results[4]) {
-        setLogEntries(results[4].data);
+        // Handle paginated response structure
+        const entriesData = results[4].data;
+        const entries = entriesData?.entries || entriesData || [];
+        setLogEntries(Array.isArray(entries) ? entries : []);
       } else {
         setLogEntries([]); // Empty array if user can't view logs
       }
@@ -440,6 +443,7 @@ function TallySessionDetailScreen() {
   };
 
   const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries
       .filter(entry => entry.weight_classification_id === wcId)
       .reduce((sum, entry) => sum + (entry.heads || 0), 0);

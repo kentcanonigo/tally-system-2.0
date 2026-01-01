@@ -82,6 +82,10 @@ function TallySessionLogsScreen() {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [showEditWeightClassDropdown, setShowEditWeightClassDropdown] = useState(false);
   const [showEditRoleDropdown, setShowEditRoleDropdown] = useState(false);
+  const [showPageSizeDropdown, setShowPageSizeDropdown] = useState(false);
+  const [pageSize, setPageSize] = useState<number | null>(50); // Default 50, null means "All"
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (sessionId) {
@@ -140,6 +144,8 @@ function TallySessionLogsScreen() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
+      // Fetch all entries (needed for client-side filtering)
+      // TODO: Optimize to use server-side pagination when no filters are applied
       const [customerRes, plantRes, entriesRes, wcRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
@@ -149,7 +155,12 @@ function TallySessionLogsScreen() {
 
       setCustomer(customerRes.data);
       setPlant(plantRes.data);
-      setLogEntries(entriesRes.data);
+      // Handle paginated response structure
+      const entriesData = entriesRes.data;
+      const entries = entriesData.entries || entriesData || [];
+      const total = entriesData.total !== undefined ? entriesData.total : entries.length;
+      setLogEntries(Array.isArray(entries) ? entries : []);
+      setTotalCount(total);
       setWeightClassifications(wcRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -220,7 +231,12 @@ function TallySessionLogsScreen() {
   };
 
   // Filter and sort log entries based on current filters and sort settings
+  // Note: Since we're doing client-side filtering, we need to fetch all entries when filters are applied
+  // For now, we'll fetch all entries and filter client-side, then paginate the filtered results
   const filteredEntries = useMemo(() => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) {
+      return [];
+    }
     let filtered = logEntries.filter((entry) => {
       if (filters.role !== 'all' && entry.role !== filters.role) {
         return false;
@@ -272,6 +288,26 @@ function TallySessionLogsScreen() {
 
     return filtered;
   }, [logEntries, filters, sortBy, sortOrder, weightClassifications]);
+
+  // Paginate filtered entries
+  const paginatedEntries = useMemo(() => {
+    if (pageSize === null) {
+      return filteredEntries; // Show all
+    }
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredEntries.slice(startIndex, endIndex);
+  }, [filteredEntries, pageSize, currentPage]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === null) return 1;
+    return Math.ceil(filteredEntries.length / pageSize);
+  }, [filteredEntries.length, pageSize]);
+
+  // Reset to first page when filters or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.role, filters.weight_classification_id, filters.category, sortBy, sortOrder]);
 
   // Calculate aggregations by weight classification
   const aggregations = useMemo(() => {
@@ -1112,8 +1148,8 @@ function TallySessionLogsScreen() {
             <Text style={[dynamicStyles.tableHeaderText, { flex: 1.5 }]}>Actions</Text>
           )}
         </View>
-        {filteredEntries.length > 0 ? (
-          filteredEntries.map((entry) => {
+        {paginatedEntries.length > 0 ? (
+          paginatedEntries.map((entry) => {
             const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
             const isTransferred = entry.original_session_id !== null && entry.original_session_id !== undefined;
             return (
@@ -1244,6 +1280,111 @@ function TallySessionLogsScreen() {
           </View>
         )}
       </View>
+
+      {/* Pagination Controls */}
+      {filteredEntries.length > 0 && (
+        <View style={[dynamicStyles.filterContainer, { marginTop: responsive.spacing.md, marginBottom: responsive.spacing.md }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: responsive.spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
+              <Text style={dynamicStyles.filterLabel}>Items per page:</Text>
+              <TouchableOpacity
+                style={[dynamicStyles.dropdownButton, { minWidth: 80 }]}
+                onPress={() => setShowPageSizeDropdown(true)}
+              >
+                <Text style={dynamicStyles.dropdownText}>
+                  {pageSize === null ? 'All' : pageSize.toString()}
+                </Text>
+                <Text style={dynamicStyles.dropdownIcon}>▼</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {pageSize !== null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
+                <Text style={[dynamicStyles.filterLabel, { fontSize: responsive.fontSize.small }]}>
+                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredEntries.length)} of {filteredEntries.length}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: responsive.padding.small,
+                    backgroundColor: currentPage === 1 ? '#bdc3c7' : colors.primary,
+                    borderRadius: 4,
+                    opacity: currentPage === 1 ? 0.5 : 1,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: responsive.fontSize.small, fontWeight: '600' }}>‹ Prev</Text>
+                </TouchableOpacity>
+                <Text style={[dynamicStyles.filterLabel, { fontSize: responsive.fontSize.small }]}>
+                  Page {currentPage} of {totalPages}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: responsive.padding.small,
+                    backgroundColor: currentPage === totalPages ? '#bdc3c7' : colors.primary,
+                    borderRadius: 4,
+                    opacity: currentPage === totalPages ? 0.5 : 1,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: responsive.fontSize.small, fontWeight: '600' }}>Next ›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {pageSize === null && (
+              <Text style={[dynamicStyles.filterLabel, { fontSize: responsive.fontSize.small }]}>
+                Showing all {filteredEntries.length} entries
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Page Size Dropdown Modal */}
+      {showPageSizeDropdown && (
+        <Modal
+          transparent
+          visible={showPageSizeDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowPageSizeDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowPageSizeDropdown(false)}
+          >
+            <View 
+              style={dynamicStyles.dropdownMenu}
+              onStartShouldSetResponder={() => true}
+            >
+              {[25, 50, 100, 250, null].map((size, index) => (
+                <TouchableOpacity
+                  key={size === null ? 'all' : size}
+                  style={[
+                    dynamicStyles.dropdownOption,
+                    index === ([25, 50, 100, 250, null].length - 1) && dynamicStyles.dropdownOptionLast,
+                    pageSize === size && dynamicStyles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setPageSize(size);
+                    setCurrentPage(1); // Reset to first page when changing page size
+                    setShowPageSizeDropdown(false);
+                  }}
+                >
+                  <Text style={[
+                    dynamicStyles.dropdownOptionText,
+                    pageSize === size && dynamicStyles.dropdownOptionTextSelected,
+                  ]}>
+                    {size === null ? 'All' : size.toString()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Role Dropdown Modal */}
       {showRoleDropdown && (

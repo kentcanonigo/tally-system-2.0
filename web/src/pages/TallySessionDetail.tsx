@@ -74,8 +74,11 @@ function TallySessionDetail() {
       setWeightClassifications(results[3].data);
       
       // Only set log entries if we fetched them
-      if (canViewLogs) {
-        setLogEntries(results[4].data);
+      if (canViewLogs && results[4]) {
+        // Handle paginated response structure
+        const entriesData = results[4].data;
+        const entries = entriesData?.entries || entriesData || [];
+        setLogEntries(Array.isArray(entries) ? entries : []);
       } else {
         setLogEntries([]);
       }
@@ -273,6 +276,7 @@ function TallySessionDetail() {
   };
 
   const getTotalHeadsForWeightClassification = (wcId: number): number => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) return 0;
     return logEntries
       .filter(entry => entry.weight_classification_id === wcId)
       .reduce((sum, entry) => sum + (entry.heads || 0), 0);

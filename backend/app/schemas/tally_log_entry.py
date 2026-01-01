@@ -73,3 +73,10 @@ class TallyLogEntryResponse(TallyLogEntryBase):
 class TallyLogEntryTransfer(BaseModel):
     entry_ids: List[int]
     target_session_id: int
+
+
+class PaginatedTallyLogEntriesResponse(BaseModel):
+    entries: List[TallyLogEntryResponse]
+    total: int
+    limit: Optional[int] = None
+    offset: Optional[int] = None

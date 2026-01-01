@@ -52,6 +52,9 @@ function TallySessionLogs() {
   const [selectedEntryForAudit, setSelectedEntryForAudit] = useState<TallyLogEntry | null>(null);
   const [auditHistory, setAuditHistory] = useState<TallyLogEntryAudit[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [pageSize, setPageSize] = useState<number | null>(50); // Default 50, null means "All"
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -69,6 +72,8 @@ function TallySessionLogs() {
       const sessionData = sessionRes.data;
       setSession(sessionData);
 
+      // Fetch all entries (needed for client-side filtering)
+      // TODO: Optimize to use server-side pagination when no filters are applied
       const [customerRes, plantRes, entriesRes, wcRes] = await Promise.all([
         customersApi.getById(sessionData.customer_id),
         plantsApi.getById(sessionData.plant_id),
@@ -78,7 +83,12 @@ function TallySessionLogs() {
 
       setCustomer(customerRes.data);
       setPlant(plantRes.data);
-      setLogEntries(entriesRes.data);
+      // Handle paginated response structure
+      const entriesData = entriesRes.data;
+      const entries = entriesData.entries || entriesData || [];
+      const total = entriesData.total !== undefined ? entriesData.total : entries.length;
+      setLogEntries(Array.isArray(entries) ? entries : []);
+      setTotalCount(total);
       setWeightClassifications(wcRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -127,6 +137,9 @@ function TallySessionLogs() {
 
   // Filter and sort log entries based on current filters and sort settings
   const filteredEntries = useMemo(() => {
+    if (!Array.isArray(logEntries) || logEntries.length === 0) {
+      return [];
+    }
     let filtered = logEntries.filter((entry) => {
       if (filters.role !== 'all' && entry.role !== filters.role) {
         return false;
@@ -178,6 +191,26 @@ function TallySessionLogs() {
 
     return filtered;
   }, [logEntries, filters, sortBy, sortOrder, weightClassifications]);
+
+  // Paginate filtered entries
+  const paginatedEntries = useMemo(() => {
+    if (pageSize === null) {
+      return filteredEntries; // Show all
+    }
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredEntries.slice(startIndex, endIndex);
+  }, [filteredEntries, pageSize, currentPage]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === null) return 1;
+    return Math.ceil(filteredEntries.length / pageSize);
+  }, [filteredEntries.length, pageSize]);
+
+  // Reset to first page when filters or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.role, filters.weight_classification_id, filters.category, sortBy, sortOrder]);
 
   // Calculate aggregations by weight classification
   const aggregations = useMemo(() => {
@@ -637,7 +670,7 @@ function TallySessionLogs() {
 
       {/* Log Entries Table */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
           <h2>Log Entries ({filteredEntries.length})</h2>
           {(hasPermission('can_edit_tally_log_entries') || hasPermission('can_delete_tally_log_entries') || hasPermission('can_transfer_tally_log_entries')) && (
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -694,6 +727,85 @@ function TallySessionLogs() {
             </div>
           )}
         </div>
+        
+        {/* Pagination Controls */}
+        {filteredEntries.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: '500' }}>Items per page:</label>
+              <select
+                value={pageSize === null ? 'all' : pageSize.toString()}
+                onChange={(e) => {
+                  const value = e.target.value === 'all' ? null : parseInt(e.target.value);
+                  setPageSize(value);
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  fontSize: '0.9rem',
+                }}
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            
+            {pageSize !== null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem' }}>
+                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredEntries.length)} of {filteredEntries.length}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    backgroundColor: currentPage === 1 ? '#bdc3c7' : '#007bff',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    opacity: currentPage === 1 ? 0.5 : 1,
+                  }}
+                >
+                  ‹ Prev
+                </button>
+                <span style={{ fontSize: '0.9rem' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    backgroundColor: currentPage === totalPages ? '#bdc3c7' : '#007bff',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    opacity: currentPage === totalPages ? 0.5 : 1,
+                  }}
+                >
+                  Next ›
+                </button>
+              </div>
+            )}
+            
+            {pageSize === null && (
+              <span style={{ fontSize: '0.9rem' }}>
+                Showing all {filteredEntries.length} entries
+              </span>
+            )}
+          </div>
+        )}
+        
         <div className="table-container">
           <table>
             <thead>
@@ -721,8 +833,8 @@ function TallySessionLogs() {
               </tr>
             </thead>
             <tbody>
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry) => {
+              {paginatedEntries.length > 0 ? (
+                paginatedEntries.map((entry) => {
                   const wc = weightClassifications.find((wc) => wc.id === entry.weight_classification_id);
                   const isTransferred = entry.original_session_id !== null && entry.original_session_id !== undefined;
                   const isSelected = selectedEntryIds.has(entry.id);

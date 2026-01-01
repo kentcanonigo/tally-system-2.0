@@ -8,6 +8,7 @@ import type {
   TallyLogEntry,
   TallyLogEntryRole,
   TallyLogEntryAudit,
+  PaginatedTallyLogEntriesResponse,
   ExportRequest,
   ExportResponse,
   TallySheetMultiCustomerResponse,
@@ -130,10 +131,15 @@ export const tallyLogEntriesApi = {
       ...data,
       tally_session_id: sessionId,
     }),
-  getBySession: (sessionId: number, role?: TallyLogEntryRole) =>
-    api.get<TallyLogEntry[]>(`/tally-sessions/${sessionId}/log-entries`, {
-      params: role ? { role } : undefined,
-    }),
+  getBySession: (sessionId: number, role?: TallyLogEntryRole, limit?: number, offset?: number) => {
+    const params: any = {};
+    if (role) params.role = role;
+    if (limit !== undefined) params.limit = limit;
+    if (offset !== undefined) params.offset = offset;
+    return api.get<PaginatedTallyLogEntriesResponse>(`/tally-sessions/${sessionId}/log-entries`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
+  },
   getById: (entryId: number) =>
     api.get<TallyLogEntry>(`/log-entries/${entryId}`),
   getAuditHistory: (entryId: number) =>

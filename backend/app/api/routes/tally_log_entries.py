@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ...database import get_db
-from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer
+from ...schemas.tally_log_entry import TallyLogEntryCreate, TallyLogEntryUpdate, TallyLogEntryResponse, TallyLogEntryRole, TallyLogEntryTransfer, PaginatedTallyLogEntriesResponse
 from ...schemas.tally_log_entry_audit import TallyLogEntryAuditResponse
 from ...crud import tally_log_entry as crud
 from ...crud import tally_session as session_crud
@@ -68,26 +68,40 @@ def create_tally_log_entry(
 
 @router.get(
     "/tally-sessions/{session_id}/log-entries",
-    response_model=List[TallyLogEntryResponse]
+    response_model=PaginatedTallyLogEntriesResponse
 )
 def get_tally_log_entries_by_session(
     session_id: int,
     role: Optional[TallyLogEntryRole] = Query(None, description="Filter by role (tally or dispatcher)"),
+    limit: Optional[int] = Query(None, ge=1, le=10000, description="Maximum number of entries to return (None for all)"),
+    offset: Optional[int] = Query(None, ge=0, description="Number of entries to skip"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("can_view_tally_logs"))
 ):
     """
-    Get all tally log entries for a session, optionally filtered by role.
+    Get tally log entries for a session, optionally filtered by role and paginated.
     Requires 'can_view_tally_logs' permission for viewing historical/detailed data.
     Results are ordered by created_at descending (newest first).
+    If limit is not provided, returns all entries.
     """
     # Verify session exists
     session = session_crud.get_tally_session(db, session_id=session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Tally session not found")
     
-    entries = crud.get_tally_log_entries_by_session(db, session_id=session_id, role=role)
-    return entries
+    entries, total = crud.get_tally_log_entries_by_session(
+        db, 
+        session_id=session_id, 
+        role=role,
+        limit=limit,
+        offset=offset
+    )
+    return PaginatedTallyLogEntriesResponse(
+        entries=entries,
+        total=total,
+        limit=limit,
+        offset=offset
+    )
 
 
 @router.get(
