@@ -372,53 +372,35 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     doc.text('Approved by: _______________', MARGIN + 5 + (signatureSpacing * 2), signatureStartY);
     doc.text('Received by: _______________', MARGIN + 5 + (signatureSpacing * 3), signatureStartY);
 
-      // ========== GRAND TOTAL (only on last page of last customer and if showGrandTotal is true) ==========
-      const isLastCustomer = customers.indexOf(customerData) === customers.length - 1;
-      const isLastPageOfLastCustomer = isLastCustomer && page_number === total_pages;
-      if (isLastPageOfLastCustomer && showGrandTotal) {
-        const grandTotalY = signatureStartY + 15;
-        
-        // Draw a line above grand total
-        doc.setLineWidth(0.2);
-        doc.line(MARGIN, grandTotalY - 2, PAGE_WIDTH - MARGIN, grandTotalY - 2);
-        
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Grand Total:', MARGIN + 5, grandTotalY + 5);
-        doc.setFontSize(10);
-        
-        // Calculate overall grand totals across all customers
-        const overallGrandTotalBags = customers.reduce((sum, c) => sum + c.grand_total_bags, 0);
-        const overallGrandTotalHeads = customers.reduce((sum, c) => sum + c.grand_total_heads, 0);
-        const overallGrandTotalKilos = customers.reduce((sum, c) => sum + c.grand_total_kilograms, 0);
-        
-        doc.text(`Bags: ${formatNumber(overallGrandTotalBags, 2)}`, MARGIN + 45, grandTotalY + 5);
-        doc.text(`Heads: ${formatNumber(overallGrandTotalHeads, 2)}`, MARGIN + 85, grandTotalY + 5);
-        doc.text(`Kilograms: ${formatNumber(overallGrandTotalKilos, 2)}`, MARGIN + 125, grandTotalY + 5);
-      }
     });
   });
 
-  // ========== GRAND TOTAL CATEGORY TABLE (at the end for both single and multiple customers) ==========
-  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    // Add a new page for the grand total category table
-    doc.addPage();
+  // ========== GRAND TOTAL CATEGORY TABLE (one per customer) ==========
+  customers.forEach((customerData) => {
+    const { customer_name } = customerData;
     
-    // Header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('GRAND TOTAL BY CLASSIFICATION', PAGE_WIDTH / 2, 18, { align: 'center' });
+    // Calculate grand totals for this specific customer
+    const customerGrandTotals = calculateGrandTotalsByClassification([customerData]);
     
-    // Group totals by category
-    const totalsByCategory = {
-      Dressed: [] as TallySheetSummaryWithCategory[],
-      Frozen: [] as TallySheetSummaryWithCategory[],
-      Byproduct: [] as TallySheetSummaryWithCategory[],
-    };
-    
-    grandTotalsByClassification.forEach((summary) => {
-      totalsByCategory[summary.category].push(summary);
-    });
+    if (customerGrandTotals && customerGrandTotals.size > 0) {
+      // Add a new page for the grand total category table
+      doc.addPage();
+      
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${customer_name} Grand Totals`, PAGE_WIDTH / 2, 18, { align: 'center' });
+      
+      // Group totals by category
+      const totalsByCategory = {
+        Dressed: [] as TallySheetSummaryWithCategory[],
+        Frozen: [] as TallySheetSummaryWithCategory[],
+        Byproduct: [] as TallySheetSummaryWithCategory[],
+      };
+      
+      customerGrandTotals.forEach((summary) => {
+        totalsByCategory[summary.category].push(summary);
+      });
     
     // Sort each category by classification name
     Object.keys(totalsByCategory).forEach(category => {
@@ -542,8 +524,8 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
       currentY = tableStartY + tableHeight + spacingBetweenTables;
     });
     
-    // Overall total row (after all category tables)
-    const allTotals = Array.from(grandTotalsByClassification.values());
+      // Overall total row (after all category tables)
+      const allTotals = Array.from(customerGrandTotals.values());
     const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
     // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
     const overallTotalHeads = allTotals.reduce((sum, s) => {
@@ -587,10 +569,11 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     doc.setFont('helvetica', 'bold');
     const overallTotalTextY = overallTotalY + (rowHeight / 2) + 1.5;
     doc.text('GRAND TOTAL', tableStartX + 2, overallTotalTextY);
-    doc.text(formatNumber(overallTotalBags, 2), tableStartX + col1Width + col2Width - 2, overallTotalTextY, { align: 'right' });
-    doc.text(formatNumber(overallTotalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, overallTotalTextY, { align: 'right' });
-    doc.text(formatNumber(overallTotalKilos, 2), tableStartX + tableWidth - 2, overallTotalTextY, { align: 'right' });
-  }
+      doc.text(formatNumber(overallTotalBags, 2), tableStartX + col1Width + col2Width - 2, overallTotalTextY, { align: 'right' });
+      doc.text(formatNumber(overallTotalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, overallTotalTextY, { align: 'right' });
+      doc.text(formatNumber(overallTotalKilos, 2), tableStartX + tableWidth - 2, overallTotalTextY, { align: 'right' });
+    }
+  });
 
   // Generate filename
   const firstCustomer = customers[0];

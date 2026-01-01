@@ -509,20 +509,26 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     allCurrentRows.push(currentRow);
   });
 
-  // Add grand total category table worksheet
-  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    const summaryWorksheet = workbook.addWorksheet('Grand Total by Classification');
+  // Add grand total category table worksheet(s) - one per customer
+  customers.forEach((customerData) => {
+    const { customer_name } = customerData;
     
-    // Group totals by category
-    const totalsByCategory = {
-      Dressed: [] as TallySheetSummaryWithCategory[],
-      Frozen: [] as TallySheetSummaryWithCategory[],
-      Byproduct: [] as TallySheetSummaryWithCategory[],
-    };
+    // Calculate grand totals for this specific customer
+    const customerGrandTotals = calculateGrandTotalsByClassification([customerData]);
     
-    grandTotalsByClassification.forEach((summary) => {
-      totalsByCategory[summary.category].push(summary);
-    });
+    if (customerGrandTotals && customerGrandTotals.size > 0) {
+      const summaryWorksheet = workbook.addWorksheet(`${customer_name} Grand Totals`);
+    
+      // Group totals by category
+      const totalsByCategory = {
+        Dressed: [] as TallySheetSummaryWithCategory[],
+        Frozen: [] as TallySheetSummaryWithCategory[],
+        Byproduct: [] as TallySheetSummaryWithCategory[],
+      };
+      
+      customerGrandTotals.forEach((summary) => {
+        totalsByCategory[summary.category].push(summary);
+      });
     
     // Sort each category by classification name
     Object.keys(totalsByCategory).forEach(category => {
@@ -626,75 +632,76 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       // Add spacing between categories
       summaryWorksheet.addRow([]);
       currentRow++;
-    });
+      });
+      
+      // Overall total row (after all category tables)
+      const allTotals = Array.from(customerGrandTotals.values());
+      const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
+      // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
+      const overallTotalHeads = allTotals.reduce((sum, s) => {
+        if (s.category === 'Byproduct') {
+          return sum; // Skip byproducts (they don't have a heads column)
+        } else {
+          return sum + s.heads; // Sum heads from dressed/frozen
+        }
+      }, 0);
+      // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
+      const overallTotalKilos = allTotals.reduce((sum, s) => {
+        if (s.category === 'Byproduct') {
+          return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
+        } else {
+          return sum + s.kilograms; // Use actual kilograms for dressed/frozen
+        }
+      }, 0);
+      
+      const overallTotalRow = summaryWorksheet.addRow(['GRAND TOTAL', overallTotalBags, overallTotalHeads, overallTotalKilos]);
+      overallTotalRow.height = 24;
+      overallTotalRow.getCell(1).style = {
+        font: { bold: true, size: 12 },
+        fill: {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD0D0D0' }
+        }
+      };
+      overallTotalRow.getCell(2).numFmt = '0.00';
+      overallTotalRow.getCell(2).style = {
+        font: { bold: true, size: 12 },
+        fill: {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD0D0D0' }
+        },
+        alignment: { horizontal: 'right' }
+      };
+      overallTotalRow.getCell(3).numFmt = '0.00';
+      overallTotalRow.getCell(3).style = {
+        font: { bold: true, size: 12 },
+        fill: {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD0D0D0' }
+        },
+        alignment: { horizontal: 'right' }
+      };
+      overallTotalRow.getCell(4).numFmt = '0.00';
+      overallTotalRow.getCell(4).style = {
+        font: { bold: true, size: 12 },
+        fill: {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD0D0D0' }
+        },
+        alignment: { horizontal: 'right' }
+      };
     
-    // Overall total row (after all category tables)
-    const allTotals = Array.from(grandTotalsByClassification.values());
-    const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
-    // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
-    const overallTotalHeads = allTotals.reduce((sum, s) => {
-      if (s.category === 'Byproduct') {
-        return sum; // Skip byproducts (they don't have a heads column)
-      } else {
-        return sum + s.heads; // Sum heads from dressed/frozen
-      }
-    }, 0);
-    // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
-    const overallTotalKilos = allTotals.reduce((sum, s) => {
-      if (s.category === 'Byproduct') {
-        return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
-      } else {
-        return sum + s.kilograms; // Use actual kilograms for dressed/frozen
-      }
-    }, 0);
-    
-    const overallTotalRow = summaryWorksheet.addRow(['GRAND TOTAL', overallTotalBags, overallTotalHeads, overallTotalKilos]);
-    overallTotalRow.height = 24;
-    overallTotalRow.getCell(1).style = {
-      font: { bold: true, size: 12 },
-      fill: {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD0D0D0' }
-      }
-    };
-    overallTotalRow.getCell(2).numFmt = '0.00';
-    overallTotalRow.getCell(2).style = {
-      font: { bold: true, size: 12 },
-      fill: {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD0D0D0' }
-      },
-      alignment: { horizontal: 'right' }
-    };
-    overallTotalRow.getCell(3).numFmt = '0.00';
-    overallTotalRow.getCell(3).style = {
-      font: { bold: true, size: 12 },
-      fill: {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD0D0D0' }
-      },
-      alignment: { horizontal: 'right' }
-    };
-    overallTotalRow.getCell(4).numFmt = '0.00';
-    overallTotalRow.getCell(4).style = {
-      font: { bold: true, size: 12 },
-      fill: {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD0D0D0' }
-      },
-      alignment: { horizontal: 'right' }
-    };
-    
-    // Set column widths
-    summaryWorksheet.getColumn(1).width = 30; // Classification
-    summaryWorksheet.getColumn(2).width = 15; // Bags
-    summaryWorksheet.getColumn(3).width = 15; // Heads
-    summaryWorksheet.getColumn(4).width = 18; // Kilograms
-  }
+      // Set column widths
+      summaryWorksheet.getColumn(1).width = 30; // Classification
+      summaryWorksheet.getColumn(2).width = 15; // Bags
+      summaryWorksheet.getColumn(3).width = 15; // Heads
+      summaryWorksheet.getColumn(4).width = 18; // Kilograms
+    }
+  });
 
   // Generate filename
   const firstCustomer = customers[0];

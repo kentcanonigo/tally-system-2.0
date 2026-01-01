@@ -343,12 +343,13 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
     a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: 'base' })
   );
   
-  // Only show grand total if there are multiple customers
-  const showGrandTotal = customers.length > 1;
+  // Always show grand total for each customer (Bags, Heads, Kilograms) - but we'll use the detailed table instead
+  const showGrandTotal = false; // Don't show simple grand total, use detailed table instead
   
   // Calculate grand totals by classification (for both single and multiple customers)
   const grandTotalsByClassification = calculateGrandTotalsByClassification(customers);
-  const showGrandTotalCategoryTable = showGrandTotal;
+  // Always show grand total category table (matching web version)
+  const showGrandTotalCategoryTable = true;
   
   // Generate HTML for each customer with a page break between customers
   const customersHTML = customers.map((customerData, index) => {
@@ -360,19 +361,25 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
     return customerHTML;
   }).join('');
 
-  // Generate grand total category table HTML if needed
+  // Generate grand total category table HTML - one per customer
   let grandTotalCategoryTableHTML = '';
-  if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    // Group totals by category
-    const totalsByCategory = {
-      Dressed: [] as TallySheetSummaryWithCategory[],
-      Frozen: [] as TallySheetSummaryWithCategory[],
-      Byproduct: [] as TallySheetSummaryWithCategory[],
-    };
+  customers.forEach((customerData) => {
+    const { customer_name } = customerData;
     
-    grandTotalsByClassification.forEach((summary) => {
-      totalsByCategory[summary.category].push(summary);
-    });
+    // Calculate grand totals for this specific customer
+    const customerGrandTotals = calculateGrandTotalsByClassification([customerData]);
+    
+    if (customerGrandTotals && customerGrandTotals.size > 0) {
+      // Group totals by category
+      const totalsByCategory = {
+        Dressed: [] as TallySheetSummaryWithCategory[],
+        Frozen: [] as TallySheetSummaryWithCategory[],
+        Byproduct: [] as TallySheetSummaryWithCategory[],
+      };
+      
+      customerGrandTotals.forEach((summary) => {
+        totalsByCategory[summary.category].push(summary);
+      });
     
     // Sort each category by classification name
     Object.keys(totalsByCategory).forEach(category => {
@@ -432,8 +439,8 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
       `;
     });
     
-    // Overall totals
-    const allTotals = Array.from(grandTotalsByClassification.values());
+      // Overall totals
+      const allTotals = Array.from(customerGrandTotals.values());
     const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
     // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
     const overallTotalHeads = allTotals.reduce((sum, s) => {
@@ -452,10 +459,10 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
       }
     }, 0);
     
-    grandTotalCategoryTableHTML = `
-      <div style="page-break-before: always; padding: 20px;">
-        <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">GRAND TOTAL BY CLASSIFICATION</h1>
-        ${categoryTablesHTML}
+      grandTotalCategoryTableHTML += `
+        <div style="page-break-before: always; padding: 20px;">
+          <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${customer_name} Grand Totals</h1>
+          ${categoryTablesHTML}
         <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 20px;">
           <thead>
             <tr>
@@ -474,9 +481,10 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
             </tr>
           </tbody>
         </table>
-      </div>
-    `;
-  }
+        </div>
+      `;
+    }
+  });
 
   return `
     <!DOCTYPE html>
