@@ -8,6 +8,7 @@ import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { usePlant } from '../contexts/PlantContext';
 import { colors } from '../theme/colors';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 function CustomersScreen() {
   const responsive = useResponsive();
@@ -105,11 +106,7 @@ function CustomersScreen() {
   };
 
   if (loading && customers.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (!activePlantId) {

@@ -18,6 +18,7 @@ import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 function TallySessionLogsScreen() {
   const route = useRoute();
@@ -611,11 +612,7 @@ function TallySessionLogsScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (!session) {

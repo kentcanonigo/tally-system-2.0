@@ -7,6 +7,7 @@ import { useResponsive } from '../utils/responsive';
 import { usePermissions } from '../utils/usePermissions';
 import { usePlant } from '../contexts/PlantContext';
 import { colors } from '../theme/colors';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 function HomeScreen() {
   const navigation = useNavigation();
@@ -84,11 +85,7 @@ function HomeScreen() {
   };
 
   if (loading || isPlantLoading) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const dynamicStyles = {

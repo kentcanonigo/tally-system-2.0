@@ -10,6 +10,7 @@ import { getTimezoneAbbreviation } from '../utils/dateFormat';
 import { plantsApi, rolesApi, setApiBaseUrl, getCurrentApiBaseUrl } from '../services/api';
 import { Plant, Role } from '../types';
 import { colors } from '../theme/colors';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 // Available tabs that can be shown/hidden
 const AVAILABLE_TABS = [
@@ -414,11 +415,7 @@ function SettingsScreen() {
   };
 
   if (isPlantLoading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const onRefresh = async () => {
