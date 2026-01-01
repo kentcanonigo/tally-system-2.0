@@ -175,8 +175,12 @@ function TallySessions() {
     }
   };
 
-  const getCustomerName = (customerId: number) => {
-    return customers.find((c) => c.id === customerId)?.name || customerId;
+  const getCustomerName = (customerId: number, sessionNumber?: number) => {
+    const customerName = customers.find((c) => c.id === customerId)?.name || customerId;
+    if (sessionNumber !== undefined) {
+      return `${customerName} (#${sessionNumber})`;
+    }
+    return customerName;
   };
 
   const getPlantName = (plantId: number) => {
@@ -585,7 +589,7 @@ function TallySessions() {
                   </td>
                 )}
                 <td>{session.id}</td>
-                <td>{getCustomerName(session.customer_id)}</td>
+                <td>{getCustomerName(session.customer_id, session.session_number)}</td>
                 <td>{getPlantName(session.plant_id)}</td>
                 <td>{formatDate(session.date, timezone)}</td>
                 <td>{getStatusBadge(session.status)}</td>
