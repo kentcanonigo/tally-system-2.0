@@ -67,20 +67,29 @@ const formatNumber = (value: number, decimals: number = 2): string => {
   return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
-// Calculate grand totals by classification across all customers
-const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
-  const totalsMap = new Map<number, TallySheetSummary>();
+interface TallySheetSummaryWithCategory extends TallySheetSummary {
+  category: 'Dressed' | 'Frozen' | 'Byproduct';
+}
+
+// Calculate grand totals by classification across all customers, grouped by category
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummaryWithCategory> => {
+  const totalsMap = new Map<number, TallySheetSummaryWithCategory>();
 
   customers.forEach(customer => {
     customer.pages.forEach(page => {
       // Process dressed, frozen, and byproduct summaries
       let summaries: TallySheetSummary[] = [];
+      let category: 'Dressed' | 'Frozen' | 'Byproduct' = 'Dressed';
+      
       if (page.is_byproduct) {
         summaries = page.summary_byproduct || [];
+        category = 'Byproduct';
       } else if (page.product_type === "Frozen Chicken") {
         summaries = page.summary_frozen || [];
+        category = 'Frozen';
       } else {
         summaries = page.summary_dressed || [];
+        category = 'Dressed';
       }
       
       summaries.forEach(summary => {
@@ -96,6 +105,7 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
             bags: summary.bags,
             heads: summary.heads,
             kilograms: summary.kilograms,
+            category: category,
           });
         }
       });
@@ -353,19 +363,100 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
   // Generate grand total category table HTML if needed
   let grandTotalCategoryTableHTML = '';
   if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    // Convert map to array and sort by classification name
-    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
-      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
-    );
+    // Group totals by category
+    const totalsByCategory = {
+      Dressed: [] as TallySheetSummaryWithCategory[],
+      Frozen: [] as TallySheetSummaryWithCategory[],
+      Byproduct: [] as TallySheetSummaryWithCategory[],
+    };
     
-    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
-    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
-    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    grandTotalsByClassification.forEach((summary) => {
+      totalsByCategory[summary.category].push(summary);
+    });
+    
+    // Sort each category by classification name
+    Object.keys(totalsByCategory).forEach(category => {
+      totalsByCategory[category as keyof typeof totalsByCategory].sort((a, b) =>
+        a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+      );
+    });
+    
+    const categoryOrder: Array<'Dressed' | 'Frozen' | 'Byproduct'> = ['Dressed', 'Frozen', 'Byproduct'];
+    
+    let categoryTablesHTML = '';
+    categoryOrder.forEach((category) => {
+      const categoryTotals = totalsByCategory[category];
+      if (categoryTotals.length === 0) return; // Skip empty categories
+      
+      const isByproduct = category === 'Byproduct';
+      const categoryTotalBags = categoryTotals.reduce((sum, s) => sum + s.bags, 0);
+      const categoryTotalHeads = categoryTotals.reduce((sum, s) => sum + s.heads, 0);
+      const categoryTotalKilos = categoryTotals.reduce((sum, s) => sum + s.kilograms, 0);
+      
+      categoryTablesHTML += `
+        <h2 style="font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">${category} Chicken</h2>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #000; padding: 8px; text-align: left; background-color: #70AD47; color: white;">Classification</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Bags</th>
+              ${isByproduct 
+                ? '<th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Kilograms</th>'
+                : '<th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Heads</th><th style="border: 1px solid #000; padding: 8px; text-align: center; background-color: #70AD47; color: white;">Kilograms</th>'
+              }
+            </tr>
+          </thead>
+          <tbody>
+            ${categoryTotals.map(summary => `
+              <tr>
+                <td style="border: 1px solid #000; padding: 6px;">${summary.classification}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.bags, 2)}</td>
+                ${isByproduct
+                  ? `<td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.heads, 2)}</td>`
+                  : `<td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.heads, 2)}</td>
+                     <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.kilograms, 2)}</td>`
+                }
+              </tr>
+            `).join('')}
+            <tr style="font-weight: bold; background-color: #C6E0B4;">
+              <td style="border: 1px solid #000; padding: 8px;">${category} TOTAL</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(categoryTotalBags, 2)}</td>
+              ${isByproduct
+                ? `<td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(categoryTotalHeads, 2)}</td>`
+                : `<td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(categoryTotalHeads, 2)}</td>
+                   <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(categoryTotalKilos, 2)}</td>`
+              }
+            </tr>
+          </tbody>
+        </table>
+      `;
+    });
+    
+    // Overall totals
+    const allTotals = Array.from(grandTotalsByClassification.values());
+    const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
+    // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
+    const overallTotalHeads = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum; // Skip byproducts (they don't have a heads column)
+      } else {
+        return sum + s.heads; // Sum heads from dressed/frozen
+      }
+    }, 0);
+    // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
+    const overallTotalKilos = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
+      } else {
+        return sum + s.kilograms; // Use actual kilograms for dressed/frozen
+      }
+    }, 0);
     
     grandTotalCategoryTableHTML = `
       <div style="page-break-before: always; padding: 20px;">
         <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">GRAND TOTAL BY CLASSIFICATION</h1>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        ${categoryTablesHTML}
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 20px;">
           <thead>
             <tr>
               <th style="border: 1px solid #000; padding: 8px; text-align: left; background-color: #70AD47; color: white;">Classification</th>
@@ -375,19 +466,11 @@ export const generateTallySheetHTML = (data: TallySheetResponse | TallySheetMult
             </tr>
           </thead>
           <tbody>
-            ${sortedTotals.map(summary => `
-              <tr>
-                <td style="border: 1px solid #000; padding: 6px;">${summary.classification}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.bags, 2)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.heads, 2)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(summary.kilograms, 2)}</td>
-              </tr>
-            `).join('')}
-            <tr style="font-weight: bold; background-color: #C6E0B4;">
-              <td style="border: 1px solid #000; padding: 8px;">TOTAL</td>
-              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalBags, 2)}</td>
-              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalHeads, 2)}</td>
-              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(totalKilos, 2)}</td>
+            <tr style="font-weight: bold; background-color: #D0D0D0;">
+              <td style="border: 1px solid #000; padding: 8px;">GRAND TOTAL</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(overallTotalBags, 2)}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(overallTotalHeads, 2)}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(overallTotalKilos, 2)}</td>
             </tr>
           </tbody>
         </table>

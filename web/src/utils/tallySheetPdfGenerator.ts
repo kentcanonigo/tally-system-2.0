@@ -431,13 +431,15 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     const tableStartX = MARGIN + 20;
     const tableWidth = PAGE_WIDTH - (2 * tableStartX);
     const rowHeight = 5.5; // Reduced from 7
-    const col1Width = tableWidth * 0.5; // Classification
-    const col2Width = tableWidth * 0.15; // Bags
-    const col3Width = tableWidth * 0.15; // Heads
-    // col4 (Kilograms) uses remaining width
     const spacingBetweenTables = 3; // Reduced from 5
     const PAGE_HEIGHT = 215.9; // Letter landscape height in mm
     const BOTTOM_MARGIN = 20; // Minimum space from bottom of page
+    
+    // Column widths - defined outside loop for use in overall total
+    const col1Width = tableWidth * 0.5; // Classification
+    const col2Width = tableWidth * 0.15; // Bags
+    const col3Width = tableWidth * 0.15; // Heads (for non-byproducts)
+    // col4 (Kilograms for non-byproducts) uses remaining width
     
     let currentY = 28; // Reduced from 35
     const categoryOrder: Array<'Dressed' | 'Frozen' | 'Byproduct'> = ['Dressed', 'Frozen', 'Byproduct'];
@@ -447,6 +449,10 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     categoryOrder.forEach((category) => {
       const categoryTotals = totalsByCategory[category];
       if (categoryTotals.length === 0) return; // Skip empty categories
+      
+      const isByproduct = category === 'Byproduct';
+      // For byproducts, adjust col3Width to be wider (Kilograms column)
+      const actualCol3Width = isByproduct ? tableWidth * 0.35 : col3Width;
       
       // Check if we need a new page before adding this category
       const estimatedHeight = 2 + 5 + (categoryTotals.length + 2) * rowHeight + spacingBetweenTables;
@@ -466,23 +472,26 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
       const numRows = categoryTotals.length + 2; // +2 for header and total row
       const tableHeight = numRows * rowHeight;
       const tableStartY = currentY;
+      const actualTableWidth = isByproduct ? col1Width + col2Width + actualCol3Width : tableWidth;
       
       // Draw table borders
       doc.setDrawColor(0);
       doc.setLineWidth(0.2);
-      doc.rect(tableStartX, tableStartY, tableWidth, tableHeight);
+      doc.rect(tableStartX, tableStartY, actualTableWidth, tableHeight);
       
       // Draw horizontal lines
       doc.setLineWidth(0.1);
       for (let i = 0; i <= numRows; i++) {
         const y = tableStartY + (i * rowHeight);
-        doc.line(tableStartX, y, tableStartX + tableWidth, y);
+        doc.line(tableStartX, y, tableStartX + actualTableWidth, y);
       }
       
       // Draw vertical lines
       doc.line(tableStartX + col1Width, tableStartY, tableStartX + col1Width, tableStartY + tableHeight);
       doc.line(tableStartX + col1Width + col2Width, tableStartY, tableStartX + col1Width + col2Width, tableStartY + tableHeight);
-      doc.line(tableStartX + col1Width + col2Width + col3Width, tableStartY, tableStartX + col1Width + col2Width + col3Width, tableStartY + tableHeight);
+      if (!isByproduct) {
+        doc.line(tableStartX + col1Width + col2Width + col3Width, tableStartY, tableStartX + col1Width + col2Width + col3Width, tableStartY + tableHeight);
+      }
       
       // Header row
       doc.setFontSize(9);
@@ -490,8 +499,12 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
       const headerY = tableStartY + (rowHeight / 2) + 1.5;
       doc.text('Classification', tableStartX + 2, headerY);
       doc.text('Bags', tableStartX + col1Width + col2Width - 2, headerY, { align: 'right' });
-      doc.text('Heads', tableStartX + col1Width + col2Width + col3Width - 2, headerY, { align: 'right' });
-      doc.text('Kilograms', tableStartX + tableWidth - 2, headerY, { align: 'right' });
+      if (isByproduct) {
+        doc.text('Kilograms', tableStartX + col1Width + col2Width + actualCol3Width - 2, headerY, { align: 'right' });
+      } else {
+        doc.text('Heads', tableStartX + col1Width + col2Width + col3Width - 2, headerY, { align: 'right' });
+        doc.text('Kilograms', tableStartX + tableWidth - 2, headerY, { align: 'right' });
+      }
       
       // Data rows
       doc.setFontSize(8);
@@ -500,8 +513,13 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
         const rowY = tableStartY + ((index + 1) * rowHeight) + (rowHeight / 2) + 1.5;
         doc.text(summary.classification, tableStartX + 2, rowY);
         doc.text(formatNumber(summary.bags, 2), tableStartX + col1Width + col2Width - 2, rowY, { align: 'right' });
-        doc.text(formatNumber(summary.heads, 2), tableStartX + col1Width + col2Width + col3Width - 2, rowY, { align: 'right' });
-        doc.text(formatNumber(summary.kilograms, 2), tableStartX + tableWidth - 2, rowY, { align: 'right' });
+        if (isByproduct) {
+          // For byproducts: show heads value as Kilograms
+          doc.text(formatNumber(summary.heads, 2), tableStartX + col1Width + col2Width + actualCol3Width - 2, rowY, { align: 'right' });
+        } else {
+          doc.text(formatNumber(summary.heads, 2), tableStartX + col1Width + col2Width + col3Width - 2, rowY, { align: 'right' });
+          doc.text(formatNumber(summary.kilograms, 2), tableStartX + tableWidth - 2, rowY, { align: 'right' });
+        }
       });
       
       // Category total row
@@ -513,8 +531,13 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
       doc.setFont('helvetica', 'bold');
       doc.text(`${category} TOTAL`, tableStartX + 2, categoryTotalRowY);
       doc.text(formatNumber(categoryTotalBags, 2), tableStartX + col1Width + col2Width - 2, categoryTotalRowY, { align: 'right' });
-      doc.text(formatNumber(categoryTotalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, categoryTotalRowY, { align: 'right' });
-      doc.text(formatNumber(categoryTotalKilos, 2), tableStartX + tableWidth - 2, categoryTotalRowY, { align: 'right' });
+      if (isByproduct) {
+        // For byproducts: show heads total as Kilograms
+        doc.text(formatNumber(categoryTotalHeads, 2), tableStartX + col1Width + col2Width + actualCol3Width - 2, categoryTotalRowY, { align: 'right' });
+      } else {
+        doc.text(formatNumber(categoryTotalHeads, 2), tableStartX + col1Width + col2Width + col3Width - 2, categoryTotalRowY, { align: 'right' });
+        doc.text(formatNumber(categoryTotalKilos, 2), tableStartX + tableWidth - 2, categoryTotalRowY, { align: 'right' });
+      }
       
       currentY = tableStartY + tableHeight + spacingBetweenTables;
     });
@@ -522,8 +545,22 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
     // Overall total row (after all category tables)
     const allTotals = Array.from(grandTotalsByClassification.values());
     const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
-    const overallTotalHeads = allTotals.reduce((sum, s) => sum + s.heads, 0);
-    const overallTotalKilos = allTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
+    const overallTotalHeads = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum; // Skip byproducts (they don't have a heads column)
+      } else {
+        return sum + s.heads; // Sum heads from dressed/frozen
+      }
+    }, 0);
+    // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
+    const overallTotalKilos = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
+      } else {
+        return sum + s.kilograms; // Use actual kilograms for dressed/frozen
+      }
+    }, 0);
     
     // Check if we need a new page for the overall total
     if (currentY + rowHeight + 3 > PAGE_HEIGHT - BOTTOM_MARGIN) {

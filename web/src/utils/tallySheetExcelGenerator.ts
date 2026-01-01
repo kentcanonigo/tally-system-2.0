@@ -539,6 +539,9 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       const categoryTotals = totalsByCategory[category];
       if (categoryTotals.length === 0) return; // Skip empty categories
       
+      const isByproduct = category === 'Byproduct';
+      const numColumns = isByproduct ? 3 : 4; // Byproduct: Classification, Bags, Kilograms; Others: Classification, Bags, Heads, Kilograms
+      
       // Category header
       const categoryHeaderRow = summaryWorksheet.addRow([`${category} Chicken`]);
       categoryHeaderRow.height = 20;
@@ -550,11 +553,13 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
           fgColor: { argb: 'FFE0E0E0' }
         }
       };
-      summaryWorksheet.mergeCells(currentRow, 1, currentRow, 4);
+      summaryWorksheet.mergeCells(currentRow, 1, currentRow, numColumns);
       currentRow++;
       
       // Header row for this category
-      const headerRow = summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
+      const headerRow = isByproduct 
+        ? summaryWorksheet.addRow(['Classification', 'Bags', 'Kilograms'])
+        : summaryWorksheet.addRow(['Classification', 'Bags', 'Heads', 'Kilograms']);
       headerRow.height = 20;
       headerRow.eachCell((cell) => {
         cell.style = summaryHeaderStyle;
@@ -563,15 +568,26 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       
       // Data rows for this category
       categoryTotals.forEach(summary => {
-        const row = summaryWorksheet.addRow([
-          summary.classification,
-          summary.bags,
-          summary.heads,
-          summary.kilograms
-        ]);
-        row.getCell(2).numFmt = '0.00';
-        row.getCell(3).numFmt = '0.00';
-        row.getCell(4).numFmt = '0.00';
+        const row = isByproduct
+          ? summaryWorksheet.addRow([
+              summary.classification,
+              summary.bags,
+              summary.heads // Use heads value as Kilograms for byproducts
+            ])
+          : summaryWorksheet.addRow([
+              summary.classification,
+              summary.bags,
+              summary.heads,
+              summary.kilograms
+            ]);
+        if (isByproduct) {
+          row.getCell(2).numFmt = '0.00';
+          row.getCell(3).numFmt = '0.00';
+        } else {
+          row.getCell(2).numFmt = '0.00';
+          row.getCell(3).numFmt = '0.00';
+          row.getCell(4).numFmt = '0.00';
+        }
         row.eachCell((cell, colNumber) => {
           if (colNumber === 1) {
             cell.style = summaryCellLeftStyle;
@@ -587,15 +603,24 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
       const categoryTotalHeads = categoryTotals.reduce((sum, s) => sum + s.heads, 0);
       const categoryTotalKilos = categoryTotals.reduce((sum, s) => sum + s.kilograms, 0);
       
-      const categoryTotalRow = summaryWorksheet.addRow([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads, categoryTotalKilos]);
+      const categoryTotalRow = isByproduct
+        ? summaryWorksheet.addRow([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads]) // Use heads as Kilograms for byproducts
+        : summaryWorksheet.addRow([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads, categoryTotalKilos]);
       categoryTotalRow.height = 22;
       categoryTotalRow.getCell(1).style = summaryTotalLeftStyle;
-      categoryTotalRow.getCell(2).numFmt = '0.00';
-      categoryTotalRow.getCell(2).style = summaryTotalStyle;
-      categoryTotalRow.getCell(3).numFmt = '0.00';
-      categoryTotalRow.getCell(3).style = summaryTotalStyle;
-      categoryTotalRow.getCell(4).numFmt = '0.00';
-      categoryTotalRow.getCell(4).style = summaryTotalStyle;
+      if (isByproduct) {
+        categoryTotalRow.getCell(2).numFmt = '0.00';
+        categoryTotalRow.getCell(2).style = summaryTotalStyle;
+        categoryTotalRow.getCell(3).numFmt = '0.00';
+        categoryTotalRow.getCell(3).style = summaryTotalStyle;
+      } else {
+        categoryTotalRow.getCell(2).numFmt = '0.00';
+        categoryTotalRow.getCell(2).style = summaryTotalStyle;
+        categoryTotalRow.getCell(3).numFmt = '0.00';
+        categoryTotalRow.getCell(3).style = summaryTotalStyle;
+        categoryTotalRow.getCell(4).numFmt = '0.00';
+        categoryTotalRow.getCell(4).style = summaryTotalStyle;
+      }
       currentRow++;
       
       // Add spacing between categories
@@ -606,8 +631,22 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     // Overall total row (after all category tables)
     const allTotals = Array.from(grandTotalsByClassification.values());
     const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
-    const overallTotalHeads = allTotals.reduce((sum, s) => sum + s.heads, 0);
-    const overallTotalKilos = allTotals.reduce((sum, s) => sum + s.kilograms, 0);
+    // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
+    const overallTotalHeads = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum; // Skip byproducts (they don't have a heads column)
+      } else {
+        return sum + s.heads; // Sum heads from dressed/frozen
+      }
+    }, 0);
+    // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
+    const overallTotalKilos = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
+      } else {
+        return sum + s.kilograms; // Use actual kilograms for dressed/frozen
+      }
+    }, 0);
     
     const overallTotalRow = summaryWorksheet.addRow(['GRAND TOTAL', overallTotalBags, overallTotalHeads, overallTotalKilos]);
     overallTotalRow.height = 24;

@@ -115,20 +115,29 @@ const formatDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
-// Calculate grand totals by classification across all customers
-const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummary> => {
-  const totalsMap = new Map<number, TallySheetSummary>();
+interface TallySheetSummaryWithCategory extends TallySheetSummary {
+  category: 'Dressed' | 'Frozen' | 'Byproduct';
+}
+
+// Calculate grand totals by classification across all customers, grouped by category
+const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummaryWithCategory> => {
+  const totalsMap = new Map<number, TallySheetSummaryWithCategory>();
 
   customers.forEach(customer => {
     customer.pages.forEach(page => {
       // Process dressed, frozen, and byproduct summaries
       let summaries: TallySheetSummary[] = [];
+      let category: 'Dressed' | 'Frozen' | 'Byproduct' = 'Dressed';
+      
       if (page.is_byproduct) {
         summaries = page.summary_byproduct || [];
+        category = 'Byproduct';
       } else if (page.product_type === "Frozen Chicken") {
         summaries = page.summary_frozen || [];
+        category = 'Frozen';
       } else {
         summaries = page.summary_dressed || [];
+        category = 'Dressed';
       }
       
       summaries.forEach(summary => {
@@ -144,6 +153,7 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
             bags: summary.bags,
             heads: summary.heads,
             kilograms: summary.kilograms,
+            category: category,
           });
         }
       });
@@ -418,31 +428,98 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
   
   // Add grand total category table worksheet if multiple customers
   if (showGrandTotalCategoryTable && grandTotalsByClassification && grandTotalsByClassification.size > 0) {
-    // Convert map to array and sort by classification name
-    const sortedTotals = Array.from(grandTotalsByClassification.values()).sort((a, b) => 
-      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
-    );
+    // Group totals by category
+    const totalsByCategory = {
+      Dressed: [] as TallySheetSummaryWithCategory[],
+      Frozen: [] as TallySheetSummaryWithCategory[],
+      Byproduct: [] as TallySheetSummaryWithCategory[],
+    };
     
-    const summaryWorksheetData: any[][] = [];
-    
-    // Header row
-    summaryWorksheetData.push(['Classification', 'Bags', 'Heads', 'Kilograms']);
-    
-    // Data rows
-    sortedTotals.forEach(summary => {
-      summaryWorksheetData.push([
-        summary.classification,
-        summary.bags,
-        summary.heads,
-        summary.kilograms
-      ]);
+    grandTotalsByClassification.forEach((summary) => {
+      totalsByCategory[summary.category].push(summary);
     });
     
-    // Total row
-    const totalBags = sortedTotals.reduce((sum, s) => sum + s.bags, 0);
-    const totalHeads = sortedTotals.reduce((sum, s) => sum + s.heads, 0);
-    const totalKilos = sortedTotals.reduce((sum, s) => sum + s.kilograms, 0);
-    summaryWorksheetData.push(['TOTAL', totalBags, totalHeads, totalKilos]);
+    // Sort each category by classification name
+    Object.keys(totalsByCategory).forEach(category => {
+      totalsByCategory[category as keyof typeof totalsByCategory].sort((a, b) =>
+        a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+      );
+    });
+    
+    const summaryWorksheetData: any[][] = [];
+    const categoryOrder: Array<'Dressed' | 'Frozen' | 'Byproduct'> = ['Dressed', 'Frozen', 'Byproduct'];
+    
+    // Render each category sub-table
+    categoryOrder.forEach((category) => {
+      const categoryTotals = totalsByCategory[category];
+      if (categoryTotals.length === 0) return; // Skip empty categories
+      
+      const isByproduct = category === 'Byproduct';
+      
+      // Category header
+      summaryWorksheetData.push([`${category} Chicken`]);
+      summaryWorksheetData.push([]); // Empty row
+      
+      // Header row for this category
+      if (isByproduct) {
+        summaryWorksheetData.push(['Classification', 'Bags', 'Kilograms']);
+      } else {
+        summaryWorksheetData.push(['Classification', 'Bags', 'Heads', 'Kilograms']);
+      }
+      
+      // Data rows for this category
+      categoryTotals.forEach(summary => {
+        if (isByproduct) {
+          summaryWorksheetData.push([
+            summary.classification,
+            summary.bags,
+            summary.heads // Use heads value as Kilograms for byproducts
+          ]);
+        } else {
+          summaryWorksheetData.push([
+            summary.classification,
+            summary.bags,
+            summary.heads,
+            summary.kilograms
+          ]);
+        }
+      });
+      
+      // Category total row
+      const categoryTotalBags = categoryTotals.reduce((sum, s) => sum + s.bags, 0);
+      const categoryTotalHeads = categoryTotals.reduce((sum, s) => sum + s.heads, 0);
+      const categoryTotalKilos = categoryTotals.reduce((sum, s) => sum + s.kilograms, 0);
+      
+      if (isByproduct) {
+        summaryWorksheetData.push([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads]); // Use heads as Kilograms for byproducts
+      } else {
+        summaryWorksheetData.push([`${category} TOTAL`, categoryTotalBags, categoryTotalHeads, categoryTotalKilos]);
+      }
+      
+      // Add spacing between categories
+      summaryWorksheetData.push([]);
+    });
+    
+    // Overall total row (after all category tables)
+    const allTotals = Array.from(grandTotalsByClassification.values());
+    const overallTotalBags = allTotals.reduce((sum, s) => sum + s.bags, 0);
+    // For overall heads: only sum heads from dressed/frozen (byproducts don't show heads column)
+    const overallTotalHeads = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum; // Skip byproducts (they don't have a heads column)
+      } else {
+        return sum + s.heads; // Sum heads from dressed/frozen
+      }
+    }, 0);
+    // For overall kilograms: sum kilograms from dressed/frozen, plus heads from byproducts (since byproducts display heads as "Kilograms")
+    const overallTotalKilos = allTotals.reduce((sum, s) => {
+      if (s.category === 'Byproduct') {
+        return sum + s.heads; // Use heads value for byproducts (displayed as "Kilograms")
+      } else {
+        return sum + s.kilograms; // Use actual kilograms for dressed/frozen
+      }
+    }, 0);
+    summaryWorksheetData.push(['GRAND TOTAL', overallTotalBags, overallTotalHeads, overallTotalKilos]);
     
     // Create worksheet
     const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryWorksheetData);
@@ -451,8 +528,8 @@ export const generateTallySheetExcel = async (data: TallySheetResponse | TallySh
     const colWidths: any[] = [];
     colWidths[0] = { wch: 30 }; // Classification
     colWidths[1] = { wch: 15 }; // Bags
-    colWidths[2] = { wch: 15 }; // Heads
-    colWidths[3] = { wch: 18 }; // Kilograms
+    colWidths[2] = { wch: 15 }; // Heads/Kilograms (for byproducts)
+    colWidths[3] = { wch: 18 }; // Kilograms (not used for byproducts)
     summaryWorksheet['!cols'] = colWidths;
     
     // Add worksheet to workbook
