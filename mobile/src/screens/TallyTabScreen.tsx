@@ -1602,39 +1602,6 @@ function TallyTabScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: 8,
-                  }}
-                >
-                  Role
-                </Text>
-                <View
-                  style={{
-                    borderWidth: 1,
-                    borderColor: '#ddd',
-                    borderRadius: 8,
-                    backgroundColor: '#fff',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Picker
-                    selectedValue={exportRole}
-                    onValueChange={(itemValue) => setExportRole(itemValue)}
-                    style={{
-                      color: '#2c3e50',
-                    }}
-                  >
-                    <Picker.Item label="Tally-er" value={TallyLogEntryRole.TALLY} />
-                    <Picker.Item label="Dispatcher" value={TallyLogEntryRole.DISPATCHER} />
-                  </Picker>
-                </View>
-              </View>
-
               <View style={styles.formatOptionsContainer}>
                 <TouchableOpacity
                   style={[
