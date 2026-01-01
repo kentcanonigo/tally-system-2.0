@@ -9,7 +9,6 @@ import TallySessions from './pages/TallySessions';
 import TallySessionDetail from './pages/TallySessionDetail';
 import TallySessionLogs from './pages/TallySessionLogs';
 import Settings from './pages/Settings';
-import ExportPage from './pages/ExportPage';
 import Users from './pages/Users';
 import Roles from './pages/Roles';
 import RoleEdit from './pages/RoleEdit';
@@ -68,7 +67,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   
   // Check if user can manage roles (SUPERADMIN or ADMIN role)
   const canManageRoles = isSuperadmin || hasAnyPermission(['can_manage_customers', 'can_manage_weight_classes']);
-  const canExportData = hasPermission('can_export_data');
 
   return (
     <div className="app">
@@ -111,11 +109,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           <li>
             <Link to="/tally-sessions">Tally Sessions</Link>
           </li>
-          {canExportData && (
-            <li>
-              <Link to="/export">Export</Link>
-            </li>
-          )}
           {canManageRoles && (
             <>
               <li>
@@ -184,14 +177,6 @@ function App() {
                     <Route path="/tally-sessions" element={<TallySessions />} />
                     <Route path="/tally-sessions/:id" element={<TallySessionDetail />} />
                     <Route path="/tally-sessions/:id/logs" element={<TallySessionLogs />} />
-                    <Route
-                      path="/export"
-                      element={
-                        <PermissionRoute permission="can_export_data">
-                          <ExportPage />
-                        </PermissionRoute>
-                      }
-                    />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/roles" element={<Roles />} />
                     <Route path="/roles/:id" element={<RoleEdit />} />

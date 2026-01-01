@@ -1793,8 +1793,12 @@ function TallyScreen(props?: TallyScreenProps) {
                           const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                           if (!wc) return null;
                           
-                          const requiredBags = allocation.required_bags || 0;
+                          // Always use log entry counts as single source of truth
                           const roleEntryCount = getEntryCountForWeightClassification(allocation.weight_classification_id);
+                          const requiredBags = Number(allocation.required_bags ?? 0);
+
+                          const isOverAllocated = requiredBags > 0 && roleEntryCount > requiredBags;
+                          const isFulfilled = requiredBags > 0 && roleEntryCount >= requiredBags;
                           const sum = getSumForWeightClassification(allocation.weight_classification_id);
                           const totalHeads = getTotalHeadsForWeightClassification(allocation.weight_classification_id);
                           
@@ -1806,7 +1810,11 @@ function TallyScreen(props?: TallyScreenProps) {
                               <Text style={[
                                 dynamicStyles.summaryCell,
                                 { flex: 1.5 },
-                                roleEntryCount > requiredBags && { color: '#e74c3c' }
+                                isOverAllocated 
+                                  ? { color: '#e67e22', fontWeight: '600' } 
+                                  : isFulfilled 
+                                    ? { color: '#27ae60', fontWeight: '600' } 
+                                    : {}
                               ]}>
                                 {requiredBags > 0 ? `${roleEntryCount} / ${requiredBags}` : `${requiredBags} req`}
                               </Text>
