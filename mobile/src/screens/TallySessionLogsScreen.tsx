@@ -876,8 +876,12 @@ function TallySessionLogsScreen() {
       <View style={dynamicStyles.header}>
         <TouchableOpacity 
           onPress={() => {
-            // UI back button always goes back to previous screen (e.g., TallySessionDetail)
-            navigation.goBack();
+            // UI back button always goes back to TallySessionDetail screen
+            if (sessionId) {
+              navigation.navigate('TallySessionDetail' as never, { sessionId } as never);
+            } else {
+              navigation.goBack();
+            }
           }} 
           style={styles.backButton}
         >

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, StackActions } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -90,7 +90,24 @@ function MainTabs() {
         <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       )}
       {isTabVisible('Sessions') && (
-        <Tab.Screen name="Sessions" component={SessionsStack} options={{ headerShown: false }} />
+        <Tab.Screen 
+          name="Sessions" 
+          component={SessionsStack} 
+          options={{ headerShown: false }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset the stack to the initial screen when Sessions tab is pressed
+              const state = navigation.getState();
+              const sessionsRoute = state.routes.find((r) => r.name === 'Sessions');
+              if (sessionsRoute?.state) {
+                navigation.dispatch({
+                  ...StackActions.popToTop(),
+                  target: sessionsRoute.state.key,
+                });
+              }
+            },
+          })}
+        />
       )}
       {isTabVisible('Tally') && (
         <Tab.Screen name="Tally" component={TallyTabScreen} options={{ headerShown: false }} />
