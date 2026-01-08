@@ -96,6 +96,8 @@ function TallyScreen(props?: TallyScreenProps) {
   const [quantityInput, setQuantityInput] = useState('1');
   const [byproductHeadsInput, setByproductHeadsInput] = useState('15');
   const [quantityModalHeadsInput, setQuantityModalHeadsInput] = useState('15');
+  const [byproductWeightInput, setByproductWeightInput] = useState('1');
+  const [quantityModalWeightInput, setQuantityModalWeightInput] = useState('1');
   const [useCustomHeads, setUseCustomHeads] = useState(false);
   const [quantityModalUseCustomHeads, setQuantityModalUseCustomHeads] = useState(false);
   
@@ -743,6 +745,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
     // Use custom heads if toggle is enabled, otherwise use weight classification's default_heads
     let heads: number;
+    let weight: number;
     if (useCustomHeads) {
       // Validate heads input when using custom heads
       const parsedHeads = parseFloat(byproductHeadsInput);
@@ -751,9 +754,19 @@ function TallyScreen(props?: TallyScreenProps) {
         return;
       }
       heads = parsedHeads;
+      
+      // Validate weight input when using manual input
+      const parsedWeight = parseFloat(byproductWeightInput);
+      if (isNaN(parsedWeight) || parsedWeight <= 0) {
+        Alert.alert('Error', 'Please enter a valid weight (must be greater than 0)');
+        return;
+      }
+      weight = parsedWeight;
     } else {
       // Use weight classification's default_heads
       heads = wc.default_heads ?? 15;
+      // Use default weight of 1 when manual input is disabled
+      weight = 1;
     }
 
     const allocation = getCurrentAllocation(wcId);
@@ -773,7 +786,7 @@ function TallyScreen(props?: TallyScreenProps) {
           },
           {
             text: 'Yes, Add It',
-            onPress: () => createByproductLogEntry(wcId, heads),
+            onPress: () => createByproductLogEntry(wcId, heads, weight),
           },
         ]
       );
@@ -800,7 +813,7 @@ function TallyScreen(props?: TallyScreenProps) {
             },
             {
               text: 'Proceed',
-              onPress: () => createByproductLogEntry(wcId, heads),
+              onPress: () => createByproductLogEntry(wcId, heads, weight),
             },
           ]
         );
@@ -808,15 +821,15 @@ function TallyScreen(props?: TallyScreenProps) {
       }
     }
 
-    createByproductLogEntry(wcId, heads);
+    createByproductLogEntry(wcId, heads, weight);
 
-    async function createByproductLogEntry(wcId: number, heads: number) {
+    async function createByproductLogEntry(wcId: number, heads: number, weight: number) {
       setIsSubmitting(true);
       try {
         await tallyLogEntriesApi.create(sessionId, {
           weight_classification_id: wcId,
           role: tallyRole as TallyLogEntryRole,
-          weight: 1,
+          weight: weight,
           heads: heads,
           notes: null,
         });
@@ -866,6 +879,7 @@ function TallyScreen(props?: TallyScreenProps) {
 
     // Use custom heads if toggle is enabled, otherwise use weight classification's default_heads
     let heads: number;
+    let weight: number;
     if (quantityModalUseCustomHeads) {
       // Validate heads input when using custom heads
       const parsedHeads = parseFloat(quantityModalHeadsInput);
@@ -874,9 +888,19 @@ function TallyScreen(props?: TallyScreenProps) {
         return;
       }
       heads = parsedHeads;
+      
+      // Validate weight input when using manual input
+      const parsedWeight = parseFloat(quantityModalWeightInput);
+      if (isNaN(parsedWeight) || parsedWeight <= 0) {
+        Alert.alert('Error', 'Please enter a valid weight (must be greater than 0)');
+        return;
+      }
+      weight = parsedWeight;
     } else {
       // Use weight classification's default_heads
       heads = wc.default_heads ?? 15;
+      // Use default weight of 1 when manual input is disabled
+      weight = 1;
     }
 
     if (!sessionId) {
@@ -900,7 +924,7 @@ function TallyScreen(props?: TallyScreenProps) {
           },
           {
             text: 'Yes, Add It',
-            onPress: () => createQuantityLogEntries(quantity, heads),
+            onPress: () => createQuantityLogEntries(quantity, heads, weight),
           },
         ]
       );
@@ -930,7 +954,7 @@ function TallyScreen(props?: TallyScreenProps) {
             },
             {
               text: 'Proceed',
-              onPress: () => createQuantityLogEntries(quantity, heads),
+              onPress: () => createQuantityLogEntries(quantity, heads, weight),
             },
           ]
         );
@@ -939,9 +963,9 @@ function TallyScreen(props?: TallyScreenProps) {
     }
 
     // No over-allocation, proceed directly
-    createQuantityLogEntries(quantity, heads);
+    createQuantityLogEntries(quantity, heads, weight);
 
-    async function createQuantityLogEntries(quantity: number, heads: number) {
+    async function createQuantityLogEntries(quantity: number, heads: number, weight: number) {
       setIsSubmitting(true);
       try {
         if (!selectedByproductId) {
@@ -949,12 +973,12 @@ function TallyScreen(props?: TallyScreenProps) {
         }
         
         // Create log entries sequentially to avoid race conditions
-        // Each entry has weight = 1, and the backend counts each entry as 1 bag
+        // Each entry uses the specified weight, and the backend counts each entry as 1 bag
         for (let i = 0; i < quantity; i++) {
           await tallyLogEntriesApi.create(sessionId, {
             weight_classification_id: selectedByproductId,
             role: tallyRole as TallyLogEntryRole,
-            weight: 1,
+            weight: weight,
             heads: heads,
             notes: null,
           });
@@ -978,6 +1002,9 @@ function TallyScreen(props?: TallyScreenProps) {
           setShowQuantityModal(false);
           setSelectedByproductId(null);
           setQuantityInput('1');
+          setQuantityModalHeadsInput('15');
+          setQuantityModalWeightInput('1');
+          setQuantityModalUseCustomHeads(false);
         }, 0);
       } catch (error: any) {
         const errorMessage = formatApiErrorMessage(
@@ -1272,7 +1299,7 @@ function TallyScreen(props?: TallyScreenProps) {
           <View style={{ marginBottom: responsive.spacing.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: useCustomHeads ? responsive.spacing.sm : 0 }}>
               <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', flex: 1 }}>
-                Use Custom Heads:
+                Manual Input:
               </Text>
               <TouchableOpacity
                 style={[
@@ -1301,31 +1328,58 @@ function TallyScreen(props?: TallyScreenProps) {
               </TouchableOpacity>
             </View>
             {useCustomHeads && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
-                <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
-                  Heads:
-                </Text>
-                <TextInput
-                  style={[
-                    {
-                      flex: 1,
-                      borderWidth: 1,
-                      borderColor: '#bdc3c7',
-                      borderRadius: 4,
-                      padding: responsive.padding.small,
-                      backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
-                      fontSize: responsive.fontSize.medium,
-                      color: '#2c3e50',
-                    },
-                    disabledInputStyle
-                  ]}
-                  value={byproductHeadsInput}
-                  onChangeText={setByproductHeadsInput}
-                  keyboardType="numeric"
-                  placeholder="15"
-                  editable={canStartTally}
-                />
-              </View>
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: responsive.spacing.xs }}>
+                  <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
+                    Heads:
+                  </Text>
+                  <TextInput
+                    style={[
+                      {
+                        flex: 1,
+                        borderWidth: 1,
+                        borderColor: '#bdc3c7',
+                        borderRadius: 4,
+                        padding: responsive.padding.small,
+                        backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
+                        fontSize: responsive.fontSize.medium,
+                        color: '#2c3e50',
+                      },
+                      disabledInputStyle
+                    ]}
+                    value={byproductHeadsInput}
+                    onChangeText={setByproductHeadsInput}
+                    keyboardType="numeric"
+                    placeholder="15"
+                    editable={canStartTally}
+                  />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm }}>
+                  <Text style={{ fontSize: responsive.fontSize.small, color: '#2c3e50', fontWeight: '600', minWidth: 60 }}>
+                    Weight:
+                  </Text>
+                  <TextInput
+                    style={[
+                      {
+                        flex: 1,
+                        borderWidth: 1,
+                        borderColor: '#bdc3c7',
+                        borderRadius: 4,
+                        padding: responsive.padding.small,
+                        backgroundColor: canStartTally ? '#fff' : '#f5f5f5',
+                        fontSize: responsive.fontSize.medium,
+                        color: '#2c3e50',
+                      },
+                      disabledInputStyle
+                    ]}
+                    value={byproductWeightInput}
+                    onChangeText={setByproductWeightInput}
+                    keyboardType="numeric"
+                    placeholder="1"
+                    editable={canStartTally}
+                  />
+                </View>
+              </>
             )}
           </View>
           <View style={[dynamicStyles.summaryTable, { flex: 1 }]}>
@@ -1963,6 +2017,7 @@ function TallyScreen(props?: TallyScreenProps) {
           setSelectedByproductId(null);
           setQuantityInput('1');
           setQuantityModalHeadsInput('15');
+          setQuantityModalWeightInput('1');
           setQuantityModalUseCustomHeads(false);
         }}
       >
@@ -2022,7 +2077,7 @@ function TallyScreen(props?: TallyScreenProps) {
             {/* Custom Heads Toggle */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: quantityModalUseCustomHeads ? responsive.spacing.sm : responsive.spacing.lg }}>
               <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, flex: 1 }]}>
-                Use Custom Heads:
+                Manual Input:
               </Text>
               <TouchableOpacity
                 style={{
@@ -2052,10 +2107,20 @@ function TallyScreen(props?: TallyScreenProps) {
                   Heads:
                 </Text>
                 <TextInput
-                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.md }]}
                   placeholder="Enter heads"
                   value={quantityModalHeadsInput}
                   onChangeText={setQuantityModalHeadsInput}
+                  keyboardType="numeric"
+                />
+                <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
+                  Weight:
+                </Text>
+                <TextInput
+                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+                  placeholder="Enter weight"
+                  value={quantityModalWeightInput}
+                  onChangeText={setQuantityModalWeightInput}
                   keyboardType="numeric"
                 />
               </>
@@ -2069,6 +2134,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   setSelectedByproductId(null);
                   setQuantityInput('1');
                   setQuantityModalHeadsInput('15');
+                  setQuantityModalWeightInput('1');
                   setQuantityModalUseCustomHeads(false);
                 }}
               >
