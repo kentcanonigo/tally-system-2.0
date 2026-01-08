@@ -2022,15 +2022,15 @@ function TallyScreen(props?: TallyScreenProps) {
         }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: responsive.isTablet ? 400 : '90%', padding: responsive.padding.large }]}>
-            <Text style={[styles.modalTitle, { fontSize: responsive.fontSize.large, marginBottom: responsive.spacing.md }]}>
+          <View style={[styles.modalContent, { width: responsive.isTablet ? 400 : '90%', padding: responsive.padding.medium }]}>
+            <Text style={[styles.modalTitle, { fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.sm }]}>
               Add Quantity
             </Text>
 
             <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}>
               Select Byproduct:
             </Text>
-            <ScrollView style={{ maxHeight: 200, marginBottom: responsive.spacing.md }}>
+            <ScrollView style={{ maxHeight: 150, marginBottom: responsive.spacing.sm }}>
               {filteredAllocations.map((allocation) => {
                 const wc = weightClassifications.find((wc) => wc.id === allocation.weight_classification_id);
                 if (!wc) return null;
@@ -2040,7 +2040,7 @@ function TallyScreen(props?: TallyScreenProps) {
                     style={[
                       styles.modalOption,
                       selectedByproductId === wc.id && styles.modalOptionSelected,
-                      { padding: responsive.padding.medium }
+                      { padding: responsive.padding.small }
                     ]}
                     onPress={() => {
                       setSelectedByproductId(wc.id);
@@ -2067,7 +2067,7 @@ function TallyScreen(props?: TallyScreenProps) {
               Quantity:
             </Text>
             <TextInput
-              style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.md }]}
+              style={[styles.modalInput, { padding: responsive.padding.small, fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.sm }]}
               placeholder="Enter quantity"
               value={quantityInput}
               onChangeText={setQuantityInput}
@@ -2075,7 +2075,7 @@ function TallyScreen(props?: TallyScreenProps) {
             />
 
             {/* Custom Heads Toggle */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.sm, marginBottom: quantityModalUseCustomHeads ? responsive.spacing.sm : responsive.spacing.lg }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: responsive.spacing.xs, marginBottom: quantityModalUseCustomHeads ? responsive.spacing.xs : responsive.spacing.sm }}>
               <Text style={[styles.modalLabel, { fontSize: responsive.fontSize.small, flex: 1 }]}>
                 Manual Input:
               </Text>
@@ -2107,7 +2107,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   Heads:
                 </Text>
                 <TextInput
-                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.md }]}
+                  style={[styles.modalInput, { padding: responsive.padding.small, fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.xs }]}
                   placeholder="Enter heads"
                   value={quantityModalHeadsInput}
                   onChangeText={setQuantityModalHeadsInput}
@@ -2117,7 +2117,7 @@ function TallyScreen(props?: TallyScreenProps) {
                   Weight:
                 </Text>
                 <TextInput
-                  style={[styles.modalInput, { padding: responsive.padding.medium, fontSize: responsive.fontSize.medium, marginBottom: responsive.spacing.lg }]}
+                  style={[styles.modalInput, { padding: responsive.padding.small, fontSize: responsive.fontSize.small, marginBottom: responsive.spacing.sm }]}
                   placeholder="Enter weight"
                   value={quantityModalWeightInput}
                   onChangeText={setQuantityModalWeightInput}
@@ -2126,9 +2126,9 @@ function TallyScreen(props?: TallyScreenProps) {
               </>
             )}
 
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: responsive.spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: responsive.spacing.xs, marginTop: responsive.spacing.xs }}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancelButton, { padding: responsive.padding.medium }]}
+                style={[styles.modalButton, styles.modalCancelButton, { paddingVertical: responsive.padding.small, paddingHorizontal: responsive.padding.medium }]}
                 onPress={() => {
                   setShowQuantityModal(false);
                   setSelectedByproductId(null);
@@ -2144,7 +2144,7 @@ function TallyScreen(props?: TallyScreenProps) {
                 style={[
                   styles.modalButton,
                   styles.modalSubmitButton,
-                  { padding: responsive.padding.medium },
+                  { paddingVertical: responsive.padding.small, paddingHorizontal: responsive.padding.medium },
                   isSubmitting && { opacity: 0.6 }
                 ]}
                 onPress={handleQuantitySubmit}
