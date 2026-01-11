@@ -250,6 +250,7 @@ export interface User {
   active_plant_id?: number | null;
   acceptable_difference_threshold?: number;
   visible_tabs?: string[] | null;
+  classification_order?: { [category: string]: number[] } | null;
 }
 
 export interface LoginRequest {

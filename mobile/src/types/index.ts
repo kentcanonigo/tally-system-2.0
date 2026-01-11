@@ -144,6 +144,7 @@ export interface User {
   active_plant_id?: number | null;
   acceptable_difference_threshold?: number;
   visible_tabs?: string[] | null;
+  classification_order?: { [category: string]: number[] } | null;
 }
 
 export interface UserPreferencesUpdate {
@@ -151,6 +152,7 @@ export interface UserPreferencesUpdate {
   active_plant_id?: number;
   acceptable_difference_threshold?: number;
   visible_tabs?: string[];
+  classification_order?: { [category: string]: number[] };
 }
 
 export interface LoginRequest {

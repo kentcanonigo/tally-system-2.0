@@ -27,6 +27,7 @@ class User(Base):
     active_plant_id = Column(Integer, nullable=True)
     acceptable_difference_threshold = Column(Integer, nullable=False, default=0)
     visible_tabs = Column(JSON, nullable=True, default=None)  # JSON array of visible tab names
+    classification_order = Column(JSON, nullable=True, default=None)  # JSON object: { "Dressed": [id1, id2, ...], "Frozen": [...], "Byproduct": [...] }
 
     # Relationships
     plant_permissions = relationship("PlantPermission", back_populates="user", cascade="all, delete-orphan")

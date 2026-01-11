@@ -26,6 +26,7 @@ import { TallySession, Customer } from '../types';
 import { usePlant } from '../contexts/PlantContext';
 import { usePermissions } from '../utils/usePermissions';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { getActiveSessions } from '../utils/activeSessions';
 import { colors } from '../theme/colors';
@@ -34,6 +35,7 @@ const ExportScreen = () => {
   const { activePlantId } = usePlant();
   const { hasPermission } = usePermissions();
   const { timezone } = useTimezone();
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
   const [filteredSessions, setFilteredSessions] = useState<TallySession[]>([]);
@@ -403,7 +405,7 @@ const ExportScreen = () => {
       });
 
       if (format === 'pdf') {
-        const html = generateTallySheetHTML(response.data);
+        const html = generateTallySheetHTML(response.data, true, user?.classification_order || undefined);
         const { uri } = await printToFileAsync({
           html,
           base64: false
@@ -444,7 +446,7 @@ const ExportScreen = () => {
 
         await shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf' });
       } else {
-        await generateTallySheetExcel(response.data);
+        await generateTallySheetExcel(response.data, true, user?.classification_order || undefined);
       }
     } catch (error) {
       console.error('Tally sheet export error:', error);

@@ -11,6 +11,7 @@ import { plantsApi, rolesApi, setApiBaseUrl, getCurrentApiBaseUrl } from '../ser
 import { Plant, Role } from '../types';
 import { colors } from '../theme/colors';
 import { LoadingScreen } from '../components/LoadingScreen';
+import { ClassificationOrderDialog } from '../components/ClassificationOrderDialog';
 
 // Available tabs that can be shown/hidden
 const AVAILABLE_TABS = [
@@ -57,6 +58,9 @@ function SettingsScreen() {
   // API URL state
   const [apiUrl, setApiUrl] = useState<string>('');
   const [isLoadingApiUrl, setIsLoadingApiUrl] = useState(false);
+  
+  // Classification order dialog state
+  const [showClassificationOrderDialog, setShowClassificationOrderDialog] = useState(false);
 
   // Update state when user data changes
   useEffect(() => {
@@ -558,6 +562,24 @@ function SettingsScreen() {
       </View>
 
       <View style={dynamicStyles.section}>
+        <Text style={dynamicStyles.sectionTitle}>Export Settings</Text>
+        <Text style={dynamicStyles.label}>
+          Customize the order of classifications in tally sheet grand totals:
+        </Text>
+
+        <TouchableOpacity
+          style={[dynamicStyles.saveButton, { backgroundColor: colors.primary, marginTop: 8 }]}
+          onPress={() => setShowClassificationOrderDialog(true)}
+        >
+          <Text style={dynamicStyles.saveButtonText}>Customize Classification Order</Text>
+        </TouchableOpacity>
+
+        <Text style={dynamicStyles.infoText}>
+          Reorder classifications within each category (Dressed, Frozen, Byproduct) to control how they appear in exported tally sheets.
+        </Text>
+      </View>
+
+      <View style={dynamicStyles.section}>
         <Text style={dynamicStyles.sectionTitle}>API URL (Testing)</Text>
         <Text style={dynamicStyles.label}>
           Manually set the API base URL for testing (client-only, not synced):
@@ -854,6 +876,12 @@ function SettingsScreen() {
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* Classification Order Dialog */}
+      <ClassificationOrderDialog
+        visible={showClassificationOrderDialog}
+        onClose={() => setShowClassificationOrderDialog(false)}
+      />
       </ScrollView>
     </SafeAreaView>
   );

@@ -73,6 +73,86 @@ const formatNumber = (value: number, decimals: number = 2): string => {
   return value.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
+// Default order for classifications (case-insensitive matching)
+const DEFAULT_DRESSED_ORDER = ['Dressed Chicken', 'os', 'p4', 'p3', 'p2', 'p1', 'us', 'SQ', 'cb'];
+const DEFAULT_BYPRODUCT_ORDER = ['lv', 'gz', 'si', 'ft', 'hd', 'pv', 'bld'];
+
+const getDefaultOrder = (category: string): string[] => {
+  if (category === 'Dressed') return DEFAULT_DRESSED_ORDER;
+  if (category === 'Byproduct') return DEFAULT_BYPRODUCT_ORDER;
+  return []; // Frozen: alphabetical
+};
+
+// Sort classifications by custom order or default order
+const sortClassifications = <T extends { classification_id: number; classification: string }>(
+  items: T[],
+  category: 'Dressed' | 'Frozen' | 'Byproduct',
+  customOrder?: { [category: string]: number[] }
+): T[] => {
+  const categoryOrder = customOrder?.[category];
+  
+  if (categoryOrder && categoryOrder.length > 0) {
+    // Use custom order
+    const itemMap = new Map(items.map(item => [item.classification_id, item]));
+    const ordered: T[] = [];
+    const unordered: T[] = [];
+
+    // Add items in custom order
+    for (const id of categoryOrder) {
+      const item = itemMap.get(id);
+      if (item) {
+        ordered.push(item);
+        itemMap.delete(id);
+      }
+    }
+
+    // Add remaining items alphabetically
+    for (const item of itemMap.values()) {
+      unordered.push(item);
+    }
+    unordered.sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+
+    return [...ordered, ...unordered];
+  }
+
+  // Use default order
+  const defaultOrder = getDefaultOrder(category);
+  if (defaultOrder.length === 0) {
+    // Alphabetical for Frozen
+    return [...items].sort((a, b) => 
+      a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+    );
+  }
+
+  const ordered: T[] = [];
+  const unordered: T[] = [];
+  const lowerDefaultOrder = defaultOrder.map(c => c.toLowerCase());
+
+  // Add classifications in default order
+  for (const defaultClass of lowerDefaultOrder) {
+    const found = items.find(item => 
+      item.classification.toLowerCase() === defaultClass
+    );
+    if (found) {
+      ordered.push(found);
+    }
+  }
+
+  // Add remaining classifications alphabetically
+  for (const item of items) {
+    if (!ordered.find(o => o.classification_id === item.classification_id)) {
+      unordered.push(item);
+    }
+  }
+  unordered.sort((a, b) => 
+    a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+  );
+
+  return [...ordered, ...unordered];
+};
+
 // Calculate grand totals by classification across all customers, grouped by category
 const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): Map<number, TallySheetSummaryWithCategory> => {
   const totalsMap = new Map<number, TallySheetSummaryWithCategory>();
@@ -118,7 +198,11 @@ const calculateGrandTotalsByClassification = (customers: TallySheetResponse[]): 
   return totalsMap;
 };
 
-export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMultiCustomerResponse, showGrandTotal: boolean = true) => {
+export const generateTallySheetPDF = (
+  data: TallySheetResponse | TallySheetMultiCustomerResponse, 
+  showGrandTotal: boolean = true,
+  classificationOrder?: { [category: string]: number[] }
+) => {
   // Check if it's a multi-customer response
   const isMultiCustomer = 'customers' in data;
   let customers: TallySheetResponse[] = isMultiCustomer ? (data as TallySheetMultiCustomerResponse).customers : [data as TallySheetResponse];
@@ -397,10 +481,12 @@ export const generateTallySheetPDF = (data: TallySheetResponse | TallySheetMulti
         totalsByCategory[summary.category].push(summary);
       });
     
-    // Sort each category by classification name
+    // Sort each category by custom order or default order
     Object.keys(totalsByCategory).forEach(category => {
-      totalsByCategory[category as keyof typeof totalsByCategory].sort((a, b) =>
-        a.classification.localeCompare(b.classification, undefined, { sensitivity: 'base' })
+      totalsByCategory[category as keyof typeof totalsByCategory] = sortClassifications(
+        totalsByCategory[category as keyof typeof totalsByCategory],
+        category as 'Dressed' | 'Frozen' | 'Byproduct',
+        classificationOrder
       );
     });
     

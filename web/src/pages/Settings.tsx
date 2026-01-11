@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { consoleApi, authApi } from '../services/api';
+import { ClassificationOrderDialog } from '../components/ClassificationOrderDialog';
 
 const ACCEPTABLE_DIFFERENCE_THRESHOLD_KEY = 'tally_system_acceptable_difference_threshold';
 const DEFAULT_THRESHOLD = 0;
@@ -55,6 +56,9 @@ function Settings() {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [consoleMessage, setConsoleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Classification order dialog state
+  const [showClassificationOrderDialog, setShowClassificationOrderDialog] = useState(false);
 
   useEffect(() => {
     loadThreshold();
@@ -274,6 +278,23 @@ function Settings() {
           )}
         </div>
 
+        <h2 style={{ marginBottom: '20px', marginTop: '40px', color: '#2c3e50' }}>Export Settings</h2>
+        <div className="form-group">
+          <label>Classification Order</label>
+          <p style={{ color: '#7f8c8d', fontSize: '14px', marginBottom: '10px' }}>
+            Customize the order of classifications in tally sheet grand totals:
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowClassificationOrderDialog(true)}
+          >
+            Customize Classification Order
+          </button>
+          <p style={{ color: '#7f8c8d', fontSize: '14px', marginTop: '10px', fontStyle: 'italic' }}>
+            Reorder classifications within each category (Dressed, Frozen, Byproduct) to control how they appear in exported tally sheets.
+          </p>
+        </div>
+
         {(isAdmin || isSuperadmin) && (
           <>
             <h2 style={{ marginBottom: '20px', marginTop: '40px', color: '#2c3e50' }}>Admin Console</h2>
@@ -471,6 +492,13 @@ function Settings() {
           </div>
         </div>
       )}
+
+      {/* Classification Order Dialog */}
+      <ClassificationOrderDialog
+        visible={showClassificationOrderDialog}
+        onClose={() => setShowClassificationOrderDialog(false)}
+        activePlantId={user?.active_plant_id || null}
+      />
     </div>
   );
 }

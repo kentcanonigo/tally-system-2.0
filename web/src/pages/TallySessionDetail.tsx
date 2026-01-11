@@ -12,7 +12,7 @@ import { TallyLogEntryRole as RoleEnum } from '../types';
 import { getAcceptableDifferenceThreshold } from '../utils/settings';
 
 function TallySessionDetail() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const timezone = useTimezone();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -253,9 +253,9 @@ function TallySessionDetail() {
       
       // Show grand total for single customer as well
       if (format === 'pdf') {
-        generateTallySheetPDF(customerData, true);
+        generateTallySheetPDF(customerData, true, user?.classification_order || undefined);
       } else {
-        await generateTallySheetExcel(customerData, true);
+        await generateTallySheetExcel(customerData, true, user?.classification_order || undefined);
       }
     } catch (error: any) {
       console.error('Tally sheet export error:', error);

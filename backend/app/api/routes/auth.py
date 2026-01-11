@@ -4,8 +4,9 @@ from ...database import get_db
 from ...schemas.user import UserLogin, Token, UserResponse, UserPreferencesUpdate
 from ...crud import user as user_crud
 from ...auth.jwt import create_access_token
-from ...auth.dependencies import get_current_user
+from ...auth.dependencies import get_current_user, get_user_accessible_plant_ids, user_has_role
 from ...models import User
+from ...models.weight_classification import WeightClassification
 
 router = APIRouter()
 
@@ -86,7 +87,8 @@ async def get_current_user_info(
         timezone=current_user.timezone,
         active_plant_id=current_user.active_plant_id,
         acceptable_difference_threshold=current_user.acceptable_difference_threshold,
-        visible_tabs=current_user.visible_tabs
+        visible_tabs=current_user.visible_tabs,
+        classification_order=current_user.classification_order
     )
     
     return user_response
@@ -96,15 +98,17 @@ async def get_current_user_info(
 async def update_user_preferences(
     preferences: UserPreferencesUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    accessible_plant_ids: list[int] = Depends(get_user_accessible_plant_ids)
 ):
     """
-    Update current user's preferences (timezone, active plant, difference threshold).
+    Update current user's preferences (timezone, active plant, difference threshold, classification order).
     
     Args:
         preferences: User preferences to update
         current_user: Current authenticated user from JWT token
         db: Database session
+        accessible_plant_ids: List of plant IDs the user has access to
     
     Returns:
         Updated user information
@@ -133,6 +137,59 @@ async def update_user_preferences(
             )
         current_user.visible_tabs = preferences.visible_tabs
     
+    if preferences.classification_order is not None:
+        # Validate classification_order structure and access
+        if not isinstance(preferences.classification_order, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="classification_order must be a dictionary"
+            )
+        
+        # Collect all classification IDs from all categories
+        all_classification_ids = []
+        for category, classification_ids in preferences.classification_order.items():
+            if not isinstance(classification_ids, list):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"classification_order['{category}'] must be a list of integers"
+                )
+            if not all(isinstance(id, int) for id in classification_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"classification_order['{category}'] must contain only integers"
+                )
+            all_classification_ids.extend(classification_ids)
+        
+        # Validate that all classification IDs belong to plants the user has access to
+        if all_classification_ids:
+            # Get all classifications with their plant IDs
+            classifications = db.query(WeightClassification).filter(
+                WeightClassification.id.in_(all_classification_ids)
+            ).all()
+            
+            # Check if all IDs exist
+            found_ids = {wc.id for wc in classifications}
+            missing_ids = set(all_classification_ids) - found_ids
+            if missing_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Classification IDs not found: {sorted(missing_ids)}"
+                )
+            
+            # Check plant access (superadmins have access to all plants)
+            if not user_has_role(current_user, 'SUPERADMIN'):
+                invalid_classifications = [
+                    wc.id for wc in classifications 
+                    if wc.plant_id not in accessible_plant_ids
+                ]
+                if invalid_classifications:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You don't have access to classifications from these plants: {sorted(invalid_classifications)}"
+                    )
+        
+        current_user.classification_order = preferences.classification_order
+    
     db.commit()
     db.refresh(current_user)
     
@@ -155,6 +212,7 @@ async def update_user_preferences(
         timezone=current_user.timezone,
         active_plant_id=current_user.active_plant_id,
         acceptable_difference_threshold=current_user.acceptable_difference_threshold,
-        visible_tabs=current_user.visible_tabs
+        visible_tabs=current_user.visible_tabs,
+        classification_order=current_user.classification_order
     )
 

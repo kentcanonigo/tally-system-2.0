@@ -203,7 +203,7 @@ export const consoleApi = {
 
 // Auth API
 export const authApi = {
-  updatePreferences: (preferences: { timezone?: string; active_plant_id?: number | null; acceptable_difference_threshold?: number; visible_tabs?: string[] | null }) =>
+  updatePreferences: (preferences: { timezone?: string; active_plant_id?: number | null; acceptable_difference_threshold?: number; visible_tabs?: string[] | null; classification_order?: { [category: string]: number[] } }) =>
     api.put<User>('/auth/me/preferences', preferences),
 };
 

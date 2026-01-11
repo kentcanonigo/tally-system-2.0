@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic_core import PydanticCustomError
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from ..models.user import UserRole
 import re
@@ -127,6 +127,7 @@ class UserResponse(BaseModel):
     active_plant_id: Optional[int] = None
     acceptable_difference_threshold: int = 0
     visible_tabs: Optional[List[str]] = None  # List of visible tab names
+    classification_order: Optional[Dict[str, List[int]]] = None  # JSON object: { "Dressed": [id1, id2, ...], "Frozen": [...], "Byproduct": [...] }
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,6 +152,7 @@ class UserPreferencesUpdate(BaseModel):
     active_plant_id: Optional[int] = None
     acceptable_difference_threshold: Optional[int] = None
     visible_tabs: Optional[List[str]] = None  # List of visible tab names
+    classification_order: Optional[Dict[str, List[int]]] = None  # JSON object: { "Dressed": [id1, id2, ...], "Frozen": [...], "Byproduct": [...] }
     
     model_config = ConfigDict(from_attributes=True)
 

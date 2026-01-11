@@ -16,7 +16,7 @@ import { TallyLogEntryRole as RoleEnum } from '../types';
 type CalendarValue = Date | [Date, Date] | [Date | null, Date | null] | null;
 
 function TallySessions() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const timezone = useTimezone();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
@@ -383,12 +383,13 @@ function TallySessions() {
       
       // Pass all customers data to generators - always show grand total category table
       const showGrandTotal = true;
+      const classificationOrder = user?.classification_order || undefined;
       if (format === 'pdf') {
         // Pass multi-customer response to generate single PDF with all customers
-        generateTallySheetPDF({ customers: customersWithData }, showGrandTotal);
+        generateTallySheetPDF({ customers: customersWithData }, showGrandTotal, classificationOrder);
       } else {
         // Pass multi-customer response to generate single Excel file with all customers
-        await generateTallySheetExcel({ customers: customersWithData }, showGrandTotal);
+        await generateTallySheetExcel({ customers: customersWithData }, showGrandTotal, classificationOrder);
       }
     } catch (error: any) {
       console.error('Tally sheet export failed', error);
