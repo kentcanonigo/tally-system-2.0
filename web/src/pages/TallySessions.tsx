@@ -21,6 +21,7 @@ function TallySessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TallySession[]>([]);
   const [allSessions, setAllSessions] = useState<TallySession[]>([]); // Store all sessions for filtering
+  const [sessionDates, setSessionDates] = useState<string[]>([]); // Store dates that have sessions
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,13 @@ function TallySessions() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Fetch session dates when calendar is opened
+  useEffect(() => {
+    if (showCalendar) {
+      fetchSessionDates();
+    }
+  }, [showCalendar, filters]);
 
   useEffect(() => {
     setCurrentPage(1); // Reset to page 1 when filters change
@@ -106,14 +114,23 @@ function TallySessions() {
     return sorted;
   }, [sortBy, sortOrder]);
 
+  // Helper function to format a Date object as YYYY-MM-DD in local timezone (no UTC conversion)
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Filter and sort sessions by selected date
   useEffect(() => {
     let filtered = allSessions;
     
     if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(selectedDate);
       filtered = allSessions.filter((session) => {
-        const sessionDate = new Date(session.date).toISOString().split('T')[0];
+        // session.date is already a YYYY-MM-DD string from the backend
+        const sessionDate = session.date;
         return sessionDate === dateStr;
       });
     }
@@ -139,6 +156,21 @@ function TallySessions() {
       setPlants(plantsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
+    }
+  };
+
+  const fetchSessionDates = async () => {
+    try {
+      const params: any = {};
+      if (filters.customer_id) params.customer_id = Number(filters.customer_id);
+      if (filters.plant_id) params.plant_id = Number(filters.plant_id);
+      if (filters.status) params.status = filters.status;
+
+      const response = await tallySessionsApi.getDates(params);
+      setSessionDates(response.data);
+    } catch (error) {
+      console.error('Error fetching session dates:', error);
+      setSessionDates([]);
     }
   };
 
@@ -194,11 +226,8 @@ function TallySessions() {
   // Create tile content for calendar to mark dates with sessions
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view === 'month') {
-      const dateStr = date.toISOString().split('T')[0];
-      const hasSessions = allSessions.some((session) => {
-        const sessionDate = new Date(session.date).toISOString().split('T')[0];
-        return sessionDate === dateStr;
-      });
+      const dateStr = formatDateLocal(date);
+      const hasSessions = sessionDates.includes(dateStr);
       if (hasSessions) {
         return <div style={{ height: '4px', width: '4px', backgroundColor: '#db2175', borderRadius: '50%', margin: '2px auto' }} />;
       }
@@ -209,11 +238,8 @@ function TallySessions() {
   // Mark dates with sessions
   const tileClassName = ({ date, view }: { date: Date; view: string }) => {
     if (view === 'month') {
-      const dateStr = date.toISOString().split('T')[0];
-      const hasSessions = allSessions.some((session) => {
-        const sessionDate = new Date(session.date).toISOString().split('T')[0];
-        return sessionDate === dateStr;
-      });
+      const dateStr = formatDateLocal(date);
+      const hasSessions = sessionDates.includes(dateStr);
       if (hasSessions) {
         return 'has-sessions';
       }
@@ -234,7 +260,7 @@ function TallySessions() {
       return;
     }
     
-    if (selectedDate && selectedDate.toISOString().split('T')[0] === value.toISOString().split('T')[0]) {
+    if (selectedDate && formatDateLocal(selectedDate) === formatDateLocal(value)) {
       // If same date clicked, clear filter
       setSelectedDate(null);
     } else {
@@ -662,8 +688,8 @@ function TallySessions() {
             <button
               className="btn btn-secondary"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1 || loading}
-              style={{ opacity: (currentPage === 1 || loading) ? 0.5 : 1 }}
+              disabled={currentPage === 1 || loading || selectedDate !== null}
+              style={{ opacity: (currentPage === 1 || loading || selectedDate !== null) ? 0.5 : 1 }}
             >
               Previous
             </button>
@@ -673,8 +699,8 @@ function TallySessions() {
             <button
               className="btn btn-secondary"
               onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={(!hasMorePages && !selectedDate) || loading}
-              style={{ opacity: ((!hasMorePages && !selectedDate) || loading) ? 0.5 : 1 }}
+              disabled={!hasMorePages || loading || selectedDate !== null}
+              style={{ opacity: (!hasMorePages || loading || selectedDate !== null) ? 0.5 : 1 }}
             >
               Next
             </button>

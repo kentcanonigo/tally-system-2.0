@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
+from datetime import date
 from ..models.tally_session import TallySession
 from ..schemas.tally_session import TallySessionCreate, TallySessionUpdate
 
@@ -71,4 +72,30 @@ def delete_tally_session(db: Session, session_id: int) -> bool:
     db.delete(db_session)
     db.commit()
     return True
+
+
+def get_tally_session_dates(
+    db: Session,
+    customer_id: Optional[int] = None,
+    plant_id: Optional[int] = None,
+    status: Optional[str] = None,
+    accessible_plant_ids: Optional[List[int]] = None
+) -> List[date]:
+    """Get distinct dates that have tally sessions, optionally filtered by customer, plant, or status.
+    If accessible_plant_ids is provided, only returns dates for sessions in those plants."""
+    query = db.query(TallySession.date).distinct()
+    
+    if customer_id:
+        query = query.filter(TallySession.customer_id == customer_id)
+    if plant_id:
+        query = query.filter(TallySession.plant_id == plant_id)
+    if status:
+        query = query.filter(TallySession.status == status)
+    if accessible_plant_ids is not None:
+        query = query.filter(TallySession.plant_id.in_(accessible_plant_ids))
+    
+    # Order by date descending (most recent first)
+    results = query.order_by(TallySession.date.desc()).all()
+    # Extract date values from the result tuples
+    return [result[0] for result in results]
 

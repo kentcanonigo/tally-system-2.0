@@ -36,6 +36,35 @@ def read_tally_sessions(
     return tally_sessions
 
 
+@router.get("/tally-sessions/dates", response_model=List[str])
+def read_tally_session_dates(
+    customer_id: Optional[int] = Query(None),
+    plant_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
+):
+    """Get distinct dates that have tally sessions. Users only see dates for sessions in plants they have access to.
+    Returns a list of ISO date strings (YYYY-MM-DD format)."""
+    # Determine which plant IDs to filter by
+    plant_ids_to_filter = None
+    if not user_has_role(current_user, 'SUPERADMIN'):
+        plant_ids_to_filter = accessible_plant_ids
+    
+    # Get distinct dates
+    dates = crud.get_tally_session_dates(
+        db,
+        customer_id=customer_id,
+        plant_id=plant_id,
+        status=status,
+        accessible_plant_ids=plant_ids_to_filter
+    )
+    
+    # Convert date objects to ISO format strings (YYYY-MM-DD)
+    return [date_obj.isoformat() for date_obj in dates]
+
+
 @router.get("/tally-sessions/{session_id}", response_model=TallySessionResponse)
 def read_tally_session(
     session_id: int, 
