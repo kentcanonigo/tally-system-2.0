@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import date
 from ...database import get_db
 from ...schemas.tally_session import TallySessionCreate, TallySessionUpdate, TallySessionResponse, TallySessionStatus
 from ...crud import tally_session as crud
@@ -20,13 +21,14 @@ def read_tally_sessions(
     customer_id: Optional[int] = Query(None),
     plant_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
+    date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     accessible_plant_ids: List[int] = Depends(get_user_accessible_plant_ids)
 ):
     """Get tally sessions. Users only see sessions for plants they have access to."""
     tally_sessions = crud.get_tally_sessions(
-        db, skip=skip, limit=limit, customer_id=customer_id, plant_id=plant_id, status=status
+        db, skip=skip, limit=limit, customer_id=customer_id, plant_id=plant_id, status=status, date=date
     )
     
     # Filter by accessible plants for non-superadmins

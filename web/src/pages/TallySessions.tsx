@@ -68,6 +68,11 @@ function TallySessions() {
   }, [filters]);
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to page 1 when date filter changes
+    fetchSessions(1);
+  }, [selectedDate]);
+
+  useEffect(() => {
     fetchSessions(currentPage);
   }, [currentPage, itemsPerPage]);
 
@@ -122,29 +127,11 @@ function TallySessions() {
     return `${year}-${month}-${day}`;
   };
 
-  // Filter and sort sessions by selected date
+  // Sort sessions (backend now handles date filtering)
   useEffect(() => {
-    let filtered = allSessions;
-    
-    if (selectedDate) {
-      const dateStr = formatDateLocal(selectedDate);
-      filtered = allSessions.filter((session) => {
-        // session.date is already a YYYY-MM-DD string from the backend
-        const sessionDate = session.date;
-        return sessionDate === dateStr;
-      });
-    }
-    
-    const sorted = sortSessions(filtered);
+    const sorted = sortSessions(allSessions);
     setSessions(sorted);
-  }, [selectedDate, allSessions, sortSessions]);
-
-  // Reset to page 1 when date filter changes
-  useEffect(() => {
-    if (selectedDate !== null) {
-      setCurrentPage(1);
-    }
-  }, [selectedDate]);
+  }, [allSessions, sortSessions]);
 
   const fetchData = async () => {
     try {
@@ -181,6 +168,11 @@ function TallySessions() {
       if (filters.customer_id) params.customer_id = Number(filters.customer_id);
       if (filters.plant_id) params.plant_id = Number(filters.plant_id);
       if (filters.status) params.status = filters.status;
+      
+      // Add date filter if selected
+      if (selectedDate) {
+        params.date = formatDateLocal(selectedDate);
+      }
 
       // Add pagination parameters
       const skip = (page - 1) * itemsPerPage;
@@ -487,7 +479,7 @@ function TallySessions() {
           style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
         >
           <span className="material-icons">calendar_today</span>
-          {selectedDate ? `Filtered: ${formatDate(selectedDate.toISOString().split('T')[0], timezone)}` : 'Calendar'}
+          {selectedDate ? `Filtered: ${formatDate(formatDateLocal(selectedDate), timezone)}` : 'Calendar'}
         </button>
         {selectedDate && (
           <button className="btn btn-secondary" onClick={clearDateFilter}>

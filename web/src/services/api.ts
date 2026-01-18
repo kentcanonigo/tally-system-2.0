@@ -95,7 +95,7 @@ export const weightClassificationsApi = {
 
 // Tally Sessions API
 export const tallySessionsApi = {
-  getAll: (params?: { customer_id?: number; plant_id?: number; status?: string; skip?: number; limit?: number }) =>
+  getAll: (params?: { customer_id?: number; plant_id?: number; status?: string; date?: string; skip?: number; limit?: number }) =>
     api.get<TallySession[]>('/tally-sessions', { params }),
   getById: (id: number) => api.get<TallySession>(`/tally-sessions/${id}`),
   getDates: (params?: { customer_id?: number; plant_id?: number; status?: string }) =>

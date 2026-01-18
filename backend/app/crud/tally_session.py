@@ -36,7 +36,8 @@ def get_tally_sessions(
     limit: int = 100,
     customer_id: Optional[int] = None,
     plant_id: Optional[int] = None,
-    status: Optional[str] = None
+    status: Optional[str] = None,
+    date: Optional[date] = None
 ) -> List[TallySession]:
     query = db.query(TallySession)
     
@@ -46,6 +47,8 @@ def get_tally_sessions(
         query = query.filter(TallySession.plant_id == plant_id)
     if status:
         query = query.filter(TallySession.status == status)
+    if date:
+        query = query.filter(TallySession.date == date)
     
     return query.order_by(TallySession.date.desc()).offset(skip).limit(limit).all()
 
